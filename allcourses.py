@@ -140,16 +140,43 @@ lectures_df = init_lectures(course_code, default_topics)
 # -----------------------------
 # STUDENT MODE
 # -----------------------------
-if mode=="Student":
+if mode == "Student":
     st.subheader(f"🎓 {course} Student Access")
+
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name")
         matric = st.text_input("Matric Number")
         week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist())
-        submit_attendance = st.form_submit_button("Mark Attendance")
-    
-    if submit_attendance and name.strip() and matric.strip():
-        mark_attendance(course_code, name, matric, week)
+        attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)")
+        submit_attendance = st.form_submit_button("✅ Mark Attendance")
+
+    if submit_attendance:
+        # --- Input validation ---
+        if not name.strip() or not matric.strip():
+            st.warning("Please enter your full name and matric number.")
+        elif not attendance_code.strip():
+            st.warning("Please enter the attendance code for today.")
+        else:
+            # --- Time and code check ---
+            from datetime import datetime
+
+            # Set your lecture time window (adjust as needed)
+            start_time = datetime.strptime("09:00", "%H:%M").time()  # class starts
+            end_time   = datetime.strptime("11:00", "%H:%M").time()  # class ends
+            now        = datetime.now().time()
+
+            # Set your daily/weekly attendance code
+            valid_code = "BIO203-OK3"  # Change this each lecture
+
+            if not (start_time <= now <= end_time):
+                st.error("⏰ Attendance can only be marked between 9:00 AM and 11:00 AM.")
+            elif attendance_code != valid_code:
+                st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
+            else:
+                # --- Mark attendance (call your existing function) ---
+                mark_attendance(course_code, name, matric, week)
+                st.success(f"✅ Attendance recorded for {name} ({week}).")
+
 
     lecture_info = lectures_df[lectures_df["Week"]==week].iloc[0]
 
@@ -161,6 +188,24 @@ if mode=="Student":
     st.subheader(f"📖 {week}: {lecture_info['Topic']}")
     if brief.strip():
         st.write(f"**Lecture Brief:** {brief}")
+    brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
+    if brief.strip():
+        st.write(f"**Lecture Brief:** {brief}")
+
+# Add this right after
+    pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
+    if os.path.exists(pdf_path):
+        st.markdown("### 📘 Lecture Note")
+        with open(pdf_path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        st.download_button(
+            label="📥 Download Lecture PDF",
+            data=pdf_bytes,
+            file_name=f"{course_code}_{week}.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.info("Lecture note not uploaded yet.")
 
     # Assignment upload
     st.divider()
@@ -249,6 +294,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
