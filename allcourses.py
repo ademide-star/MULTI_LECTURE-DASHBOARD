@@ -117,7 +117,7 @@ def close_classwork_after_20min(course_code):
 # -----------------------------
 # LAYOUT
 # -----------------------------
-st.set_page_config(page_title="Multi-Course Dashboard", layout="wide")
+st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚",layout="wide")
 st.title("📚 Multi-Course Portal")
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
@@ -240,3 +240,4 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
