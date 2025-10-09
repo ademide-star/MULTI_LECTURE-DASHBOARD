@@ -76,7 +76,15 @@ def save_file(course_code, name, week, uploaded_file, submission_type):
     with open(save_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     st.success(f"✅ {submission_type.capitalize()} uploaded successfully as {uploaded_file.name}")
-
+# PDF and seminar helpers
+# -----------------------------
+def display_module_pdf(week):
+    pdf_path = f"{MODULES_DIR}/{week.replace(' ','_')}.pdf"
+    if os.path.exists(pdf_path):
+        with open(pdf_path,"rb") as f:
+            st.download_button(label=f"📥 Download {week} Module PDF", data=f, file_name=f"{week}_module.pdf", mime="application/pdf")
+    else:
+        st.info("Lecture PDF module not yet uploaded.")
 # -----------------------------
 # CLASSWORK CONTROL
 # -----------------------------
@@ -241,5 +249,6 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
