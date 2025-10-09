@@ -194,13 +194,20 @@ if mode == "Student":
 
 # Add this right after
     pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
+
     if os.path.exists(pdf_path):
         st.markdown("### 📘 Lecture Note")
-        with open(pdf_path, "rb") as pdf_file: pdf_bytes = pdf_file.read()
-            st.download_button(label="📥 Download Lecture PDF", data=pdf_bytes, file_name=f"{course_code}_{week}.pdf", mime="application/pdf"
-        )
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_bytes = pdf_file.read()
+        st.download_button(
+            label="📥 Download Lecture PDF",
+            data=pdf_bytes,
+            file_name=f"{course_code}_{week}.pdf",
+            mime="application/pdf"
+    )
     else:
         st.info("Lecture note not uploaded yet.")
+
 
     # Assignment upload
     st.divider()
@@ -289,6 +296,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
