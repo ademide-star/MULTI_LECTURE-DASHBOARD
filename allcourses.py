@@ -6,7 +6,27 @@ from datetime import datetime, date, timedelta
 import streamlit as st
 
 # --- REFRESH EVERY 30 SECONDS ---
-st_autorefresh = st.experimental_rerun  # for manual rerun
+# -----------------------------
+# 🌀 Smart Auto-Refresh (every 30 seconds)
+# -----------------------------
+from streamlit_autorefresh import st_autorefresh
+
+# Automatically refresh data every 30 seconds
+st_autorefresh(interval=30 * 1000, key="auto_refresh")
+
+st.markdown("""
+<style>
+/* Hide GitHub and Streamlit footer */
+footer {visibility: hidden;}
+#MainMenu {visibility: hidden;}
+.viewerBadge_container__1QSob,
+.viewerBadge_link__1S137,
+.viewerBadge_text__1JaDK {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # --- CONFIG ---
 st.set_page_config(page_title="Lecture Dashboard", layout="wide")
@@ -54,6 +74,28 @@ a[href*="github.com"] {
     </a>
 </div>
 """, unsafe_allow_html=True)
+import pandas as pd
+import os
+
+def get_student_scores(course_code, student_name):
+    """Fetch and combine student's attendance, classwork, seminar, and assignment scores."""
+    records = []
+
+    base_path = os.path.join("data", course_code)
+
+    for file_name in ["attendance.csv", "classwork.csv", "seminar.csv", "assignment.csv"]:
+        file_path = os.path.join(base_path, file_name)
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+            df = df[df["StudentName"].str.lower() == student_name.lower()]
+            df["Type"] = file_name.replace(".csv", "")
+            records.append(df)
+
+    if not records:
+        return pd.DataFrame()
+
+    combined = pd.concat(records, ignore_index=True)
+    return combined[["StudentName", "Week", "Type", "Score", "Status"]] if "Score" in combined.columns else combined
 
 # -----------------------------
 # CONFIGURATION
@@ -299,6 +341,9 @@ lectures_df = init_lectures(course_code, default_topics)
 # -----------------------------
 # STUDENT MODE
 # -----------------------------
+# -----------------------------
+# STUDENT MODE
+# -----------------------------
 if mode == "Student":
     st.subheader(f"🎓 {course} Student Access")
 
@@ -327,11 +372,10 @@ if mode == "Student":
                 st.stop()
 
             start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
-            end_time   = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
+            end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
             valid_code = COURSE_TIMINGS[course_code]["valid_code"]
-            now        = datetime.now().time()
+            now = datetime.now().time()
 
-            # --- Attendance timing and code checks ---
             if not (start_time <= now <= end_time):
                 st.error(f"⏰ Attendance for {course_code} is only open between "
                          f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
@@ -341,9 +385,23 @@ if mode == "Student":
                 st.info("✅ Attendance already marked. You can’t mark it again.")
             else:
                 mark_attendance(course_code, name, matric, week)
-                st.session_state["attended_week"] = week
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
 
+    # -----------------------------
+    # 🎯 Show Student Scores
+    # -----------------------------
+    st.divider()
+    st.subheader("📊 Your Continuous Assessment (CA) Summary")
+
+    student_scores = get_student_scores(course_code, name)
+
+    if student_scores.empty:
+        st.warning("No records found yet. Submit your classwork, seminar, or assignment to see updates.")
+    else:
+        st.dataframe(
+            student_scores.style.highlight_max(axis=0, color='lightgreen'),
+            use_container_width=True
+        )
 
     # --- Show lecture info once attendance is successful ---
     if "attended_week" in st.session_state:
@@ -545,6 +603,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
