@@ -309,9 +309,9 @@ if mode == "Student":
                     type=["pdf", "docx", "jpg", "png"], 
                     key=f"{course_code}_assignment"
                 )
-                if uploaded_assignment and st.button(f"Submit Assignment for {week}"):
-                    save_file(course_code, name, week, uploaded_assignment, "assignment")
-                    st.success("✅ Assignment uploaded successfully!")
+            if uploaded_assignment and st.button(f"Submit Assignment for {week}"):
+                save_file(course_code, name, week, uploaded_assignment, "assignment")
+                st.success("✅ Assignment uploaded successfully!")
             else:
                 st.info("Assignment not released yet.")
             # Show attached lecture note if available
@@ -409,6 +409,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
