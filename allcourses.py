@@ -201,7 +201,15 @@ def save_file(course_code, name, week, uploaded_file, file_type):
         updated.to_csv(record_file, index=False)
     else:
         record.to_csv(record_file, index=False)
-
+        
+def has_marked_attendance(course_code, week, student_name):
+    ATTENDANCE_FILE = get_file(course_code, "attendance")
+    if not os.path.exists(ATTENDANCE_FILE):
+        return False
+    df = pd.read_csv(ATTENDANCE_FILE)
+    # Normalize strings to avoid case issues
+    df["StudentName"] = df["StudentName"].str.strip().str.lower()
+    return student_name.strip().lower() in df.loc[df["Week"] == week, "StudentName"].values
 # -----------------------------
 # LAYOUT
 # -----------------------------
@@ -394,6 +402,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
