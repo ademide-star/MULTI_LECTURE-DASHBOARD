@@ -5,45 +5,28 @@ import re
 from datetime import datetime, date, timedelta
 from streamlit_autorefresh import st_autorefresh
 
-# -------------------------------------------------
-# 🧭 PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
-# -------------------------------------------------
+# ✅ Must come before any Streamlit output
 st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
 
-# -------------------------------------------------
-# 🔁 AUTO REFRESH EVERY 30 SECONDS
-# -------------------------------------------------
+# --- REFRESH EVERY 30 SECONDS ---
 st_autorefresh(interval=30 * 1000, key="auto_refresh")
 
-# -------------------------------------------------
-# 🎨 CUSTOM CSS – Hide footer, menu, and GitHub links
-# -------------------------------------------------
+# --- STYLES ---
 st.markdown("""
 <style>
 footer {visibility: hidden;}
 #MainMenu {visibility: hidden;}
 .viewerBadge_container__1QSob,
 .viewerBadge_link__1S137,
-.viewerBadge_text__1JaDK {
-    display: none !important;
-}
-
-/* Custom footer */
+.viewerBadge_text__1JaDK { display: none !important; }
 .custom-footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: #f0f2f6;
-    color: #333333;
-    text-align: center;
-    padding: 8px;
-    font-size: 15px;
-    font-weight: 500;
-    border-top: 1px solid #cccccc;
+    position: fixed; left: 0; bottom: 0;
+    width: 100%; background-color: #f0f2f6;
+    color: #333; text-align: center; padding: 8px;
+    font-size: 15px; font-weight: 500;
+    border-top: 1px solid #ccc;
 }
 </style>
-
 <div class="custom-footer">
     Developed by <b>Mide</b> | © 2025 | 
     <a href="https://example.com" target="_blank" style="text-decoration:none; color:#1f77b4;">
@@ -52,39 +35,40 @@ footer {visibility: hidden;}
 </div>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# 🧾 COURSE DATA
-# -------------------------------------------------
+# ✅ Define COURSES before use
 COURSES = {
     "MCB 221 – General Microbiology": "MCB221",
     "BCH 201 – General Biochemistry": "BCH201",
     "BIO 203 – General Physiology": "BIO203"
 }
 
-# -------------------------------------------------
-# 🧩 FUNCTIONS
-# -------------------------------------------------
-def init_lectures(course_code, default_topics):
-    """Initialize default lecture topics for each course."""
-    df = pd.DataFrame({
-        "Week": [f"Week {i+1}" for i in range(len(default_topics))],
-        "Course Code": [course_code] * len(default_topics),
-        "Topic": default_topics
-    })
-    return df
+# ✅ Define init_lectures before calling it
+def init_lectures(course_code, topics):
+    # You said you don’t want a table — but this function must exist for code to run
+    # It just creates a DataFrame with placeholder weeks (you won’t display it)
+    return pd.DataFrame({"Week": [f"Week {i+1}" for i in range(len(topics))], "Topic": topics})
 
-# -------------------------------------------------
-# 📘 DASHBOARD BODY
-# -------------------------------------------------
-st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education, Omu-Ijebu")
+# -----------------------------
+# LAYOUT
+# -----------------------------
+st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
 
-# Course selection
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
-
-# Mode selection
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
+
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
+
+# You can remove or ignore this part later if you don’t use lectures_df
+week = st.selectbox("Select Lecture Week:", lectures_df["Week"].tolist())
+
+# Example placeholder for your lecture brief area
+if mode == "Teacher/Admin":
+    st.text_area(f"Enter Lecture Brief for {course} - {week}")
+else:
+    st.info(f"Lecture brief for {course} - {week} not yet uploaded.")
 
 
 def get_student_scores(course_code, student_name):
@@ -600,6 +584,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
