@@ -248,11 +248,11 @@ if mode == "Student":
 
     # Attendance submission logic
     # --- Attendance Section ---
-if submit_attendance:
-    if not name.strip() or not matric.strip():
-        st.warning("Please enter your full name and matric number.")
-    elif not attendance_code.strip():
-        st.warning("Please enter the attendance code for today.")
+    if submit_attendance:
+        if not name.strip() or not matric.strip():
+            st.warning("Please enter your full name and matric number.")
+        elif not attendance_code.strip():
+            st.warning("Please enter the attendance code for today.")
     else:
         from datetime import datetime
 
@@ -420,6 +420,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
