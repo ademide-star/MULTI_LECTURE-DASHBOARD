@@ -5,13 +5,19 @@ import re
 from datetime import datetime, date, timedelta
 from streamlit_autorefresh import st_autorefresh
 
-# ✅ Must be at the top before any Streamlit code
+# -------------------------------------------------
+# 🧭 PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
+# -------------------------------------------------
 st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
 
-# --- REFRESH EVERY 30 SECONDS ---
+# -------------------------------------------------
+# 🔁 AUTO REFRESH EVERY 30 SECONDS
+# -------------------------------------------------
 st_autorefresh(interval=30 * 1000, key="auto_refresh")
 
-# --- CUSTOM STYLES ---
+# -------------------------------------------------
+# 🎨 CUSTOM CSS – Hide footer, menu, and GitHub links
+# -------------------------------------------------
 st.markdown("""
 <style>
 footer {visibility: hidden;}
@@ -21,12 +27,8 @@ footer {visibility: hidden;}
 .viewerBadge_text__1JaDK {
     display: none !important;
 }
-</style>
-""", unsafe_allow_html=True)
 
-# --- CUSTOM FOOTER ---
-st.markdown("""
-<style>
+/* Custom footer */
 .custom-footer {
     position: fixed;
     left: 0;
@@ -50,29 +52,40 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- PAGE BODY ---
-st.subheader("Department of Biological Sciences Sikiru Adetona College of Education Omu-Ijebu")
-st.title("📚 Multi-Course Portal")
-
-# Make sure COURSES and init_lectures are defined before use
-# Example:
+# -------------------------------------------------
+# 🧾 COURSE DATA
+# -------------------------------------------------
 COURSES = {
-    "Biochemistry (BIO203)": "BIO203",
-    "Anatomy & Physiology": "BIO205",
-    "Genetics": "BIO301",
+    "MCB 221 – General Microbiology": "MCB221",
+    "BCH 201 – General Biochemistry": "BCH201",
+    "BIO 203 – General Physiology": "BIO203"
 }
 
+# -------------------------------------------------
+# 🧩 FUNCTIONS
+# -------------------------------------------------
 def init_lectures(course_code, default_topics):
-    return pd.DataFrame({"Course Code": course_code, "Topics": default_topics})
+    """Initialize default lecture topics for each course."""
+    df = pd.DataFrame({
+        "Week": [f"Week {i+1}" for i in range(len(default_topics))],
+        "Course Code": [course_code] * len(default_topics),
+        "Topic": default_topics
+    })
+    return df
 
+# -------------------------------------------------
+# 📘 DASHBOARD BODY
+# -------------------------------------------------
+st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education, Omu-Ijebu")
+st.title("📚 Multi-Course Portal")
+
+# Course selection
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 
+# Mode selection
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-st.dataframe(lectures_df)
 
 def get_student_scores(course_code, student_name):
     """Fetch and combine student's attendance, classwork, seminar, and assignment scores."""
@@ -587,6 +600,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
