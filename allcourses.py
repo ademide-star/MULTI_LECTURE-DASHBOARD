@@ -74,6 +74,29 @@ a[href*="github.com"] {
     </a>
 </div>
 """, unsafe_allow_html=True)
+import os
+import pandas as pd
+
+data_dir = "data"
+os.makedirs(data_dir, exist_ok=True)
+
+files = {
+    "attendance_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Status", "Timestamp"],
+    "assignment_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "FilePath", "Score", "Timestamp"],
+    "classwork_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Score", "Timestamp"],
+    "seminar_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Topic", "Score", "Timestamp"],
+    "scores.csv": ["StudentName", "Matric", "CourseCode", "ClassworkAvg", "SeminarAvg", "AssignmentAvg", "TotalCA", "LastUpdated"]
+}
+
+for filename, headers in files.items():
+    file_path = os.path.join(data_dir, filename)
+    if not os.path.exists(file_path):
+        pd.DataFrame(columns=headers).to_csv(file_path, index=False)
+        print(f"✅ Created {file_path}")
+    else:
+        print(f"✔️ {file_path} already exists")
+
+
 import pandas as pd
 import os
 
@@ -586,6 +609,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
