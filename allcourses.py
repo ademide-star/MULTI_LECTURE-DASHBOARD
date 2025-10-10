@@ -178,6 +178,32 @@ def close_classwork_after_20min(course_code):
                 df.at[idx,"IsOpen"]=0
                 df.at[idx,"OpenTime"]=None
     df.to_csv(CLASSWORK_STATUS_FILE,index=False)
+def save_file(course_code, name, week, uploaded_file, file_type):
+    # Create directory structure
+    folder_path = os.path.join("submissions", course_code, file_type)
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Save uploaded file
+    file_path = os.path.join(folder_path, f"{name}_{week}_{uploaded_file.name}")
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    # Log record in CSV
+    record_file = os.path.join("submissions", f"{course_code}_submissions.csv")
+    record = pd.DataFrame([{
+        "Name": name,
+        "Week": week,
+        "FileName": uploaded_file.name,
+        "Type": file_type,
+        "Path": file_path
+    }])
+
+    if os.path.exists(record_file):
+        existing = pd.read_csv(record_file)
+        updated = pd.concat([existing, record], ignore_index=True)
+        updated.to_csv(record_file, index=False)
+    else:
+        record.to_csv(record_file, index=False)
 
 # -----------------------------
 # LAYOUT
@@ -200,8 +226,11 @@ import streamlit as st
 from datetime import datetime
 
 # Example placeholder paths
-MODULES_DIR = "modules"  # folder containing PDFs
-valid_code = "BIO203-OK3"  # change each lecture
+COURSES = {
+    "BIO203": {"valid_code": "BIO203-OK3", "start_time": "10:00", "end_time": "12:00", "module_dir": "modules_bio203"},
+    "BCH201": {"valid_code": "BCH201-XY7", "start_time": "02:00", "end_time": "O4:00", "module_dir": "modules_bch201"},
+    "MCB221": {"valid_code": "MCB221-ZT9", "start_time": "10:00", "end_time": "12:00", "module_dir": "modules_mcb221"},
+}
 
 # -----------------------------
 # STUDENT MODE
@@ -224,19 +253,18 @@ if mode == "Student":
         elif not attendance_code.strip():
             st.warning("Please enter the attendance code for today.")
         else:
-            start_time = datetime.strptime("10:00", "%H:%M").time()  # Start time
-            end_time = datetime.strptime("12:00", "%H:%M").time()    # End time
+            start_time = datetime.strptime(course_info["start_time"], "%H:%M").time()
+            end_time = datetime.strptime(course_info["end_time"], "%H:%M").time()
             now = datetime.now().time()
 
             if not (start_time <= now <= end_time):
-                st.error("⏰ Attendance can only be marked between 10:00 AM and 12:00 PM.")
-            elif attendance_code != valid_code:
-                st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
+                st.error(f"⏰ Attendance for {course_code} is only allowed between {course_info['start_time']} and {course_info['end_time']}.")
+            elif attendance_code != course_info["valid_code"]:
+                st.error("❌ Invalid attendance code.")
             else:
-                # Mark attendance and store attended week in session
                 mark_attendance(course_code, name, matric, week)
                 st.session_state["attended_week"] = week
-                st.success(f"✅ Attendance recorded for {name} ({week}).")
+                st.success(f"✅ Attendance recorded for {name} ({course_code}, {week}).")
 
     # --- Automatically show lecture info once attendance is successful ---
     if "attended_week" in st.session_state:
@@ -259,12 +287,24 @@ if mode == "Student":
             if brief.strip():
                 st.write(f"**Lecture Brief:** {brief}")
 
-            if classwork_text.strip():
-                st.write(f"**Classwork:** {classwork_text}")
+            if lecture_info["Classwork"].strip():
+                st.markdown("### 🧩 Classwork Questions")
+                questions = [q.strip() for q in lecture_info["Classwork"].split(";") if q.strip()]
+                with st.form("cw_form"):
+                    answers = [st.text_input(f"Q{i+1}: {q}") for i,q in enumerate(questions)]
+                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(week))
+                    if submit_cw: save_classwork(name, matric, week, answers)
+            else: st.info("Classwork not yet released.")
 
             if assignment.strip():
-                st.write(f"**Assignment:** {assignment}")
-
+                st.markdown(
+                    f"""<div style='background-color:#f0f9ff;padding:12px;border-left:5px solid #0078d4;border-radius:8px;margin-top:10px;'>
+                        <h4>📘 <b>Assignment for {week}</b></h4> 
+                        <p style='font-size:16px;color:#333;'>{assignment}</p>
+                    </div>
+                """,
+                unsafe_allow_html=True
+                )
             # Show attached lecture note if available
             pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
 
@@ -360,6 +400,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
