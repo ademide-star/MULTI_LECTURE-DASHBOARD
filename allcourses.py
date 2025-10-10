@@ -219,19 +219,6 @@ mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 # Initialize lectures for each course
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
 lectures_df = init_lectures(course_code, default_topics)
-
-import os
-import pandas as pd
-import streamlit as st
-from datetime import datetime
-
-# Example placeholder paths
-COURSES = {
-    "BIO203": {"valid_code": "BIO203-OK3", "start_time": "10:00", "end_time": "14:00", "module_dir": "modules_bio203"},
-    "BCH201": {"valid_code": "BCH201-XY7", "start_time": "02:00", "end_time": "16:00", "module_dir": "modules_bch201"},
-    "MCB221": {"valid_code": "MCB221-ZT9", "start_time": "10:00", "end_time": "14:00", "module_dir": "modules_mcb221"},
-}
-
 # -----------------------------
 # STUDENT MODE
 # -----------------------------
@@ -258,9 +245,9 @@ if mode == "Student":
 
         # Define course-specific times
         COURSE_TIMINGS = {
-            "BIO203": {"start": "10:00", "end": "14:00"},
-            "BCH201": {"start": "14:00", "end": "16:00"},
-            "MCB221": {"start": "10:00", "end": "14:00"},
+            "BIO203": {"valid_code": "BIO203-ZT7","start": "10:00", "end": "14:00"},
+            "BCH201": {"valid_code": "BCH201-ZT8","start": "14:00", "end": "16:00"},
+            "MCB221": {"valid_code": "MCB221-ZT9","start": "10:00", "end": "14:00"},
         }
 
         # Ensure the course exists
@@ -420,6 +407,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
