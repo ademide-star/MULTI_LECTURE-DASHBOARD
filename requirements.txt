@@ -1,12 +1,24 @@
-streamlit
-pandas
+# Core app framework
+streamlit>=1.37.0
+
+# Data handling
+pandas>=2.0.0
+numpy>=1.26.0
+
+# File operations
+openpyxl>=3.1.2
+python-docx>=1.0.1
+reportlab>=4.0.9
+Pillow>=10.0.0
+
+# Charts and visualization
+matplotlib>=3.8.0
+
+# Auto-refresh and UI helpers
+streamlit-autorefresh>=0.0.3
+
+# Optional performance and compatibility tools
+requests
 datetime
-os
-python-dateutil
-numpy
-matplotlib
-openpyxl     
-streamlit-autorefresh
-pathlib
-
-
+runtime.txt
+python-3.10
