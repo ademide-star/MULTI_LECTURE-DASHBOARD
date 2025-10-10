@@ -289,16 +289,6 @@ if mode == "Student":
     if uploaded_assignment and st.button(f"Submit Assignment for {week}"):
         save_file(course_code, name, week, uploaded_assignment, "assignment")
 
-    # Classwork
-    if classwork_text.strip():
-        st.divider()
-        st.subheader("🧩 Classwork Questions")
-        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-        with st.form(f"{course_code}_cw_form"):
-            answers = [st.text_input(f"Q{i+1}: {q}") for i,q in enumerate(questions)]
-            submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
-            if submit_cw: save_classwork(course_code, name, matric, week, answers)
-
     # Drawing Upload
     st.divider()
     st.subheader("🖌️ Drawing Upload")
@@ -370,6 +360,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
