@@ -301,19 +301,6 @@ if mode == "Student":
             else:
                 st.info("Assignment not released yet.")
 
-                # File upload for assignment
-                st.divider()
-                st.subheader("📄 Assignment Upload")
-                uploaded_assignment = st.file_uploader(
-                    f"Upload Assignment for {week}", 
-                    type=["pdf", "docx", "jpg", "png"], 
-                    key=f"{course_code}_assignment"
-                )
-            if uploaded_assignment and st.button(f"Submit Assignment for {week}"):
-                save_file(course_code, name, week, uploaded_assignment, "assignment")
-                st.success("✅ Assignment uploaded successfully!")
-            else:
-                st.info("Assignment not released yet.")
             # Show attached lecture note if available
             pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
 
@@ -409,6 +396,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
