@@ -39,7 +39,17 @@ def init_lectures(course_code, default_weeks):
     df["Assignment"] = df["Assignment"].fillna("")
     df["Classwork"] = df["Classwork"].fillna("")
     return df
-
+    
+def display_seminar_upload(name, matric):
+    today = date.today()
+    if today >= date(today.year,10,20):
+        seminar_file = st.file_uploader("Upload Seminar PPT", type=["ppt","pptx"])
+        if seminar_file:
+            save_seminar(name, matric, seminar_file)
+        st.info("Seminar presentations will hold in the **3rd week of November**.")
+    else:
+        st.warning("Seminar submissions will open mid-semester.")
+        
 def mark_attendance(course_code, name, matric, week):
     ATTENDANCE_FILE = get_file(course_code, "attendance")
     df = pd.read_csv(ATTENDANCE_FILE) if os.path.exists(ATTENDANCE_FILE) else pd.DataFrame(columns=["Timestamp","Matric Number","Name","Week"])
@@ -76,6 +86,7 @@ def save_file(course_code, name, week, uploaded_file, submission_type):
     with open(save_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     st.success(f"✅ {submission_type.capitalize()} uploaded successfully as {uploaded_file.name}")
+
 # PDF and seminar helpers
 # -----------------------------
 def display_module_pdf(week):
@@ -229,6 +240,7 @@ if mode == "Student":
     # Drawing Upload
     st.divider()
     st.subheader("🖌️ Drawing Upload")
+    student_name = st.text_input("Enter your full name", key="student_name_input")
     uploaded_drawing = st.file_uploader(f"Upload Drawing for {week}", type=["jpg","jpeg","png","pdf"], key=f"{course_code}_drawing")
     if uploaded_drawing and st.button(f"Submit Drawing for {week}"):
         save_file(course_code, name, week, uploaded_drawing, "drawing")
@@ -296,6 +308,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
