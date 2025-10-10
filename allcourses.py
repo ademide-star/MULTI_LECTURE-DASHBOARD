@@ -218,8 +218,8 @@ if mode == "Student":
             from datetime import datetime
 
             # Set your lecture time window (adjust as needed)
-            start_time = datetime.strptime("09:00", "%H:%M").time()  # class starts
-            end_time   = datetime.strptime("11:00", "%H:%M").time()  # class ends
+            start_time = datetime.strptime("10:00", "%H:%M").time()  # class starts
+            end_time   = datetime.strptime("12:00", "%H:%M").time()  # class ends
             now        = datetime.now().time()
 
             # Set your daily/weekly attendance code
@@ -233,7 +233,7 @@ if mode == "Student":
                 # --- Mark attendance (call your existing function) ---
                 mark_attendance(course_code, name, matric, week)
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
-                st.session_state["attended_week"] = week if marked else None
+               
 
 import pandas as pd
 import streamlit as st
@@ -380,6 +380,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
