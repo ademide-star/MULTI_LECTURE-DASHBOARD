@@ -232,7 +232,9 @@ if mode == "Student":
         week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist())
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)")
         submit_attendance = st.form_submit_button("✅ Mark Attendance")
-
+    if mark and name.strip() and matric.strip():
+        marked = mark_attendance(name, matric, week)
+        st.session_state["attended_week"] = week if marked else None
     # Attendance submission logic
     # --- Attendance Section ---
     if submit_attendance:
@@ -260,8 +262,6 @@ if mode == "Student":
         end_time   = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
         now        = datetime.now().time()
 
-        valid_code = "BIO203-OK3"  # update dynamically if needed
-
         if not (start_time <= now <= end_time):
             st.error(f"⏰ Attendance for {course_code} is only open between {start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
         elif attendance_code != valid_code:
@@ -270,7 +270,6 @@ if mode == "Student":
             mark_attendance(course_code, name, matric, week)
             st.session_state["attended_week"] = week
             st.success(f"✅ Attendance recorded for {name} ({week}).")
-
 
     # --- Automatically show lecture info once attendance is successful ---
     if "attended_week" in st.session_state:
@@ -407,6 +406,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
