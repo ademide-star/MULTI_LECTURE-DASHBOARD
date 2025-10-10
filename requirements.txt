@@ -10,6 +10,8 @@ openpyxl>=3.1.2
 python-docx>=1.0.1
 reportlab>=4.0.9
 Pillow>=10.0.0
+scikit-learn>=1.4.2,<2
+imbalanced-learn==0.14.0
 
 # Charts and visualization
 matplotlib>=3.8.0
@@ -22,3 +24,4 @@ requests
 datetime
 runtime.txt
 python-3.10
+
