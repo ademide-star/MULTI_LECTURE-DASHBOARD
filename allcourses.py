@@ -28,9 +28,6 @@ footer {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 
-# --- CONFIG ---
-st.set_page_config(page_title="Lecture Dashboard", layout="wide")
-
 
 # Hide default Streamlit elements & GitHub link, then add custom footer
 st.markdown("""
@@ -609,6 +606,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
