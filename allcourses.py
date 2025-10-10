@@ -3,6 +3,52 @@ import pandas as pd
 import os
 import re
 from datetime import datetime, date, timedelta
+import streamlit as st
+
+
+
+# Hide default Streamlit elements & GitHub link, then add custom footer
+st.markdown("""
+<style>
+/* Hide Streamlit default UI */
+footer {visibility: hidden;}
+#MainMenu {visibility: hidden;}
+
+/* Hide GitHub repo link/button */
+a[href*="github.com"] {
+    display: none !important;
+}
+
+/* Hide viewer badge */
+.viewerBadge_container__1QSob,
+.viewerBadge_link__1S137,
+.viewerBadge_text__1JaDK {
+    display: none !important;
+}
+
+/* Custom footer */
+.custom-footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #f0f2f6;
+    color: #333333;
+    text-align: center;
+    padding: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    border-top: 1px solid #cccccc;
+}
+</style>
+
+<div class="custom-footer">
+    Developed by <b>Mide</b> | © 2025 | 
+    <a href="https://example.com" target="_blank" style="text-decoration:none; color:#1f77b4;">
+        Visit our website
+    </a>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # CONFIGURATION
@@ -187,11 +233,15 @@ if mode == "Student":
                 # --- Mark attendance (call your existing function) ---
                 mark_attendance(course_code, name, matric, week)
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
-
+                st.session_state["attended_week"] = week if marked else None
 
     lecture_info = lectures_df[lectures_df["Week"]==week].iloc[0]
 
     # Safely get lecture brief, assignment, classwork
+    if "attended_week" in st.session_state:
+        week = st.session_state["attended_week"]
+        st.success(f"Access granted for {week}")
+    
     brief = str(lecture_info["Brief"])
     assignment = str(lecture_info["Assignment"])
     classwork_text = str(lecture_info["Classwork"])
@@ -308,6 +358,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
