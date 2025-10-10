@@ -75,6 +75,20 @@ a[href*="github.com"] {
 
 import pandas as pd
 import os
+# -----------------------------
+# LAYOUT
+# -----------------------------
+st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
+st.subheader("Department of Biological Sciences Sikiru Adetona College of Education Omu-Ijebu")
+st.title("📚 Multi-Course Portal")
+course = st.selectbox("Select Course:", list(COURSES.keys()))
+course_code = COURSES[course]
+
+mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
+
+# Initialize lectures for each course
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
+lectures_df = init_lectures(course_code, default_topics)
 
 def get_student_scores(course_code, student_name):
     """Fetch and combine student's attendance, classwork, seminar, and assignment scores."""
@@ -341,22 +355,6 @@ def get_student_scores(course_code, matric):
             results[stype] = []
 
     return results
-
-
-# -----------------------------
-# LAYOUT
-# -----------------------------
-st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
-st.subheader("Department of Biological Sciences Sikiru Adetona College of Education Omu-Ijebu")
-st.title("📚 Multi-Course Portal")
-course = st.selectbox("Select Course:", list(COURSES.keys()))
-course_code = COURSES[course]
-
-mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
-
-# Initialize lectures for each course
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
-lectures_df = init_lectures(course_code, default_topics)
 # ============================
 # 🎓 STUDENT MODE
 # ============================
@@ -605,6 +603,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
