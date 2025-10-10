@@ -5,6 +5,11 @@ import re
 from datetime import datetime, date, timedelta
 import streamlit as st
 
+# --- REFRESH EVERY 30 SECONDS ---
+st_autorefresh = st.experimental_rerun  # for manual rerun
+
+# --- CONFIG ---
+st.set_page_config(page_title="Lecture Dashboard", layout="wide")
 
 
 # Hide default Streamlit elements & GitHub link, then add custom footer
@@ -222,6 +227,60 @@ def mark_attendance(course_code, name, matric, week):
     df.to_csv(ATTENDANCE_FILE, index=False)
     return True
 
+import os
+import pandas as pd
+from datetime import datetime
+
+# ============================
+# FILE HELPERS
+# ============================
+def get_score_file(course_code, score_type):
+    folder_path = os.path.join("submissions", course_code)
+    os.makedirs(folder_path, exist_ok=True)
+    return os.path.join(folder_path, f"{score_type}_scores.csv")
+
+# --- Record or Update Student Score ---
+def record_score(course_code, score_type, name, matric, week, score, remarks=""):
+    score_file = get_score_file(course_code, score_type)
+    df = pd.read_csv(score_file) if os.path.exists(score_file) else pd.DataFrame(columns=["StudentName", "Matric", "Week", "Score", "Remarks"])
+
+    # Check existing entry
+    existing = (
+        (df["Matric"].astype(str).str.lower() == matric.strip().lower()) &
+        (df["Week"] == week)
+    )
+    if existing.any():
+        df.loc[existing, ["Score", "Remarks"]] = [score, remarks]
+    else:
+        new_row = {
+            "StudentName": name.strip(),
+            "Matric": matric.strip(),
+            "Week": week,
+            "Score": score,
+            "Remarks": remarks,
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+    df.to_csv(score_file, index=False)
+    st.success(f"✅ {score_type.capitalize()} score updated for {name} ({week})")
+
+# --- Cached retrieval (auto-refreshable) ---
+@st.cache_data(ttl=30)  # cache refreshes every 30 seconds
+def get_student_scores(course_code, matric):
+    score_types = ["classwork", "seminar", "assignment"]
+    results = {}
+
+    for stype in score_types:
+        f = get_score_file(course_code, stype)
+        if os.path.exists(f):
+            df = pd.read_csv(f)
+            df = df[df["Matric"].astype(str).str.lower() == matric.strip().lower()]
+            results[stype] = df[["Week", "Score"]].to_dict("records")
+        else:
+            results[stype] = []
+
+    return results
+
 
 # -----------------------------
 # LAYOUT
@@ -290,6 +349,48 @@ if mode == "Student":
     if "attended_week" in st.session_state:
         week = st.session_state["attended_week"]
         lecture_row = lectures_df[lectures_df["Week"] == week]
+   # ============================
+# STUDENT SCORE VIEW
+# ============================
+        week = st.session_state["attended_week"]
+
+        st.markdown("---")
+        st.subheader("📊 Continuous Assessment Summary (Live)")
+
+# Auto-refresh every 30 seconds
+        st.caption("🔄 This section updates automatically every 30 seconds.")
+        st_autorefresh_interval = st.experimental_rerun  # allow rerun manually if needed
+
+# Load live scores
+        scores = get_student_scores(course_code, matric)
+
+# Display scores
+        for stype, data in scores.items():
+            if data:
+                st.write(f"**{stype.capitalize()} Scores:**")
+                for entry in data:
+                    st.write(f"- {entry['Week']}: **{entry['Score']} marks**")
+            else:
+                st.info(f"No {stype} scores yet.")
+
+# Calculate weighted total
+        cw_total = sum(d["Score"] for d in scores["classwork"]) / max(len(scores["classwork"]), 1)
+        sem_total = sum(d["Score"] for d in scores["seminar"]) / max(len(scores["seminar"]), 1)
+        ass_total = sum(d["Score"] for d in scores["assignment"]) / max(len(scores["assignment"]), 1)
+
+        total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
+
+        st.markdown(f"""
+        <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
+        <h4>📘 <b>Performance Summary</b></h4>
+        <ul>
+        <li>🧩 Classwork Avg: <b>{cw_total:.1f}%</b> (30%)</li>
+        <li>🎤 Seminar Avg: <b>{sem_total:.1f}%</b> (20%)</li>
+        <li>📝 Assignment Avg: <b>{ass_total:.1f}%</b> (50%)</li>
+    </ul>
+    <h3>💯 Total Continuous Assessment (CA): <b>{total_CA:.1f}%</b></h3>
+</div>
+""", unsafe_allow_html=True)
 
         if lecture_row.empty:
             st.error(f"No lecture data found for {week}.")
@@ -419,6 +520,32 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
+# ============================
+# ADMIN SCORE ENTRY
+# ============================
+st.divider()
+st.subheader("🏫 Record / Update Student Scores")
+
+name = st.text_input("Student Name")
+matric = st.text_input("Matric Number")
+week = st.selectbox("Select Week", lectures_df["Week"].tolist())
+score = st.number_input("Enter Score (0–100)", 0, 100, 0)
+remarks = st.text_input("Remarks (optional)")
+score_type = st.radio("Select Assessment Type", ["classwork", "seminar", "assignment"])
+submit_score = st.button("💾 Save / Update Score")
+
+if submit_score:
+    if not name or not matric:
+        st.warning("Please enter student name and matric number.")
+    else:
+        record_score(course_code, score_type, name, matric, week, score, remarks)
+        st.cache_data.clear()  # 🔄 instantly update student view
+
+if st.button("🔁 Refresh Scores Now"):
+    st.cache_data.clear()
+    st.experimental_rerun()
+
 
 
 
