@@ -245,9 +245,9 @@ if mode == "Student":
             st.warning("Please enter the attendance code for today.")
         else:
             COURSE_TIMINGS = {
-                "BIO203": {"valid_code": "BIO203-ZT7","start": "10:00", "end": "14:00"},
-                "BCH201": {"valid_code": "BCH201-ZT8","start": "14:00", "end": "16:00"},
-                "MCB221": {"valid_code": "MCB221-ZT9","start": "10:00", "end": "14:00"},
+                "BIO203": {"valid_code": "BIO203-ZT7", "start": "10:00", "end": "14:00"},
+                "BCH201": {"valid_code": "BCH201-ZT8", "start": "14:00", "end": "16:00"},
+                "MCB221": {"valid_code": "MCB221-ZT9", "start": "10:00", "end": "14:00"},
             }
 
             if course_code not in COURSE_TIMINGS:
@@ -259,20 +259,19 @@ if mode == "Student":
             valid_code = COURSE_TIMINGS[course_code]["valid_code"]
             now        = datetime.now().time()
 
+            # --- Attendance timing and code checks ---
             if not (start_time <= now <= end_time):
                 st.error(f"⏰ Attendance for {course_code} is only open between "
                          f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
             elif attendance_code != valid_code:
                 st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-             if not name.strip() or not matric.strip():
-                st.warning("Please enter your full name.")
-            elif has_marked_attendance(course_code, week, student_name):
-                st.info("✅ Attendance already marked. You can’t mark it again.")elif has_marked_attendance(course_code, week, student_name):    
+            elif has_marked_attendance(course_code, week, name):
+                st.info("✅ Attendance already marked. You can’t mark it again.")
             else:
                 mark_attendance(course_code, name, matric, week)
                 st.session_state["attended_week"] = week
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
-                st.info("✅ Attendance already marked. You can’t mark it again.")
+
 
     # --- Show lecture info once attendance is successful ---
     if "attended_week" in st.session_state:
@@ -407,6 +406,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
