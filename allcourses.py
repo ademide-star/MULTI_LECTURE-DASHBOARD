@@ -338,16 +338,15 @@ mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 # Initialize lectures for each course
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
 lectures_df = init_lectures(course_code, default_topics)
-# -----------------------------
-# STUDENT MODE
-# -----------------------------
-# -----------------------------
-# STUDENT MODE
-# -----------------------------
+# ============================
+# 🎓 STUDENT MODE
+# ============================
 if mode == "Student":
     st.subheader(f"🎓 {course} Student Access")
 
-    # Attendance form
+    # -----------------------------
+    # ATTENDANCE FORM
+    # -----------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name")
         matric = st.text_input("Matric Number")
@@ -376,6 +375,7 @@ if mode == "Student":
             valid_code = COURSE_TIMINGS[course_code]["valid_code"]
             now = datetime.now().time()
 
+            # Attendance validation
             if not (start_time <= now <= end_time):
                 st.error(f"⏰ Attendance for {course_code} is only open between "
                          f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
@@ -385,70 +385,53 @@ if mode == "Student":
                 st.info("✅ Attendance already marked. You can’t mark it again.")
             else:
                 mark_attendance(course_code, name, matric, week)
+                st.session_state["attended_week"] = week
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
 
     # -----------------------------
-    # 🎯 Show Student Scores
+    # 📊 STUDENT PERFORMANCE SECTION
     # -----------------------------
     st.divider()
-    st.subheader("📊 Your Continuous Assessment (CA) Summary")
+    st.subheader("📈 Your Continuous Assessment (CA) Summary")
 
-    student_scores = get_student_scores(course_code, name)
+    # Load student scores (from a CSV or function)
+    scores_file = os.path.join("scores", f"{course_code}_scores.csv")
 
-    if student_scores.empty:
-        st.warning("No records found yet. Submit your classwork, seminar, or assignment to see updates.")
+    if os.path.exists(scores_file):
+        df_scores = pd.read_csv(scores_file)
+
+        student_scores = df_scores[
+            (df_scores["StudentName"].str.lower() == name.strip().lower()) &
+            (df_scores["MatricNo"].str.lower() == matric.strip().lower())
+        ]
+
+        if not student_scores.empty:
+            # Calculate weighted CA
+            cw_total = student_scores["ClassworkScore"].mean() if "ClassworkScore" in student_scores else 0
+            sem_total = student_scores["SeminarScore"].mean() if "SeminarScore" in student_scores else 0
+            ass_total = student_scores["AssignmentScore"].mean() if "AssignmentScore" in student_scores else 0
+
+            total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
+
+            st.dataframe(student_scores[["Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]],
+                         use_container_width=True)
+
+            st.markdown(f"""
+            <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
+                <h4>📘 <b>Performance Summary</b></h4>
+                <ul>
+                    <li>🧩 Classwork Avg: <b>{cw_total:.1f}%</b> (30%)</li>
+                    <li>🎤 Seminar Avg: <b>{sem_total:.1f}%</b> (20%)</li>
+                    <li>📝 Assignment Avg: <b>{ass_total:.1f}%</b> (50%)</li>
+                </ul>
+                <h3>💯 Total Continuous Assessment (CA): <b>{total_CA:.1f}%</b></h3>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No scores found yet. Participate in classwork, seminar, or assignments.")
     else:
-        st.dataframe(
-            student_scores.style.highlight_max(axis=0, color='lightgreen'),
-            use_container_width=True
-        )
+        st.warning("📁 Scores file not yet available for this course.")
 
-    # --- Show lecture info once attendance is successful ---
-    if "attended_week" in st.session_state:
-        week = st.session_state["attended_week"]
-        lecture_row = lectures_df[lectures_df["Week"] == week]
-   # ============================
-# STUDENT SCORE VIEW
-# ============================
-        week = st.session_state["attended_week"]
-
-        st.markdown("---")
-        st.subheader("📊 Continuous Assessment Summary (Live)")
-
-# Auto-refresh every 30 seconds
-        st.caption("🔄 This section updates automatically every 30 seconds.")
-        st_autorefresh_interval = st.experimental_rerun  # allow rerun manually if needed
-
-# Load live scores
-        scores = get_student_scores(course_code, matric)
-
-# Display scores
-        for stype, data in scores.items():
-            if data:
-                st.write(f"**{stype.capitalize()} Scores:**")
-                for entry in data:
-                    st.write(f"- {entry['Week']}: **{entry['Score']} marks**")
-            else:
-                st.info(f"No {stype} scores yet.")
-
-# Calculate weighted total
-        cw_total = sum(d["Score"] for d in scores["classwork"]) / max(len(scores["classwork"]), 1)
-        sem_total = sum(d["Score"] for d in scores["seminar"]) / max(len(scores["seminar"]), 1)
-        ass_total = sum(d["Score"] for d in scores["assignment"]) / max(len(scores["assignment"]), 1)
-
-        total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
-
-        st.markdown(f"""
-        <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
-        <h4>📘 <b>Performance Summary</b></h4>
-        <ul>
-        <li>🧩 Classwork Avg: <b>{cw_total:.1f}%</b> (30%)</li>
-        <li>🎤 Seminar Avg: <b>{sem_total:.1f}%</b> (20%)</li>
-        <li>📝 Assignment Avg: <b>{ass_total:.1f}%</b> (50%)</li>
-    </ul>
-    <h3>💯 Total Continuous Assessment (CA): <b>{total_CA:.1f}%</b></h3>
-</div>
-""", unsafe_allow_html=True)
 
         if lecture_row.empty:
             st.error(f"No lecture data found for {week}.")
@@ -603,6 +586,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
