@@ -194,12 +194,22 @@ mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
 lectures_df = init_lectures(course_code, default_topics)
 
+import os
+import pandas as pd
+import streamlit as st
+from datetime import datetime
+
+# Example placeholder paths
+MODULES_DIR = "modules"  # folder containing PDFs
+valid_code = "BIO203-OK3"  # change each lecture
+
 # -----------------------------
 # STUDENT MODE
 # -----------------------------
 if mode == "Student":
     st.subheader(f"🎓 {course} Student Access")
 
+    # Attendance form
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name")
         matric = st.text_input("Matric Number")
@@ -207,90 +217,70 @@ if mode == "Student":
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)")
         submit_attendance = st.form_submit_button("✅ Mark Attendance")
 
+    # Attendance submission logic
     if submit_attendance:
-        # --- Input validation ---
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
         elif not attendance_code.strip():
             st.warning("Please enter the attendance code for today.")
         else:
-            # --- Time and code check ---
-            from datetime import datetime
-
-            # Set your lecture time window (adjust as needed)
-            start_time = datetime.strptime("10:00", "%H:%M").time()  # class starts
-            end_time   = datetime.strptime("12:00", "%H:%M").time()  # class ends
-            now        = datetime.now().time()
-
-            # Set your daily/weekly attendance code
-            valid_code = "BIO203-OK3"  # Change this each lecture
+            start_time = datetime.strptime("10:00", "%H:%M").time()  # Start time
+            end_time = datetime.strptime("12:00", "%H:%M").time()    # End time
+            now = datetime.now().time()
 
             if not (start_time <= now <= end_time):
-                st.error("⏰ Attendance can only be marked between 9:00 AM and 11:00 AM.")
+                st.error("⏰ Attendance can only be marked between 10:00 AM and 12:00 PM.")
             elif attendance_code != valid_code:
                 st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
             else:
-                # --- Mark attendance (call your existing function) ---
+                # Mark attendance and store attended week in session
                 mark_attendance(course_code, name, matric, week)
+                st.session_state["attended_week"] = week
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
-               
 
-import pandas as pd
-import streamlit as st
+    # --- Automatically show lecture info once attendance is successful ---
+    if "attended_week" in st.session_state:
+        week = st.session_state["attended_week"]
+        lecture_row = lectures_df[lectures_df["Week"] == week]
 
-# Example: safely retrieve lecture info
-if "attended_week" in st.session_state:
-    week = st.session_state["attended_week"]
-    st.success(f"Access granted for {week}")
-else:
-    st.error("No week selected or attendance not recorded.")
-    st.stop()
+        if lecture_row.empty:
+            st.error(f"No lecture data found for {week}.")
+        else:
+            lecture_info = lecture_row.iloc[0]
+            st.markdown("---")
+            st.subheader(f"📖 {week}: {lecture_info['Topic']}")
 
-# Safely locate the lecture row
-lecture_row = lectures_df[lectures_df["Week"] == week]
+            # Safely extract content
+            brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
+            assignment = str(lecture_info["Assignment"]) if pd.notnull(lecture_info["Assignment"]) else ""
+            classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
 
-if lecture_row.empty:
-    st.error(f"No lecture data found for {week}.")
-    st.stop()
+            # Display sections
+            if brief.strip():
+                st.write(f"**Lecture Brief:** {brief}")
 
-lecture_info = lecture_row.iloc[0]
+            if classwork_text.strip():
+                st.write(f"**Classwork:** {classwork_text}")
 
-# Display lecture topic
-st.subheader(f"📖 {week}: {lecture_info['Topic']}")
+            if assignment.strip():
+                st.write(f"**Assignment:** {assignment}")
 
-# Safely extract fields
-brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
-assignment = str(lecture_info["Assignment"]) if pd.notnull(lecture_info["Assignment"]) else ""
-classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
+            # Show attached lecture note if available
+            pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
 
-# Show lecture brief
-if brief.strip():
-    st.write(f"**Lecture Brief:** {brief}")
-
-# Optionally display classwork or assignment
-if classwork_text.strip():
-    st.write(f"**Classwork:** {classwork_text}")
-
-if assignment.strip():
-    st.write(f"**Assignment:** {assignment}")
-
-
-# Add this right after
-    pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
-
-    if os.path.exists(pdf_path):
-        st.markdown("### 📘 Lecture Note")
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_bytes = pdf_file.read()
-        st.download_button(
-            label="📥 Download Lecture PDF",
-            data=pdf_bytes,
-            file_name=f"{course_code}_{week}.pdf",
-            mime="application/pdf"
-    )
-    else:
-        st.info("Lecture note not uploaded yet.")
-
+            if os.path.exists(pdf_path):
+                st.markdown("### 📘 Lecture Note")
+                with open(pdf_path, "rb") as pdf_file:
+                    pdf_bytes = pdf_file.read()
+                st.download_button(
+                    label="📥 Download Lecture PDF",
+                    data=pdf_bytes,
+                    file_name=f"{course_code}_{week}.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.info("Lecture note not uploaded yet.")
+                st.rerun()
 
     # Assignment upload
     st.divider()
@@ -380,6 +370,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
