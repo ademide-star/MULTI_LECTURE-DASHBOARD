@@ -288,7 +288,7 @@ if mode == "Student":
                 questions = [q.strip() for q in lecture_info["Classwork"].split(";") if q.strip()]
                 with st.form("cw_form"):
                     answers = [st.text_input(f"Q{i+1}: {q}") for i,q in enumerate(questions)]
-                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(week))
+                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
                     if submit_cw: save_classwork(name, matric, week, answers)
             else: st.info("Classwork not yet released.")
 
@@ -394,6 +394,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
