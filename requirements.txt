@@ -1,29 +1,27 @@
-# Core
-streamlit==1.26.0
-pandas==2.1.1
-numpy==1.26.0
+# --- Core ---
+streamlit==1.38.0
+pandas==2.2.2
+numpy==1.26.4
 
-# File handling and uploads
-python-multipart==0.0.6
+# --- File handling and uploads ---
+python-multipart==0.0.9
 python-docx==0.8.11
-Pillow==10.0.0
+Pillow==10.4.0
 
-# Data analysis & ML dependencies
+# --- Data analysis & ML dependencies ---
 scikit-learn==1.4.2
 imbalanced-learn==0.14.0
 
-# Visualization
-matplotlib==3.8.1
-seaborn==0.12.2
+# --- Visualization ---
+matplotlib==3.9.2
+seaborn==0.13.2
 
-# Auto-refresh / utilities
-streamlit-autorefresh==0.1.1
+# --- Auto-refresh / utilities ---
+streamlit-autorefresh==1.0.1
 markdown-it-py==4.0.0
 mdurl==0.1.2
-pygments==2.19.2
-rich==14.2.0
+pygments==2.19.1
+rich==13.9.2
 
-# Optional: datetime handling (if needed in your code)
-python-dateutil==2.9.4
-
-
+# --- Optional: datetime handling (if needed) ---
+python-dateutil==2.9.0.post0
