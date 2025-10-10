@@ -227,9 +227,9 @@ from datetime import datetime
 
 # Example placeholder paths
 COURSES = {
-    "BIO203": {"valid_code": "BIO203-OK3", "start_time": "10:00", "end_time": "02:00", "module_dir": "modules_bio203"},
-    "BCH201": {"valid_code": "BCH201-XY7", "start_time": "02:00", "end_time": "O4:00", "module_dir": "modules_bch201"},
-    "MCB221": {"valid_code": "MCB221-ZT9", "start_time": "10:00", "end_time": "02:00", "module_dir": "modules_mcb221"},
+    "BIO203": {"valid_code": "BIO203-OK3", "start_time": "10:00", "end_time": "14:00", "module_dir": "modules_bio203"},
+    "BCH201": {"valid_code": "BCH201-XY7", "start_time": "02:00", "end_time": "16:00", "module_dir": "modules_bch201"},
+    "MCB221": {"valid_code": "MCB221-ZT9", "start_time": "10:00", "end_time": "14:00", "module_dir": "modules_mcb221"},
 }
 
 # -----------------------------
@@ -258,9 +258,9 @@ if submit_attendance:
 
         # Define course-specific times
         COURSE_TIMINGS = {
-            "BIO203": {"start": "10:00", "end": "02:00"},
-            "BCH201": {"start": "02:00", "end": "04:00"},
-            "MCB221": {"start": "10:00", "end": "02:00"},
+            "BIO203": {"start": "10:00", "end": "14:00"},
+            "BCH201": {"start": "14:00", "end": "16:00"},
+            "MCB221": {"start": "10:00", "end": "14:00"},
         }
 
         # Ensure the course exists
@@ -420,6 +420,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
