@@ -1,8 +1,12 @@
 streamlit
 pandas
-# Optional extras
+datetime
+os
+python-dateutil
 numpy
 matplotlib
 openpyxl     
 streamlit-autorefresh
+pathlib
+
 
