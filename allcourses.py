@@ -3,20 +3,17 @@ import pandas as pd
 import os
 import re
 from datetime import datetime, date, timedelta
-import streamlit as st
-
-# --- REFRESH EVERY 30 SECONDS ---
-# -----------------------------
-# 🌀 Smart Auto-Refresh (every 30 seconds)
-# -----------------------------
 from streamlit_autorefresh import st_autorefresh
 
-# Automatically refresh data every 30 seconds
+# ✅ Must be at the top before any Streamlit code
+st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
+
+# --- REFRESH EVERY 30 SECONDS ---
 st_autorefresh(interval=30 * 1000, key="auto_refresh")
 
+# --- CUSTOM STYLES ---
 st.markdown("""
 <style>
-/* Hide GitHub and Streamlit footer */
 footer {visibility: hidden;}
 #MainMenu {visibility: hidden;}
 .viewerBadge_container__1QSob,
@@ -27,28 +24,9 @@ footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-
-
-# Hide default Streamlit elements & GitHub link, then add custom footer
+# --- CUSTOM FOOTER ---
 st.markdown("""
 <style>
-/* Hide Streamlit default UI */
-footer {visibility: hidden;}
-#MainMenu {visibility: hidden;}
-
-/* Hide GitHub repo link/button */
-a[href*="github.com"] {
-    display: none !important;
-}
-
-/* Hide viewer badge */
-.viewerBadge_container__1QSob,
-.viewerBadge_link__1S137,
-.viewerBadge_text__1JaDK {
-    display: none !important;
-}
-
-/* Custom footer */
 .custom-footer {
     position: fixed;
     left: 0;
@@ -72,23 +50,29 @@ a[href*="github.com"] {
 </div>
 """, unsafe_allow_html=True)
 
-
-import pandas as pd
-import os
-# -----------------------------
-# LAYOUT
-# -----------------------------
-st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
+# --- PAGE BODY ---
 st.subheader("Department of Biological Sciences Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
+
+# Make sure COURSES and init_lectures are defined before use
+# Example:
+COURSES = {
+    "Biochemistry (BIO203)": "BIO203",
+    "Anatomy & Physiology": "BIO205",
+    "Genetics": "BIO301",
+}
+
+def init_lectures(course_code, default_topics):
+    return pd.DataFrame({"Course Code": course_code, "Topics": default_topics})
+
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 
-# Initialize lectures for each course
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]  # Replace with actual topics
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
+st.dataframe(lectures_df)
 
 def get_student_scores(course_code, student_name):
     """Fetch and combine student's attendance, classwork, seminar, and assignment scores."""
@@ -603,6 +587,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
