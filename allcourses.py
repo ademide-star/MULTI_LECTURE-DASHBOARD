@@ -235,16 +235,45 @@ if mode == "Student":
                 st.success(f"✅ Attendance recorded for {name} ({week}).")
                 st.session_state["attended_week"] = week if marked else None
 
-    lecture_info = lectures_df[lectures_df["Week"]==week].iloc[0]
+import pandas as pd
+import streamlit as st
 
-    # Safely get lecture brief, assignment, classwork
-    if "attended_week" in st.session_state:
-        week = st.session_state["attended_week"]
-        st.success(f"Access granted for {week}")
-    st.subheader(f"📖 {week}: {lecture_info['Topic']}")
-    brief = str(lecture_info["Brief"])
-    assignment = str(lecture_info["Assignment"])
-    classwork_text = str(lecture_info["Classwork"])
+# Example: safely retrieve lecture info
+if "attended_week" in st.session_state:
+    week = st.session_state["attended_week"]
+    st.success(f"Access granted for {week}")
+else:
+    st.error("No week selected or attendance not recorded.")
+    st.stop()
+
+# Safely locate the lecture row
+lecture_row = lectures_df[lectures_df["Week"] == week]
+
+if lecture_row.empty:
+    st.error(f"No lecture data found for {week}.")
+    st.stop()
+
+lecture_info = lecture_row.iloc[0]
+
+# Display lecture topic
+st.subheader(f"📖 {week}: {lecture_info['Topic']}")
+
+# Safely extract fields
+brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
+assignment = str(lecture_info["Assignment"]) if pd.notnull(lecture_info["Assignment"]) else ""
+classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
+
+# Show lecture brief
+if brief.strip():
+    st.write(f"**Lecture Brief:** {brief}")
+
+# Optionally display classwork or assignment
+if classwork_text.strip():
+    st.write(f"**Classwork:** {classwork_text}")
+
+if assignment.strip():
+    st.write(f"**Assignment:** {assignment}")
+
 
 # Add this right after
     pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
@@ -351,6 +380,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
