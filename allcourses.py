@@ -241,17 +241,10 @@ if mode == "Student":
     if "attended_week" in st.session_state:
         week = st.session_state["attended_week"]
         st.success(f"Access granted for {week}")
-    
+    st.subheader(f"📖 {week}: {lecture_info['Topic']}")
     brief = str(lecture_info["Brief"])
     assignment = str(lecture_info["Assignment"])
     classwork_text = str(lecture_info["Classwork"])
-
-    st.subheader(f"📖 {week}: {lecture_info['Topic']}")
-    if brief.strip():
-        st.write(f"**Lecture Brief:** {brief}")
-    brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
-    if brief.strip():
-        st.write(f"**Lecture Brief:** {brief}")
 
 # Add this right after
     pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{week.replace(' ', '_')}.pdf")
@@ -358,6 +351,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
