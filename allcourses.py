@@ -202,13 +202,26 @@ def save_file(course_code, name, week, uploaded_file, file_type):
     else:
         record.to_csv(record_file, index=False)
         
-def has_marked_attendance(course_code, week, student_name):
+def mark_attendance(course_code, name, matric, week):
     ATTENDANCE_FILE = get_file(course_code, "attendance")
+
+    # Create file if it doesn't exist
     if not os.path.exists(ATTENDANCE_FILE):
-        return False
+        df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status"])
+        df.to_csv(ATTENDANCE_FILE, index=False)
+
     df = pd.read_csv(ATTENDANCE_FILE)
-    df["StudentName"] = df["StudentName"].str.strip().str.lower()
-    return student_name.strip().lower() in df.loc[df["Week"] == week, "StudentName"].values
+
+    # Check if attendance already exists
+    if ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any():
+        return False  # Already marked
+
+    # Record new attendance
+    new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Status": "Present"}
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df.to_csv(ATTENDANCE_FILE, index=False)
+    return True
+
 
 # -----------------------------
 # LAYOUT
@@ -406,6 +419,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
