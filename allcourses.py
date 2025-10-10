@@ -297,12 +297,9 @@ if mode == "Student":
             # Assignment Section
             if assignment.strip():
                 st.subheader("📚 Assignment")
-                st.markdown(f"""
-                <div style='background-color:#f0f9ff;padding:12px;border-left:5px solid #0078d4;border-radius:8px;margin-top:10px;'>
-                    <h4>📘 <b>Assignment for {week}</b></h4> 
-                    <p style='font-size:16px;color:#333;'>{assignment}</p>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"**Assignment:** {lecture_info['Assignment']}")
+            else:
+                st.info("Assignment not released yet.")
 
                 # File upload for assignment
                 st.divider()
@@ -412,6 +409,7 @@ if mode=="Teacher/Admin":
                 st.info(f"No {label.lower()} yet.")
     else:
         if password: st.error("❌ Incorrect password")
+
 
 
 
