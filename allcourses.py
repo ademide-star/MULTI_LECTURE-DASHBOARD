@@ -61,14 +61,6 @@ mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"])
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
 
-# You can remove or ignore this part later if you don’t use lectures_df
-week = st.selectbox("Select Lecture Week:", lectures_df["Week"].tolist())
-
-# Example placeholder for your lecture brief area
-if mode == "Teacher/Admin":
-    st.text_area(f"Enter Lecture Brief for {course} - {week}")
-else:
-    st.info(f"Lecture brief for {course} - {week} not yet uploaded.")
 
 
 def get_student_scores(course_code, student_name):
@@ -584,6 +576,7 @@ if submit_score:
 if st.button("🔁 Refresh Scores Now"):
     st.cache_data.clear()
     st.experimental_rerun()
+
 
 
 
