@@ -355,24 +355,23 @@ if mode == "Student":
         st.divider()
         st.subheader(f"📖 {lecture_info['Week']}: {lecture_info['Topic']}")
 
-        brief = str(lecture_info.get("Brief", ""))
-        assignment = str(lecture_info.get("Assignment", ""))
-        classwork_text = str(lecture_info.get("Classwork", ""))
+        brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
+        assignment = str(lecture_info["Assignment"])
+        classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
 
         if brief.strip():
             st.markdown(f"**Lecture Brief:** {brief}")
 
-        if classwork_text.strip():
+        # Classwork Section
+           
+        if lecture_info["Classwork"].strip():
             st.markdown("### 🧩 Classwork Questions")
-            questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-            with st.form("cw_form"):
-                answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, lecture_info['Week']))
-                if submit_cw:
-                    save_file(course_code, name if 'name' in locals() else 'anonymous', lecture_info['Week'], type('obj', (), {'name': 'answers.txt', 'getbuffer': lambda: ('; '.join(answers)).encode()})(), "classwork")
-                    st.success("✅ Classwork answers submitted (logged).")
-        else:
-            st.info("Classwork not yet released.")
+            questions = [q.strip() for q in lecture_info["Classwork"].split(";") if q.strip()]
+                with st.form("cw_form"):
+                    answers = [st.text_input(f"Q{i+1}: {q}") for i,q in enumerate(questions)]
+                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
+                    if submit_cw: save_classwork(name, matric, week, answers)
+         else: st.info("Classwork not yet released.")
 
         if assignment.strip():
             st.subheader("📚 Assignment")
@@ -473,27 +472,35 @@ if mode == "Teacher/Admin":
         if password:
             st.error("❌ Incorrect password")
 
-# -----------------------------
-# ADMIN SCORE ENTRY (global)
-# -----------------------------
-st.divider()
-st.subheader("🏫 Record / Update Student Scores")
 
-name = st.text_input("Student Name")
-matric = st.text_input("Matric Number")
-week = st.selectbox("Select Week", lectures_df["Week"].tolist())
-score = st.number_input("Enter Score (0–100)", 0, 100, 0)
-remarks = st.text_input("Remarks (optional)")
-score_type = st.radio("Select Assessment Type", ["classwork", "seminar", "assignment"])
-submit_score = st.button("💾 Save / Update Score")
+# -----------------------------
+# 🏫 ADMIN SCORE ENTRY (global)
+# -----------------------------
+if st.session_state.get("role") == "admin":   # ✅ Only admins can see this section
+    st.divider()
+    st.subheader("🏫 Record / Update Student Scores")
 
-if submit_score:
-    if not name or not matric:
-        st.warning("Please enter student name and matric number.")
-    else:
-        record_score(course_code, score_type, name, matric, week, score, remarks)
+    name = st.text_input("Student Name")
+    matric = st.text_input("Matric Number")
+    week = st.selectbox("Select Week", lectures_df["Week"].tolist())
+    score = st.number_input("Enter Score (0–100)", 0, 100, 0)
+    remarks = st.text_input("Remarks (optional)")
+    score_type = st.radio("Select Assessment Type", ["classwork", "seminar", "assignment"])
+    submit_score = st.button("💾 Save / Update Score")
+
+    if submit_score:
+        if not name or not matric:
+            st.warning("Please enter student name and matric number.")
+        else:
+            record_score(course_code, score_type, name, matric, week, score, remarks)
+            st.cache_data.clear()
+            st.success("✅ Score recorded successfully!")
+
+    # 🔁 Refresh option for admins
+    if st.button("🔁 Refresh Scores Now"):
         st.cache_data.clear()
+        st.rerun()
 
-if st.button("🔁 Refresh Scores Now"):
-    st.cache_data.clear()
-    st.rerun()
+else:
+    st.info("🔒 Only admins can record or update student scores.")
+
