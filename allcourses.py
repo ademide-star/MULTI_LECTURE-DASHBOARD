@@ -413,8 +413,8 @@ if mode == "Student":
         save_file(course_code, name if 'name' in locals() else 'anonymous', lecture_info['Week'], uploaded_seminar, "seminar")
         st.success("✅ Seminar uploaded.")
 
-# ------------------------
-------------------------
+# ------------------------#
+#------------------------#
 # TEACHER / ADMIN MODE
 # -----------------------------
 if mode == "Teacher/Admin":
@@ -504,4 +504,5 @@ if st.session_state.get("role") == "admin":   # ✅ Only admins can see this sec
 
 else:
     st.info("🔒 Only admins can record or update student scores.")
+
 
