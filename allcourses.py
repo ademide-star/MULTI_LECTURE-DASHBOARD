@@ -557,7 +557,133 @@ if os.path.exists(upload_subdir):
         st.info(f"No {upload_choice.lower()} uploaded yet.")
 else:
     st.info(f"No {upload_choice.lower()} folder found yet.")
+
+# ---------------------------------------------
+# ---------------------------------------------
+# 📂 VIEW ALL STUDENT SUBMISSIONS (Assignments, Drawings, Seminars)
+# ---------------------------------------------
+st.divider()
+st.subheader("📚 Student Uploads Dashboard")
+
+upload_types = {
+    "assignment": ["pdf", "docx", "jpg", "png"],
+    "drawing": ["jpg", "jpeg", "png", "pdf"],
+    "seminar": ["ppt", "pptx"]
+}
+
+for upload_type, allowed_exts in upload_types.items():
+    with st.expander(f"📁 View {upload_type.capitalize()} Uploads", expanded=False):
+        upload_dir = os.path.join("student_uploads", course_code, upload_type)
+        if not os.path.exists(upload_dir):
+            st.info(f"No {upload_type} uploads yet.")
+            continue
+
+        files = sorted(os.listdir(upload_dir))
+        if not files:
+            st.info(f"No {upload_type} files uploaded yet.")
+        else:
+            for file_name in files:
+                file_path = os.path.join(upload_dir, file_name)
+                file_ext = file_name.split(".")[-1].lower()
+
+                st.markdown(f"### 📎 {file_name}")
+
+                # 🖼️ Preview for images
+                if file_ext in ["jpg", "jpeg", "png"]:
+                    st.image(file_path, caption=file_name, use_container_width=True)
+
+                # 📄 Preview for PDFs
+                elif file_ext == "pdf":
+                    with open(file_path, "rb") as f:
+                        pdf_data = f.read()
+                    st.download_button(
+                        label=f"⬇️ Download {file_name}",
+                        data=pdf_data,
+                        file_name=file_name,
+                        mime="application/pdf",
+                        key=f"download_{upload_type}_{file_name}"
+                    )
+                    # Inline PDF preview
+                    st.markdown(
+                        f'<iframe src="data:application/pdf;base64,{pdf_data.decode("latin1")}" '
+                        f'width="100%" height="400px"></iframe>', unsafe_allow_html=True
+                    )
+
+                # 🧾 For Word/PPT files, allow only download
+                else:
+                    with open(file_path, "rb") as f:
+                        file_bytes = f.read()
+                    st.download_button(
+                        label=f"⬇️ Download {file_name}",
+                        data=file_bytes,
+                        file_name=file_name,
+                        mime="application/octet-stream",
+                        key=f"download_{upload_type}_{file_name}"
+                    )
+
+                st.markdown("---")
 # -----------------------------
+# ---------------------------------------------
+# 📚 STUDENT UPLOADS DASHBOARD (Assignments, Drawings, Seminars)
+# ---------------------------------------------
+st.divider()
+st.subheader("📚 Student Uploads Dashboard")
+
+upload_types = {
+    "assignment": ["pdf", "docx", "jpg", "png"],
+    "drawing": ["jpg", "jpeg", "png", "pdf"],
+    "seminar": ["ppt", "pptx"]
+}
+
+for upload_type, allowed_exts in upload_types.items():
+    with st.expander(f"📁 View {upload_type.capitalize()} Uploads", expanded=False):
+        upload_dir = os.path.join("student_uploads", course_code, upload_type)
+        if not os.path.exists(upload_dir):
+            st.info(f"No {upload_type} uploads yet.")
+            continue
+
+        files = sorted(os.listdir(upload_dir))
+        if not files:
+            st.info(f"No {upload_type} files uploaded yet.")
+        else:
+            for file_name in files:
+                file_path = os.path.join(upload_dir, file_name)
+                file_ext = file_name.split(".")[-1].lower()
+
+                st.markdown(f"### 📎 {file_name}")
+
+                # 🖼️ Preview for images
+                if file_ext in ["jpg", "jpeg", "png"]:
+                    st.image(file_path, caption=file_name, use_container_width=True)
+
+                # 📄 Preview for PDFs
+                elif file_ext == "pdf":
+                    with open(file_path, "rb") as f:
+                        pdf_data = f.read()
+                    st.download_button(
+                        label=f"⬇️ Download {file_name}",
+                        data=pdf_data,
+                        file_name=file_name,
+                        mime="application/pdf",
+                        key=f"download_{upload_type}_{file_name}"
+                    )
+                    st.markdown(f'<iframe src="data:application/pdf;base64,{pdf_data.decode("latin1")}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
+
+                # 🧾 For Word/PPT files, just allow download
+                else:
+                    with open(file_path, "rb") as f:
+                        file_bytes = f.read()
+                    st.download_button(
+                        label=f"⬇️ Download {file_name}",
+                        data=file_bytes,
+                        file_name=file_name,
+                        mime="application/octet-stream",
+                        key=f"download_{upload_type}_{file_name}"
+                    )
+
+                st.markdown("---")
+
+
 # 🏫 ADMIN SCORE ENTRY (global)
 # -----------------------------
 if st.session_state.get("role") == "admin":   # ✅ Only admins can see this section
@@ -587,6 +713,7 @@ if st.session_state.get("role") == "admin":   # ✅ Only admins can see this sec
 
 else:
     st.info("🔒 Only admins can record or update student scores.")
+
 
 
 
