@@ -371,7 +371,7 @@ if mode == "Student":
                 answers = [st.text_input(f"Q{i+1}: {q}") for i,q in enumerate(questions)]
                 submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
                 if submit_cw: save_classwork(name, matric, week, answers)
-         else: st.info("Classwork not yet released.")
+        else: st.info("Classwork not yet released.")
 
         if assignment.strip():
             st.subheader("📚 Assignment")
@@ -503,5 +503,6 @@ if st.session_state.get("role") == "admin":   # ✅ Only admins can see this sec
 
 else:
     st.info("🔒 Only admins can record or update student scores.")
+
 
 
