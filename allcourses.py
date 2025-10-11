@@ -414,6 +414,7 @@ if mode == "Student":
         st.success("✅ Seminar uploaded.")
 
 # ------------------------
+------------------------
 # TEACHER / ADMIN MODE
 # -----------------------------
 if mode == "Teacher/Admin":
@@ -424,16 +425,12 @@ if mode == "Teacher/Admin":
     if password == ADMIN_PASS:
         st.success(f"✅ Logged in as Admin for {course}")
 
-        # --------------------------
-        # ✏️ Edit Lecture Details
-        # --------------------------
+        # Edit lecture briefs, assignments, classwork
         lecture_to_edit = st.selectbox("Select Lecture", lectures_df["Week"].unique())
         row_idx = lectures_df[lectures_df["Week"] == lecture_to_edit].index[0]
-
         brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"])
         assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"])
         classwork = st.text_area("Classwork (Separate questions with ;)", value=lectures_df.at[row_idx, "Classwork"])
-
         if st.button("💾 Update Lecture"):
             lectures_df.at[row_idx, "Brief"] = brief
             lectures_df.at[row_idx, "Assignment"] = assignment
@@ -441,21 +438,17 @@ if mode == "Teacher/Admin":
             lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
             st.success(f"{lecture_to_edit} updated successfully!")
 
-        # --------------------------
-        # 📘 Upload Lecture PDF
-        # --------------------------
+        # Upload lecture PDFs
         st.divider()
         st.subheader("📄 Upload Lecture PDF Module")
-        pdf_file = st.file_uploader("Upload Lecture Module", type=["pdf"])
+        pdf_file = st.file_uploader("Upload Lecture Module", type=["pdf"]) 
         if pdf_file:
             pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_to_edit.replace(' ', '_')}.pdf")
             with open(pdf_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
             st.success(f"✅ PDF uploaded for {lecture_to_edit}")
 
-        # --------------------------
-        # 🧩 Classwork Control
-        # --------------------------
+        # Open/Close classwork
         st.divider()
         st.subheader("📚 Classwork Control")
         week_to_control = st.selectbox("Select Week to Open/Close Classwork", lectures_df["Week"].unique(), key="cw_control")
@@ -464,53 +457,7 @@ if mode == "Teacher/Admin":
             st.success(f"Classwork for {week_to_control} is now open for 20 minutes.")
         close_classwork_after_20min(course_code)
 
-        # --------------------------
-        # 📊 Uploaded Student Files Viewer
-        # --------------------------
-        st.divider()
-        st.subheader("📤 View Uploaded Student Files")
-
-        UPLOADS_DIR = os.path.join("uploads", course_code)
-        if not os.path.exists(UPLOADS_DIR):
-            os.makedirs(UPLOADS_DIR)
-
-        # Filters
-        selected_week = st.selectbox("🔎 Select Week", lectures_df["Week"].tolist())
-        selected_type = st.radio("Select Upload Type", ["assignment", "seminar", "diagram"])
-
-        search_name = st.text_input("Search by Student Name (optional)").strip().lower()
-
-        # Locate student upload folders
-        matching_files = []
-        for root, _, files in os.walk(UPLOADS_DIR):
-            for file in files:
-                if selected_type in root.lower() and selected_week.replace(" ", "_").lower() in root.lower():
-                    if search_name and search_name not in root.lower():
-                        continue
-                    file_path = os.path.join(root, file)
-                    matching_files.append((os.path.basename(root), file_path))
-
-        if matching_files:
-            st.success(f"📦 Found {len(matching_files)} uploaded {selected_type}(s) for {selected_week}")
-            for student, path in matching_files:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"👩‍🎓 **{student}** — `{os.path.basename(path)}`")
-                with col2:
-                    with open(path, "rb") as f:
-                        st.download_button(
-                            label="⬇️ Download",
-                            data=f.read(),
-                            file_name=os.path.basename(path),
-                            mime="application/octet-stream",
-                            key=f"{student}_{os.path.basename(path)}"
-                        )
-        else:
-            st.info(f"No {selected_type} uploads found for {selected_week}.")
-
-        # --------------------------
-        # 📋 View Records (Attendance & Classwork)
-        # --------------------------
+        # View records
         st.divider()
         for file, label in [("attendance", "Attendance Records"), ("classwork_submissions", "Classwork Submissions")]:
             csv_file = get_file(course_code, file)
@@ -526,164 +473,8 @@ if mode == "Teacher/Admin":
         if password:
             st.error("❌ Incorrect password")
 
+
 # -----------------------------
-# 📂 VIEW STUDENT UPLOADS
-# -----------------------------
-st.divider()
-st.subheader("📂 View Student Uploads (Assignments, Diagrams, Seminar)")
-
-UPLOADS_DIR = os.path.join("student_uploads", course_code)
-if not os.path.exists(UPLOADS_DIR):
-    os.makedirs(UPLOADS_DIR)
-
-uploaded_types = ["Assignments", "Diagrams", "Seminar Presentations"]
-upload_choice = st.selectbox("Select Upload Type", uploaded_types)
-
-upload_subdir = os.path.join(UPLOADS_DIR, upload_choice.lower().replace(" ", "_"))
-
-if os.path.exists(upload_subdir):
-    files = os.listdir(upload_subdir)
-    if len(files) > 0:
-        for file in files:
-            file_path = os.path.join(upload_subdir, file)
-            with open(file_path, "rb") as f:
-                st.download_button(
-                    label=f"📥 Download {file}",
-                    data=f,
-                    file_name=file,
-                    mime="application/octet-stream"
-                )
-    else:
-        st.info(f"No {upload_choice.lower()} uploaded yet.")
-else:
-    st.info(f"No {upload_choice.lower()} folder found yet.")
-
-# ---------------------------------------------
-# ---------------------------------------------
-# 📂 VIEW ALL STUDENT SUBMISSIONS (Assignments, Drawings, Seminars)
-# ---------------------------------------------
-st.divider()
-st.subheader("📚 Student Uploads Dashboard")
-
-upload_types = {
-    "assignment": ["pdf", "docx", "jpg", "png"],
-    "drawing": ["jpg", "jpeg", "png", "pdf"],
-    "seminar": ["ppt", "pptx"]
-}
-
-for upload_type, allowed_exts in upload_types.items():
-    with st.expander(f"📁 View {upload_type.capitalize()} Uploads", expanded=False):
-        upload_dir = os.path.join("student_uploads", course_code, upload_type)
-        if not os.path.exists(upload_dir):
-            st.info(f"No {upload_type} uploads yet.")
-            continue
-
-        files = sorted(os.listdir(upload_dir))
-        if not files:
-            st.info(f"No {upload_type} files uploaded yet.")
-        else:
-            for file_name in files:
-                file_path = os.path.join(upload_dir, file_name)
-                file_ext = file_name.split(".")[-1].lower()
-
-                st.markdown(f"### 📎 {file_name}")
-
-                # 🖼️ Preview for images
-                if file_ext in ["jpg", "jpeg", "png"]:
-                    st.image(file_path, caption=file_name, use_container_width=True)
-
-                # 📄 Preview for PDFs
-                elif file_ext == "pdf":
-                    with open(file_path, "rb") as f:
-                        pdf_data = f.read()
-                    st.download_button(
-                        label=f"⬇️ Download {file_name}",
-                        data=pdf_data,
-                        file_name=file_name,
-                        mime="application/pdf",
-                        key=f"download_{upload_type}_{file_name}"
-                    )
-                    # Inline PDF preview
-                    st.markdown(
-                        f'<iframe src="data:application/pdf;base64,{pdf_data.decode("latin1")}" '
-                        f'width="100%" height="400px"></iframe>', unsafe_allow_html=True
-                    )
-
-                # 🧾 For Word/PPT files, allow only download
-                else:
-                    with open(file_path, "rb") as f:
-                        file_bytes = f.read()
-                    st.download_button(
-                        label=f"⬇️ Download {file_name}",
-                        data=file_bytes,
-                        file_name=file_name,
-                        mime="application/octet-stream",
-                        key=f"download_{upload_type}_{file_name}"
-                    )
-
-                st.markdown("---")
-# -----------------------------
-# ---------------------------------------------
-# 📚 STUDENT UPLOADS DASHBOARD (Assignments, Drawings, Seminars)
-# ---------------------------------------------
-st.divider()
-st.subheader("📚 Student Uploads Dashboard")
-
-upload_types = {
-    "assignment": ["pdf", "docx", "jpg", "png"],
-    "drawing": ["jpg", "jpeg", "png", "pdf"],
-    "seminar": ["ppt", "pptx"]
-}
-
-for upload_type, allowed_exts in upload_types.items():
-    with st.expander(f"📁 View {upload_type.capitalize()} Uploads", expanded=False):
-        upload_dir = os.path.join("student_uploads", course_code, upload_type)
-        if not os.path.exists(upload_dir):
-            st.info(f"No {upload_type} uploads yet.")
-            continue
-
-        files = sorted(os.listdir(upload_dir))
-        if not files:
-            st.info(f"No {upload_type} files uploaded yet.")
-        else:
-            for file_name in files:
-                file_path = os.path.join(upload_dir, file_name)
-                file_ext = file_name.split(".")[-1].lower()
-
-                st.markdown(f"### 📎 {file_name}")
-
-                # 🖼️ Preview for images
-                if file_ext in ["jpg", "jpeg", "png"]:
-                    st.image(file_path, caption=file_name, use_container_width=True)
-
-                # 📄 Preview for PDFs
-                elif file_ext == "pdf":
-                    with open(file_path, "rb") as f:
-                        pdf_data = f.read()
-                    st.download_button(
-                        label=f"⬇️ Download {file_name}",
-                        data=pdf_data,
-                        file_name=file_name,
-                        mime="application/pdf",
-                        key=f"download_{upload_type}_{file_name}"
-                    )
-                    st.markdown(f'<iframe src="data:application/pdf;base64,{pdf_data.decode("latin1")}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
-
-                # 🧾 For Word/PPT files, just allow download
-                else:
-                    with open(file_path, "rb") as f:
-                        file_bytes = f.read()
-                    st.download_button(
-                        label=f"⬇️ Download {file_name}",
-                        data=file_bytes,
-                        file_name=file_name,
-                        mime="application/octet-stream",
-                        key=f"download_{upload_type}_{file_name}"
-                    )
-
-                st.markdown("---")
-
-
 # 🏫 ADMIN SCORE ENTRY (global)
 # -----------------------------
 if st.session_state.get("role") == "admin":   # ✅ Only admins can see this section
@@ -713,8 +504,4 @@ if st.session_state.get("role") == "admin":   # ✅ Only admins can see this sec
 
 else:
     st.info("🔒 Only admins can record or update student scores.")
-
-
-
-
 
