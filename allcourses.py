@@ -245,6 +245,44 @@ def close_classwork_after_20min(course_code):
                 changed = True
     if changed:
         df.to_csv(CLASSWORK_STATUS_FILE, index=False)
+        
+UPLOADS_DIR = "student_uploads"  # Adjust if you already defined elsewhere
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+def save_file(course_code, student_name, week, uploaded_file, folder_name):
+    """Save uploaded file to the appropriate course and folder."""
+    upload_dir = os.path.join(UPLOADS_DIR, course_code, folder_name)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_name = student_name.replace(" ", "_")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = os.path.join(upload_dir, f"{safe_name}_{week}_{timestamp}_{uploaded_file.name}")
+
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    return file_path
+
+
+def log_submission(course_code, matric, student_name, week, file_name, upload_type):
+    """Log each upload to a CSV file for admin tracking."""
+    log_file = os.path.join(UPLOADS_DIR, f"{course_code}_submissions_log.csv")
+    new_entry = pd.DataFrame([{
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Matric": matric,
+        "Student Name": student_name,
+        "Week": week,
+        "File": file_name,
+        "Type": upload_type
+    }])
+
+    if os.path.exists(log_file):
+        existing = pd.read_csv(log_file)
+        updated = pd.concat([existing, new_entry], ignore_index=True)
+    else:
+        updated = new_entry
+    updated.to_csv(log_file, index=False)
+
 
 # -----------------------------
 # APP LAYOUT
@@ -356,7 +394,7 @@ if mode == "Student":
         st.subheader(f"📖 {lecture_info['Week']}: {lecture_info['Topic']}")
 
         brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
-        assignment = str(lecture_info["Assignment"])
+        assignment = str(lecture_info["Assignment"]) if pd.notnull(lecture_info["Brief"]) else ""
         classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
 
         if brief.strip():
@@ -389,32 +427,95 @@ if mode == "Student":
             st.info("Lecture note not uploaded yet.")
 
     # Assignment upload
-    st.divider()
-    st.subheader("📄 Assignment Upload")
-    uploaded_assignment = st.file_uploader(f"Upload Assignment for {lecture_info['Week']}", type=["pdf", "docx", "jpg", "png"], key=f"{course_code}_assignment")
-    if uploaded_assignment and st.button(f"Submit Assignment for {lecture_info['Week']}"):
-        save_file(course_code, name if 'name' in locals() else 'anonymous', lecture_info['Week'], uploaded_assignment, "assignment")
-        st.success("✅ Assignment uploaded.")
+import pandas as pd
+from datetime import datetime
 
-    # Drawing Upload
-    st.divider()
-    st.subheader("🖌️ Drawing Upload")
-    student_name_input = st.text_input("Enter your full name", key="student_name_input")
-    uploaded_drawing = st.file_uploader(f"Upload Drawing for {lecture_info['Week']}", type=["jpg", "jpeg", "png", "pdf"], key=f"{course_code}_drawing")
-    if uploaded_drawing and st.button(f"Submit Drawing for {lecture_info['Week']}"):
-        save_file(course_code, student_name_input if student_name_input else (name if 'name' in locals() else 'anonymous'), lecture_info['Week'], uploaded_drawing, "drawing")
-        st.success("✅ Drawing uploaded.")
+# -----------------------------
+# 📄 ASSIGNMENT UPLOAD
+# -----------------------------
+st.divider()
+st.subheader("📄 Assignment Upload")
 
-    # Seminar Upload
-    st.divider()
-    st.subheader("🎤 Seminar Upload")
-    uploaded_seminar = st.file_uploader("Upload Seminar PPT", type=["ppt", "pptx"], key=f"{course_code}_seminar")
-    if uploaded_seminar and st.button(f"Submit Seminar for {lecture_info['Week']}"):
-        save_file(course_code, name if 'name' in locals() else 'anonymous', lecture_info['Week'], uploaded_seminar, "seminar")
-        st.success("✅ Seminar uploaded.")
+matric_a = st.text_input("Matric Number", key="matric_a")
+student_name_a = st.text_input("Enter your full name", key="student_name_a")
+
+uploaded_assignment = st.file_uploader(
+    f"Upload Assignment for {lecture_info['Week']}",
+    type=["pdf", "docx", "jpg", "png"],
+    key=f"{course_code}_assignment"
+)
+
+with st.form("assignment_form"):
+    submit_assignment = st.form_submit_button(f"Submit Assignment for {lecture_info['Week']}")
+
+    if submit_assignment:
+        if not matric_a or not student_name_a:
+            st.warning("Please enter your name and matric number before submitting.")
+        elif not uploaded_assignment:
+            st.warning("Please upload a file before submitting.")
+        else:
+            file_path = save_file(course_code, student_name_a, lecture_info["Week"], uploaded_assignment, "assignment")
+            log_submission(course_code, matric_a, student_name_a, lecture_info["Week"], uploaded_assignment.name, "Assignment")
+            st.success(f"✅ {student_name_a} ({matric_a}) — Assignment uploaded successfully!")
+
+# -----------------------------
+# 🖌️ DRAWING UPLOAD
+# -----------------------------
+st.divider()
+st.subheader("🖌️ Drawing Upload for Class Work")
+
+matric_d = st.text_input("Matric Number", key="matric_d")
+student_name_d = st.text_input("Enter your full name", key="student_name_d")
+
+uploaded_drawing = st.file_uploader(
+    f"Upload Drawing for {lecture_info['Week']}",
+    type=["jpg", "jpeg", "png", "pdf"],
+    key=f"{course_code}_drawing"
+)
+
+with st.form("drawing_form"):
+    submit_drawing = st.form_submit_button(f"Submit Drawing for {lecture_info['Week']}")
+
+    if submit_drawing:
+        if not matric_d or not student_name_d:
+            st.warning("Please enter your name and matric number before submitting.")
+        elif not uploaded_drawing:
+            st.warning("Please upload a file before submitting.")
+        else:
+            file_path = save_file(course_code, student_name_d, lecture_info["Week"], uploaded_drawing, "drawing")
+            log_submission(course_code, matric_d, student_name_d, lecture_info["Week"], uploaded_drawing.name, "Drawing")
+            st.success(f"✅ {student_name_d} ({matric_d}) — Drawing uploaded successfully!")
+
+# -----------------------------
+# 🎤 SEMINAR UPLOAD
+# -----------------------------
+st.divider()
+st.subheader("🎤 Seminar Upload")
+
+matric_s = st.text_input("Matric Number", key="matric_s")
+student_name_s = st.text_input("Enter your full name", key="student_name_s")
+
+uploaded_seminar = st.file_uploader(
+    "Upload Seminar PPT",
+    type=["ppt", "pptx"],
+    key=f"{course_code}_seminar"
+)
+
+with st.form("seminar_form"):
+    submit_seminar = st.form_submit_button(f"Submit Seminar for {lecture_info['Week']}")
+
+    if submit_seminar:
+        if not matric_s or not student_name_s:
+            st.warning("Please enter your name and matric number before submitting.")
+        elif not uploaded_seminar:
+            st.warning("Please upload a file before submitting.")
+        else:
+            file_path = save_file(course_code, student_name_s, lecture_info["Week"], uploaded_seminar, "seminar")
+            log_submission(course_code, matric_s, student_name_s, lecture_info["Week"], uploaded_seminar.name, "Seminar")
+            st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
+
 
 # ------------------------#
-#------------------------#
 # TEACHER / ADMIN MODE
 # -----------------------------
 if mode == "Teacher/Admin":
@@ -423,6 +524,7 @@ if mode == "Teacher/Admin":
     ADMIN_PASS = "bimpe2025class"
 
     if password == ADMIN_PASS:
+        st.session_state["role"] = "admin"  # ✅ Fix added
         st.success(f"✅ Logged in as Admin for {course}")
 
         # Edit lecture briefs, assignments, classwork
@@ -473,11 +575,10 @@ if mode == "Teacher/Admin":
         if password:
             st.error("❌ Incorrect password")
 
-
 # -----------------------------
 # 🏫 ADMIN SCORE ENTRY (global)
 # -----------------------------
-if st.session_state.get("role") == "admin":   # ✅ Only admins can see this section
+if st.session_state.get("role") == "admin":   # ✅ Now this will work after password login
     st.divider()
     st.subheader("🏫 Record / Update Student Scores")
 
@@ -497,12 +598,8 @@ if st.session_state.get("role") == "admin":   # ✅ Only admins can see this sec
             st.cache_data.clear()
             st.success("✅ Score recorded successfully!")
 
-    # 🔁 Refresh option for admins
     if st.button("🔁 Refresh Scores Now"):
         st.cache_data.clear()
         st.rerun()
-
 else:
     st.info("🔒 Only admins can record or update student scores.")
-
-
