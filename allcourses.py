@@ -11,7 +11,8 @@ import io
 # BASIC CONFIG + DIRECTORIES
 # -----------------------------
 st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
-st_autorefresh(interval=30 * 1000, key="auto_refresh")
+st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
+
 
 # Ensure required folders exist
 for d in ["data", "submissions", "records", "scores", "modules"]:
@@ -887,6 +888,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
