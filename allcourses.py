@@ -388,6 +388,35 @@ if "student_logged_in" not in st.session_state:
                     else:
                         st.error("Could not record attendance. Try again or contact your lecturer.")
 
+# -----------------------------
+# AFTER ATTENDANCE SECTION
+# -----------------------------
+
+# ✅ Login control for students
+if not st.session_state["student_logged_in"]:
+    st.info("🔒 Please log in to view classwork and lecture briefs.")
+    # Optional: Simple login for students
+    with st.expander("🔑 Student Login"):
+        student_username = st.text_input("Enter your student username")
+        student_password = st.text_input("Enter your password", type="password")
+        if st.button("Login"):
+            if student_username.strip() and student_password == "student123":  # You can change this password
+                st.session_state["student_logged_in"] = True
+                st.success("✅ Login successful!")
+            else:
+                st.error("❌ Invalid login credentials. Try again.")
+else:
+    st.success("🎓 Logged in as student")
+
+    # 👇 Only visible to logged-in students
+    st.divider()
+    st.subheader("📘 Lecture Briefs and Classwork")
+    st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
+    # You can display lecture notes or content here
+    # Example:
+    # show_lecture_briefs(course_code, lectures_df)
+
+    
     st.divider()
     st.subheader("📈 Your Continuous Assessment (CA) Summary")
 
@@ -469,24 +498,29 @@ if "student_logged_in" not in st.session_state:
         else:
             st.info("Lecture note not uploaded yet.")
 
-
-if st.session_state.get("role") != "admin":  # Only students see uploads
-   # -----------------------------
-# 📄 ASSIGNMENT UPLOAD
 # -----------------------------
-    st.divider()
-    st.subheader("📄 Assignment Upload")
-    selected_week_a = lecture_info["Week"]
-    selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
-    matric_a = st.text_input("Matric Number", key="matric_a")
-    student_name_a = st.text_input("Enter your full name", key="student_name_a")
+# 📤 STUDENT UPLOADS (VISIBLE TO ALL)
+# -----------------------------
+st.divider()
+st.subheader("📄 Assignment, Drawing & Seminar Uploads")
+st.divider()
+st.subheader("📄 Assignment Upload")
 
-    uploaded_assignment = st.file_uploader(
-        f"Upload Assignment for {selected_week_a}",
-        type=["pdf", "docx", "jpg", "png"],
-        key=f"{course_code}_assignment"
+# 🗓️ Select week for assignment
+selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
+
+# 🧑‍🎓 Student info
+matric_a = st.text_input("Matric Number", key="matric_a")
+student_name_a = st.text_input("Enter your full name", key="student_name_a")
+
+# 📎 Upload file
+uploaded_assignment = st.file_uploader(
+    f"Upload Assignment for {selected_week_a}",
+    type=["pdf", "docx", "jpg", "png"],
+    key=f"{course_code}_assignment"
 )
 
+# 🧾 Form submission
 with st.form("assignment_form"):
     submit_assignment = st.form_submit_button(f"Submit Assignment for {selected_week_a}")
 
@@ -499,64 +533,6 @@ with st.form("assignment_form"):
             file_path = save_file(course_code, student_name_a, selected_week_a, uploaded_assignment, "assignment")
             log_submission(course_code, matric_a, student_name_a, selected_week_a, uploaded_assignment.name, "Assignment")
             st.success(f"✅ {student_name_a} ({matric_a}) — Assignment uploaded successfully!")
-
-# -----------------------------
-# 🖌️ DRAWING UPLOAD
-# -----------------------------
-st.divider()
-st.subheader("🖌️ Drawing Upload for Class Work")
-selected_week_d = lecture_info["Week"]
-selected_week_d = st.selectbox("Select Week for Drawing", lectures_df["Week"].tolist(), key="drawing_week_select")
-matric_d = st.text_input("Matric Number", key="matric_d")
-student_name_d = st.text_input("Enter your full name", key="student_name_d")
-
-uploaded_drawing = st.file_uploader(
-    f"Upload Drawing for {selected_week_d}",
-    type=["jpg", "jpeg", "png", "pdf"],
-    key=f"{course_code}_drawing"
-)
-
-with st.form("drawing_form"):
-    submit_drawing = st.form_submit_button(f"Submit Drawing for {selected_week_d}")
-
-    if submit_drawing:
-        if not matric_d or not student_name_d:
-            st.warning("Please enter your name and matric number before submitting.")
-        elif not uploaded_drawing:
-            st.warning("Please upload a file before submitting.")
-        else:
-            file_path = save_file(course_code, student_name_d, selected_week_d, uploaded_drawing, "drawing")
-            log_submission(course_code, matric_d, student_name_d, selected_week_d, uploaded_drawing.name, "Drawing")
-            st.success(f"✅ {student_name_d} ({matric_d}) — Drawing uploaded successfully!")
-
-# -----------------------------
-# 🎤 SEMINAR UPLOAD
-# -----------------------------
-st.divider()
-st.subheader("🎤 Seminar Upload")
-selected_week_s = lecture_info["Week"]
-selected_week_s = st.selectbox("Select Week for Seminar", lectures_df["Week"].tolist(), key="seminar_week_select")
-matric_s = st.text_input("Matric Number", key="matric_s")
-student_name_s = st.text_input("Enter your full name", key="student_name_s")
-
-uploaded_seminar = st.file_uploader(
-    f"Upload Seminar PPT for {selected_week_s}",
-    type=["ppt", "pptx"],
-    key=f"{course_code}_seminar"
-)
-
-with st.form("seminar_form"):
-    submit_seminar = st.form_submit_button(f"Submit Seminar for {selected_week_s}")
-
-    if submit_seminar:
-        if not matric_s or not student_name_s:
-            st.warning("Please enter your name and matric number before submitting.")
-        elif not uploaded_seminar:
-            st.warning("Please upload a file before submitting.")
-        else:
-            file_path = save_file(course_code, student_name_s, selected_week_s, uploaded_seminar, "seminar")
-            log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
-            st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
 
 
 # ====================================================
@@ -586,7 +562,6 @@ if mode == "Teacher/Admin":
         st.header("📚 Lecture Management")
         lecture_to_edit = st.selectbox("Select Lecture", lectures_df["Week"].unique())
         row_idx = lectures_df[lectures_df["Week"] == lecture_to_edit].index[0]
-
         brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"])
         assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"])
         classwork = st.text_area("Classwork (Separate questions with ;)", 
@@ -750,6 +725,7 @@ if st.session_state.get("role") == "admin":
 
 else:
     st.info("🔒 Only admins can access this section.")
+
 
 
 
