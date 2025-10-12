@@ -345,8 +345,7 @@ lectures_df = init_lectures(course_code, default_topics)
 # -----------------------------
 if "student_logged_in" not in st.session_state:
     st.session_state["student_logged_in"] = False
-
-st.subheader("🎓 Student Login")
+    st.subheader("🎓 Student Login")
 
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name")
@@ -751,6 +750,7 @@ if st.session_state.get("role") == "admin":
 
 else:
     st.info("🔒 Only admins can access this section.")
+
 
 
 
