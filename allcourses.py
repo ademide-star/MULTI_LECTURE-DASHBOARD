@@ -745,10 +745,9 @@ if st.session_state.get("role") == "admin":
             file_name=f"{course_code}_filtered_scores.csv",
             mime="text/csv"
         )
-        elif:
-            st.info("No scores recorded yet.")
     else:
-        st.info("🔒 Only admins can access this section.")
+        st.info("🔒 "No scores recorded yet.")
+
 
 
 
