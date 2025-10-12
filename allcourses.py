@@ -4,6 +4,8 @@ import os
 import re
 from datetime import datetime, date, timedelta
 from streamlit_autorefresh import st_autorefresh
+import zipfile
+import io
 
 # -----------------------------
 # BASIC CONFIG + DIRECTORIES
@@ -58,6 +60,46 @@ COURSES = {
 # -----------------------------
 # FILE HELPERS
 # -----------------------------
+# --- Helper Function: View/Download Files ---
+def view_and_download_files(course_code, file_type, week):
+    """Displays uploaded files for a given type and week, with ZIP download."""
+    base_dir = os.path.join("student_uploads", course_code, file_type)
+
+    if os.path.exists(base_dir):
+        all_files = []
+        for root, dirs, files in os.walk(base_dir):
+            for file in files:
+                if week.replace(" ", "_") in file or week in root:
+                    file_path = os.path.join(root, file)
+                    uploader_name = os.path.basename(root)
+                    all_files.append({
+                        "Student": uploader_name,
+                        "File Name": file,
+                        "File Path": file_path
+                    })
+
+        if all_files:
+            df_files = pd.DataFrame(all_files)
+            st.dataframe(df_files[["Student", "File Name"]])
+
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                for item in all_files:
+                    zipf.write(item["File Path"], arcname=f"{item['Student']}/{item['File Name']}")
+            st.download_button(
+                label=f"📦 Download All {file_type.capitalize()}s for {week}",
+                data=zip_buffer.getvalue(),
+                file_name=f"{course_code}_{week.replace(' ', '_')}_{file_type}s.zip",
+                mime="application/zip"
+            )
+        else:
+            st.info(f"No {file_type} submissions found for {week}.")
+    else:
+        st.info(f"No {file_type} submission directory found yet.")
+
+
+# -----------------------------
+
 def get_file(course_code, filename):
     """Return filename of the form <COURSECODE>_<filename>.csv (in current dir)."""
     return f"{course_code}_{filename}.csv"
@@ -608,48 +650,7 @@ else:
 # 📂 SECURE ADMIN UPLOAD, VIEWER & GRADING DASHBOARD
 # ==============================
 
-import zipfile
-import io
 
-# --- Helper Function: View/Download Files ---
-def view_and_download_files(course_code, file_type, week):
-    """Displays uploaded files for a given type and week, with ZIP download."""
-    base_dir = os.path.join("student_uploads", course_code, file_type)
-
-    if os.path.exists(base_dir):
-        all_files = []
-        for root, dirs, files in os.walk(base_dir):
-            for file in files:
-                if week.replace(" ", "_") in file or week in root:
-                    file_path = os.path.join(root, file)
-                    uploader_name = os.path.basename(root)
-                    all_files.append({
-                        "Student": uploader_name,
-                        "File Name": file,
-                        "File Path": file_path
-                    })
-
-        if all_files:
-            df_files = pd.DataFrame(all_files)
-            st.dataframe(df_files[["Student", "File Name"]])
-
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as zipf:
-                for item in all_files:
-                    zipf.write(item["File Path"], arcname=f"{item['Student']}/{item['File Name']}")
-            st.download_button(
-                label=f"📦 Download All {file_type.capitalize()}s for {week}",
-                data=zip_buffer.getvalue(),
-                file_name=f"{course_code}_{week.replace(' ', '_')}_{file_type}s.zip",
-                mime="application/zip"
-            )
-        else:
-            st.info(f"No {file_type} submissions found for {week}.")
-    else:
-        st.info(f"No {file_type} submission directory found yet.")
-
-
-# -----------------------------
 # 🔐 SHOW ONLY IF ADMIN IS LOGGED IN
 # -----------------------------
 if st.session_state.get("role") == "admin":
@@ -881,3 +882,4 @@ if st.session_state.get("role") == "admin":
 
 else:
     st.info("🔒 Admin access required to manage uploads, view submissions, or grade students.")
+
