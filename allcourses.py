@@ -470,6 +470,7 @@ if mode == "Student":
 
 
 if st.session_state.get("role") != "admin":  # Only students see uploads
+    selected_week_a = lecture_info["Week"]
    # -----------------------------
 # 📄 ASSIGNMENT UPLOAD
 # -----------------------------
@@ -640,8 +641,6 @@ if mode == "Teacher/Admin":
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade
 # ---------------------------------------------------------
 if st.session_state.get("role") == "admin":
-    st.header("🏫 Instructor Dashboard")
-
     st.subheader("📂 View Student Submissions")
 
     upload_types = ["assignment", "drawing", "seminar"]
@@ -751,5 +750,6 @@ if st.session_state.get("role") == "admin":
 
 else:
     st.info("🔒 Only admins can access this section.")
+
 
 
