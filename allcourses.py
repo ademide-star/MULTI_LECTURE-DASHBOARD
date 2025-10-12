@@ -459,50 +459,6 @@ if mode == "Student":
     st.divider()
     st.subheader("📘 Lecture Briefs and Classwork")
     st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
-    # You can display lecture notes or content here
-    # Example:
-    # show_lecture_briefs(course_code, lectures_df)
-
-    
-    st.divider()
-    st.subheader("📈 Your Continuous Assessment (CA) Summary")
-
-    # Student CA summary (optional central scores file)
-    scores_file = os.path.join("scores", f"{course_code}_scores.csv")
-    if os.path.exists(scores_file):
-        df_scores = pd.read_csv(scores_file)
-        # try to protect against missing name/matric when not set
-        if 'name' in locals() and 'matric' in locals() and name.strip() and matric.strip():
-            student_scores = df_scores[
-                (df_scores["StudentName"].str.lower() == name.strip().lower()) &
-                (df_scores["MatricNo"].str.lower() == matric.strip().lower())
-            ] if ("StudentName" in df_scores.columns and "MatricNo" in df_scores.columns) else pd.DataFrame()
-
-            if not student_scores.empty:
-                cw_total = student_scores["ClassworkScore"].mean() if "ClassworkScore" in student_scores else 0
-                sem_total = student_scores["SeminarScore"].mean() if "SeminarScore" in student_scores else 0
-                ass_total = student_scores["AssignmentScore"].mean() if "AssignmentScore" in student_scores else 0
-                total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
-
-                st.dataframe(student_scores[[col for col in ["Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"] if col in student_scores.columns]], use_container_width=True)
-                st.markdown(f"""
-                    <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
-                        <h4>📘 <b>Performance Summary</b></h4>
-                        <ul>
-                            <li>🧩 Classwork Avg: <b>{cw_total:.1f}%</b> (30%)</li>
-                            <li>🎤 Seminar Avg: <b>{sem_total:.1f}%</b> (20%)</li>
-                            <li>📝 Assignment Avg: <b>{ass_total:.1f}%</b> (50%)</li>
-                        </ul>
-                        <h3>💯 Total Continuous Assessment (CA): <b>{total_CA:.1f}%</b></h3>
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.info("No scores found yet. Participate in classwork, seminar, or assignments.")
-        else:
-            st.info("Enter your name & matric above to see your CA summary (if available).")
-    else:
-        st.warning("📁 Scores file not yet available for this course.")
-
     # Show lecture info for selected week
     lecture_row = lectures_df[lectures_df["Week"] == (week if 'week' in locals() else lectures_df.iloc[0]['Week'])]
     if lecture_row.empty:
@@ -545,6 +501,48 @@ if mode == "Student":
         else:
             st.info("Lecture note not uploaded yet.")
 
+
+    
+    st.divider()
+    st.subheader("📈 Your Continuous Assessment (CA) Summary")
+
+    # Student CA summary (optional central scores file)
+    scores_file = os.path.join("scores", f"{course_code}_scores.csv")
+    if os.path.exists(scores_file):
+        df_scores = pd.read_csv(scores_file)
+        # try to protect against missing name/matric when not set
+        if 'name' in locals() and 'matric' in locals() and name.strip() and matric.strip():
+            student_scores = df_scores[
+                (df_scores["StudentName"].str.lower() == name.strip().lower()) &
+                (df_scores["MatricNo"].str.lower() == matric.strip().lower())
+            ] if ("StudentName" in df_scores.columns and "MatricNo" in df_scores.columns) else pd.DataFrame()
+
+            if not student_scores.empty:
+                cw_total = student_scores["ClassworkScore"].mean() if "ClassworkScore" in student_scores else 0
+                sem_total = student_scores["SeminarScore"].mean() if "SeminarScore" in student_scores else 0
+                ass_total = student_scores["AssignmentScore"].mean() if "AssignmentScore" in student_scores else 0
+                total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
+
+                st.dataframe(student_scores[[col for col in ["Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"] if col in student_scores.columns]], use_container_width=True)
+                st.markdown(f"""
+                    <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
+                        <h4>📘 <b>Performance Summary</b></h4>
+                        <ul>
+                            <li>🧩 Classwork Avg: <b>{cw_total:.1f}%</b> (30%)</li>
+                            <li>🎤 Seminar Avg: <b>{sem_total:.1f}%</b> (20%)</li>
+                            <li>📝 Assignment Avg: <b>{ass_total:.1f}%</b> (50%)</li>
+                        </ul>
+                        <h3>💯 Total Continuous Assessment (CA): <b>{total_CA:.1f}%</b></h3>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("No scores found yet. Participate in classwork, seminar, or assignments.")
+        else:
+            st.info("Enter your name & matric above to see your CA summary (if available).")
+    else:
+        st.warning("📁 Scores file not yet available for this course.")
+
+    
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (STUDENT SECTION)
 # ===============================================================
@@ -889,6 +887,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
