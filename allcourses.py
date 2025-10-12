@@ -746,7 +746,8 @@ if st.session_state.get("role") == "admin":
             mime="text/csv"
         )
     else:
-        st.info("🔒 "No scores recorded yet.")
+        st.info("🔒 No scores recorded yet.")
+
 
 
 
