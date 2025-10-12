@@ -61,6 +61,76 @@ COURSES = {
 # FILE HELPERS
 # -----------------------------
 # --- Helper Function: View/Download Files ---
+def init_lectures(course_code, topics):
+    """Initialize lecture weeks dataframe."""
+    df_path = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
+    if os.path.exists(df_path):
+        return pd.read_csv(df_path)
+    else:
+        df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
+        df.to_csv(df_path, index=False)
+        return df
+
+
+def save_file(course_code, student_name, week, uploaded_file, upload_type):
+    """Save uploaded file persistently."""
+    folder = os.path.join(UPLOAD_DIR, course_code, upload_type)
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{student_name}_{week}_{uploaded_file.name}"
+    file_path = os.path.join(folder, filename)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return file_path
+
+
+def log_submission(course_code, matric, student_name, week, file_name, upload_type):
+    """Log each submission permanently."""
+    log_path = os.path.join(LOG_DIR, f"{course_code}_uploads.csv")
+    log_data = {
+        "Matric": [matric],
+        "Name": [student_name],
+        "Week": [week],
+        "File": [file_name],
+        "Type": [upload_type],
+        "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+    }
+    new_entry = pd.DataFrame(log_data)
+    if os.path.exists(log_path):
+        df = pd.read_csv(log_path)
+        df = pd.concat([df, new_entry], ignore_index=True)
+    else:
+        df = new_entry
+    df.to_csv(log_path, index=False)
+
+
+def has_marked_attendance(course_code, week, name):
+    """Check if student already marked attendance."""
+    path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
+    if not os.path.exists(path):
+        return False
+    df = pd.read_csv(path)
+    return ((df["Name"] == name) & (df["Week"] == week)).any()
+
+
+def mark_attendance_entry(course_code, name, matric, week):
+    """Mark student attendance and save persistently."""
+    path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
+    data = {
+        "Name": [name],
+        "Matric": [matric],
+        "Week": [week],
+        "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+    }
+    new_row = pd.DataFrame(data)
+    if os.path.exists(path):
+        df = pd.read_csv(path)
+        df = pd.concat([df, new_row], ignore_index=True)
+    else:
+        df = new_row
+    df.to_csv(path, index=False)
+    return True
+
+
 def view_and_download_files(course_code, file_type, week):
     """Displays uploaded files for a given type and week, with ZIP download."""
     base_dir = os.path.join("student_uploads", course_code, file_type)
@@ -341,17 +411,14 @@ default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
 
 # -----------------------------
-# STUDENT MODE
-# -----------------------------
-if "student_logged_in" not in st.session_state:
-    st.session_state["student_logged_in"] = False
-    st.subheader("🎓 Student Login")
+if mode == "Student":
+    st.subheader("🎓 Student Login and Attendance")
 
     with st.form(f"{course_code}_attendance_form"):
-        name = st.text_input("Full Name")
-        matric = st.text_input("Matric Number")
-        week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist())
-        attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)")
+        name = st.text_input("Full Name", key=f"{course_code}_student_name")
+        matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
+        week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist(), key=f"{course_code}_week")
+        attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
         submit_attendance = st.form_submit_button("✅ Mark Attendance")
 
     if submit_attendance:
@@ -385,8 +452,8 @@ if "student_logged_in" not in st.session_state:
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
-                    else:
-                        st.error("Could not record attendance. Try again or contact your lecturer.")
+
+    st.divider()
 
     # 👇 Only visible to logged-in students
     st.divider()
@@ -822,6 +889,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
