@@ -468,20 +468,22 @@ if mode == "Student":
         else:
             st.info("Lecture note not uploaded yet.")
 
+
+if st.session_state.get("role") != "admin":  # Only students see uploads
    # -----------------------------
 # 📄 ASSIGNMENT UPLOAD
 # -----------------------------
-st.divider()
-st.subheader("📄 Assignment Upload")
+    st.divider()
+    st.subheader("📄 Assignment Upload")
 
-selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
-matric_a = st.text_input("Matric Number", key="matric_a")
-student_name_a = st.text_input("Enter your full name", key="student_name_a")
+    selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
+    matric_a = st.text_input("Matric Number", key="matric_a")
+    student_name_a = st.text_input("Enter your full name", key="student_name_a")
 
-uploaded_assignment = st.file_uploader(
-    f"Upload Assignment for {selected_week_a}",
-    type=["pdf", "docx", "jpg", "png"],
-    key=f"{course_code}_assignment"
+    uploaded_assignment = st.file_uploader(
+        f"Upload Assignment for {selected_week_a}",
+        type=["pdf", "docx", "jpg", "png"],
+        key=f"{course_code}_assignment"
 )
 
 with st.form("assignment_form"):
@@ -633,6 +635,57 @@ if mode == "Teacher/Admin":
                 st.download_button(f"⬇️ Download {label}", df.to_csv(index=False).encode(), csv_file)
             else:
                 st.info(f"No {label.lower()} yet.")
+                
+# ---------------------------------------------------------
+# 🧑‍🏫 ADMIN DASHBOARD: View + Grade
+# ---------------------------------------------------------
+if st.session_state.get("role") == "admin":
+    st.header("🏫 Instructor Dashboard")
+
+    st.subheader("📂 View Student Submissions")
+
+    upload_types = ["assignment", "drawing", "seminar"]
+    base_dir = "student_uploads"
+
+    for upload_type in upload_types:
+        st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+
+        upload_dir = os.path.join(base_dir, course_code, upload_type)
+        if os.path.exists(upload_dir):
+            files = sorted(os.listdir(upload_dir))
+            if files:
+                for file in files:
+                    file_path = os.path.join(upload_dir, file)
+                    st.write(f"📎 {file}")
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Download",
+                            data=f,
+                            file_name=file,
+                            mime="application/octet-stream",
+                            key=file
+                        )
+                    # Add grading box
+                    score = st.number_input(f"Enter score for {file}", 0, 100, key=f"{file}_score")
+                    if st.button(f"Save Score ({file})", key=f"save_{file}"):
+                        log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
+                        new_entry = pd.DataFrame([{
+                            "File": file,
+                            "Type": upload_type,
+                            "Score": score,
+                            "Date Graded": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }])
+                        if os.path.exists(log_file):
+                            existing = pd.read_csv(log_file)
+                            updated = pd.concat([existing, new_entry], ignore_index=True)
+                        else:
+                            updated = new_entry
+                        updated.to_csv(log_file, index=False)
+                        st.success(f"✅ Score saved for {file}")
+            else:
+                st.info(f"No {upload_type} uploaded yet.")
+        else:
+            st.info(f"No directory found for {upload_type}.")
 
         # -------------------------------------
         # 🧮 GRADING AND SCORE MANAGEMENT
@@ -698,4 +751,5 @@ if mode == "Teacher/Admin":
 
 else:
     st.info("🔒 Only admins can access this section.")
+
 
