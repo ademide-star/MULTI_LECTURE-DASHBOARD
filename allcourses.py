@@ -645,10 +645,11 @@ if mode == "Teacher/Admin":
                 st.info(f"No directory found for {upload_type}.")
 
        # ---------------------------------------------------------
-# 🧑‍🏫 ADMIN DASHBOARD: View + Grade (Only visible uploads)
+# ---------------------------------------------------------
+# 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
 # ---------------------------------------------------------
 if st.session_state.get("role") == "admin":
-    st.subheader("📂 Grade Student Submissions")
+    st.subheader("📂 View Student Submissions & Grade Them")
 
     upload_types = ["assignment", "drawing", "seminar"]
     base_dir = "student_uploads"
@@ -662,22 +663,29 @@ if st.session_state.get("role") == "admin":
             if files:
                 for file in files:
                     file_path = os.path.join(upload_dir, file)
+                    unique_key = f"{course_code}_{upload_type}_{file}"
+
                     st.write(f"📎 {file}")
+
+                    # ✅ Unique key for download button
                     with open(file_path, "rb") as f:
                         st.download_button(
                             label=f"⬇️ Download {file}",
                             data=f,
                             file_name=file,
                             mime="application/octet-stream",
-                            key=f"{upload_type}_{file}"
+                            key=f"{unique_key}_download"
                         )
 
-                    # 🧮 Grading section for this file
+                    # ✅ Unique key for score input
                     score = st.number_input(
                         f"Enter score for {file}",
-                        0, 100, key=f"{upload_type}_{file}_score"
+                        0, 100,
+                        key=f"{unique_key}_score"
                     )
-                    if st.button(f"💾 Save Score ({file})", key=f"save_{upload_type}_{file}"):
+
+                    # ✅ Unique key for save button
+                    if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
                         log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
                         new_entry = pd.DataFrame([{
                             "File": file,
@@ -696,6 +704,48 @@ if st.session_state.get("role") == "admin":
                 st.info(f"No {upload_type} uploaded yet.")
         else:
             st.info(f"No directory found for {upload_type}.")
+
+    # -----------------------------------------------------
+    # 📊 LIVE SCORE REVIEW TABLE (New Feature)
+    # -----------------------------------------------------
+    st.divider()
+    st.header("📊 Review Graded Scores")
+
+    log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
+
+    if os.path.exists(log_file):
+        scores_df = pd.read_csv(log_file)
+
+        # ✅ Filters for easier viewing
+        col1, col2 = st.columns(2)
+        with col1:
+            type_filter = st.selectbox("Filter by Upload Type", ["All"] + sorted(scores_df["Type"].unique().tolist()))
+        with col2:
+            sort_order = st.radio("Sort by Date", ["Newest First", "Oldest First"])
+
+        filtered_df = scores_df.copy()
+        if type_filter != "All":
+            filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+
+        filtered_df = filtered_df.sort_values(
+            "Date Graded", ascending=(sort_order == "Oldest First")
+        )
+
+        # ✅ Display filtered table
+        st.dataframe(filtered_df, use_container_width=True)
+
+        # ✅ Download option
+        st.download_button(
+            label="⬇️ Download All Scores (CSV)",
+            data=filtered_df.to_csv(index=False).encode(),
+            file_name=f"{course_code}_graded_scores.csv",
+            mime="text/csv",
+            key=f"{course_code}_download_scores"
+        )
+
+    else:
+        st.info("No graded scores yet. Once you grade a file, it will appear here.")
+
 
     # -------------------------------------
     # 🧮 GRADING AND SCORE MANAGEMENT
@@ -747,6 +797,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
