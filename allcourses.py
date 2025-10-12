@@ -343,8 +343,10 @@ lectures_df = init_lectures(course_code, default_topics)
 # -----------------------------
 # STUDENT MODE
 # -----------------------------
-if mode == "Student":
-    st.subheader(f"🎓 {course} Student Access")
+if "student_logged_in" not in st.session_state:
+    st.session_state["student_logged_in"] = False
+
+st.subheader("🎓 Student Login")
 
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name")
@@ -470,13 +472,12 @@ if mode == "Student":
 
 
 if st.session_state.get("role") != "admin":  # Only students see uploads
-    selected_week_a = lecture_info["Week"]
    # -----------------------------
 # 📄 ASSIGNMENT UPLOAD
 # -----------------------------
     st.divider()
     st.subheader("📄 Assignment Upload")
-
+    selected_week_a = lecture_info["Week"]
     selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
     matric_a = st.text_input("Matric Number", key="matric_a")
     student_name_a = st.text_input("Enter your full name", key="student_name_a")
@@ -505,7 +506,7 @@ with st.form("assignment_form"):
 # -----------------------------
 st.divider()
 st.subheader("🖌️ Drawing Upload for Class Work")
-
+selected_week_d = lecture_info["Week"]
 selected_week_d = st.selectbox("Select Week for Drawing", lectures_df["Week"].tolist(), key="drawing_week_select")
 matric_d = st.text_input("Matric Number", key="matric_d")
 student_name_d = st.text_input("Enter your full name", key="student_name_d")
@@ -534,7 +535,7 @@ with st.form("drawing_form"):
 # -----------------------------
 st.divider()
 st.subheader("🎤 Seminar Upload")
-
+selected_week_s = lecture_info["Week"]
 selected_week_s = st.selectbox("Select Week for Seminar", lectures_df["Week"].tolist(), key="seminar_week_select")
 matric_s = st.text_input("Matric Number", key="matric_s")
 student_name_s = st.text_input("Enter your full name", key="student_name_s")
@@ -750,6 +751,7 @@ if st.session_state.get("role") == "admin":
 
 else:
     st.info("🔒 Only admins can access this section.")
+
 
 
 
