@@ -464,6 +464,19 @@ if mode == "Student":
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
                         st.session_state[f"{course_code}_{week}_att_marked"] = True
+        if "attended_week" in st.session_state:
+            week = st.session_state["attended_week"]
+            st.success(f"Access granted for {week}")
+            lecture_info = lectures_df[lectures_df["Week"]==week].iloc[0]
+            st.subheader(f"📖 {week}: {lecture_info['Topic']}")
+            if lecture_info["Brief"].strip(): st.write(f"**Lecture Brief:** {lecture_info['Brief']}")
+        else: st.info("Lecture brief not yet available.")
+
+        if lecture_info["Assignment"].strip():
+            st.subheader("📚 Assignment")
+            st.markdown(f"**Assignment:** {lecture_info['Assignment']}")
+        else:
+            st.info("Assignment not released yet.")
 
     # 🧠 Check if attendance marked before showing materials
     if st.session_state.get(f"{course_code}_{week}_att_marked", False):
@@ -910,6 +923,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
