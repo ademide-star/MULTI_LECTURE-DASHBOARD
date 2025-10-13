@@ -461,18 +461,20 @@ if mode == "Student":
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
 
     # ---------------------------------------------
-    # 📘 Lecture Briefs and Classwork
-    # ---------------------------------------------
-    st.divider()
-    st.subheader("📘 Lecture Briefs and Classwork")
-    st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
+# 📘 Lecture Briefs and Classwork
+# ---------------------------------------------
+st.divider()
+st.subheader("📘 Lecture Briefs and Classwork")
+st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
-    # Safely select the week's lecture row
-    if "attended_week" in st.session_state:
-        week = st.session_state["attended_week"]
-        st.success(f"Access granted for {week}")
-        selected_week = week if 'week' in locals() else lectures_df.iloc[0]['Week']
-        lecture_row = lectures_df[lectures_df["Week"] == selected_week]
+lecture_row = pd.DataFrame()  # ✅ Safe default
+
+if "attended_week" in st.session_state and not lectures_df.empty:
+    week = st.session_state["attended_week"]
+    st.success(f"Access granted for {week}")
+    lecture_row = lectures_df[lectures_df["Week"] == week]
+else:
+    st.warning("No lecture selected or attendance not recorded yet.")
 
     if lecture_row.empty:
         st.error("No lecture data found for the selected week.")
@@ -997,6 +999,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
