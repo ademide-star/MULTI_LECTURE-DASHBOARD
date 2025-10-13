@@ -541,7 +541,7 @@ if mode == "Student":
     st.subheader("📈 Your Continuous Assessment (CA) Summary")
 
     # Student CA summary (optional central scores file)
-    scores_file = os.path.join("scores", f"{course_code}_scores.csv")
+    scores_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
     if os.path.exists(scores_file):
         df_scores = pd.read_csv(scores_file)
         # try to protect against missing name/matric when not set
@@ -657,6 +657,24 @@ if st.button(f"📤 Submit Seminar for {selected_week_s}", key="submit_seminar_b
         file_path = save_file(course_code, student_name_s, selected_week_s, uploaded_seminar, "seminar")
         log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
         st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
+
+# ---------------------------------------------------------
+# 🎓 STUDENT SECTION: Watch Lecture Videos
+# ---------------------------------------------------------
+st.divider()
+st.subheader("🎬 Watch Lecture Videos")
+
+video_dir = os.path.join("video_lectures", course_code)
+if os.path.exists(video_dir):
+    video_files = sorted(os.listdir(video_dir))
+    if video_files:
+        selected_video = st.selectbox("Select a lecture to watch:", video_files)
+        video_path = os.path.join(video_dir, selected_video)
+        st.video(video_path)
+    else:
+        st.info("No lecture videos have been uploaded yet.")
+else:
+    st.warning("📁 No video directory found for this course.")
 
 
 # 🔐 TEACHER / ADMIN DASHBOARD (FULL + SCORE VIEWER)
@@ -923,6 +941,41 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+# ---------------------------------------------------------
+# 🎥 ADMIN: Upload Video Lectures
+# ---------------------------------------------------------
+if st.session_state.get("role") == "admin":
+    st.subheader("🎥 Upload & Manage Video Lectures")
+
+    video_dir = os.path.join("video_lectures", course_code)
+    os.makedirs(video_dir, exist_ok=True)
+
+    uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
+
+    if uploaded_video:
+        save_path = os.path.join(video_dir, uploaded_video.name)
+        with open(save_path, "wb") as f:
+            f.write(uploaded_video.read())
+        st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
+
+    # Display list of uploaded videos
+    if os.path.exists(video_dir):
+        video_files = sorted(os.listdir(video_dir))
+        if video_files:
+            st.markdown("### 📚 Uploaded Lecture Videos")
+            for video in video_files:
+                video_path = os.path.join(video_dir, video)
+                st.video(video_path)
+                st.download_button(
+                    label=f"⬇️ Download {video}",
+                    data=open(video_path, "rb").read(),
+                    file_name=video,
+                    mime="video/mp4",
+                    key=f"{video}_download"
+                )
+        else:
+            st.info("No videos uploaded yet.")
+
 
 
 
