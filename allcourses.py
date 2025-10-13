@@ -429,9 +429,9 @@ if mode == "Student":
             st.warning("Please enter the attendance code for today.")
         else:
             COURSE_TIMINGS = {
-                "BIO203": {"valid_code": "BIO203-ZT7", "start": "10:00", "end": "14:00"},
+                "BIO203": {"valid_code": "BIO203-ZT7", "start": "02:00", "end": "14:00"},
                 "BCH201": {"valid_code": "BCH201-ZT8", "start": "14:00", "end": "16:00"},
-                "MCB221": {"valid_code": "MCB221-ZT9", "start": "10:00", "end": "14:00"},
+                "MCB221": {"valid_code": "MCB221-ZT9", "start": "02:00", "end": "14:00"},
             }
 
             if course_code not in COURSE_TIMINGS:
@@ -888,6 +888,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
