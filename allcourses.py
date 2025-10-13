@@ -468,8 +468,11 @@ if mode == "Student":
     st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
     # Safely select the week's lecture row
-    selected_week = week if 'week' in locals() else lectures_df.iloc[0]['Week']
-    lecture_row = lectures_df[lectures_df["Week"] == selected_week]
+    if "attended_week" in st.session_state:
+        week = st.session_state["attended_week"]
+        st.success(f"Access granted for {week}")
+        selected_week = week if 'week' in locals() else lectures_df.iloc[0]['Week']
+        lecture_row = lectures_df[lectures_df["Week"] == selected_week]
 
     if lecture_row.empty:
         st.error("No lecture data found for the selected week.")
@@ -994,6 +997,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
