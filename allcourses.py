@@ -6,6 +6,8 @@ from datetime import datetime, date, timedelta
 from streamlit_autorefresh import st_autorefresh
 import zipfile
 import io
+from datetime import datetime, timedelta, time
+
 
 # -----------------------------
 # BASIC CONFIG + DIRECTORIES
@@ -440,7 +442,8 @@ if mode == "Student":
                 start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
                 end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
                 valid_code = COURSE_TIMINGS[course_code]["valid_code"]
-                now_t = datetime.now().time()
+                # Adjust for Nigeria timezone (UTC+1)
+                now_t = (datetime.utcnow() + timedelta(hours=1)).time()
 
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
@@ -888,6 +891,7 @@ if st.session_state.get("role") == "admin":
         )
     else:
         st.info("🔒 No scores recorded yet.")
+
 
 
 
