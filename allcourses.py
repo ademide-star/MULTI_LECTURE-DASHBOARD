@@ -492,49 +492,50 @@ if mode == "Student":
             st.divider()
             st.subheader(f"📖 {lecture_info['Week']}: {lecture_info['Topic']}")
 
-            brief = str(lecture_info["Brief"]) if pd.notnull(lecture_info["Brief"]) else ""
-            assignment = str(lecture_info["Assignment"]) if pd.notnull(lecture_info["Assignment"]) else ""
-            classwork_text = str(lecture_info["Classwork"]) if pd.notnull(lecture_info["Classwork"]) else ""
+            # 🧩 Safely extract lecture content
+brief = str(lecture_info.get("Brief", "")).strip() if pd.notnull(lecture_info.get("Brief", "")) else ""
+assignment = str(lecture_info.get("Assignment", "")).strip() if pd.notnull(lecture_info.get("Assignment", "")) else ""
+classwork_text = str(lecture_info.get("Classwork", "")).strip() if pd.notnull(lecture_info.get("Classwork", "")) else ""
 
-            # 🧩 Lecture Brief
-            if brief.strip():
-                st.markdown(f"**Lecture Brief:** {brief}")
+# 🧾 Lecture Brief
+if brief:
+    st.markdown(f"**Lecture Brief:** {brief}")
+else:
+    st.info("Lecture brief not available yet.")
 
-            # 🧩 Classwork Section
-            if classwork_text.strip():
-                st.markdown("### 🧩 Classwork Questions")
-                questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-                with st.form("cw_form"):
-                    answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
-                    if submit_cw:
-                        save_classwork(name, matric, week, answers)
-                        st.success("✅ Classwork submitted successfully.")
-            else:
-                st.info("Classwork not yet released.")
+# 🧩 Classwork Section
+if classwork_text:
+    st.markdown("### 🧩 Classwork Questions")
+    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+    with st.form("cw_form"):
+        answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
+        submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
+        if submit_cw:
+            save_classwork(name, matric, week, answers)
+            st.success("✅ Classwork submitted successfully.")
+else:
+    st.info("Classwork not yet released.")
 
-            # 🧾 Assignment Section
-            if assignment.strip():
-                st.subheader("📚 Assignment")
-                st.markdown(f"**Assignment:** {assignment}")
-            else:
-                st.info("Assignment not released yet.")
+# 📝 Assignment Section
+if assignment:
+    st.subheader("📚 Assignment")
+    st.markdown(f"**Assignment:** {assignment}")
+else:
+    st.info("Assignment not released yet.")
 
-            # 📥 Lecture PDF Section
-            pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info['Week'].replace(' ', '_')}.pdf")
-            if os.path.exists(pdf_path):
-                with open(pdf_path, "rb") as pdf_file:
-                    pdf_bytes = pdf_file.read()
-                st.download_button(
-                    label=f"📥 Download {lecture_info['Week']} Module PDF",
-                    data=pdf_bytes,
-                    file_name=f"{course_code}_{lecture_info['Week']}.pdf",
-                    mime="application/pdf"
-                )
-            else:
-                st.info("Lecture note not uploaded yet.")
-    else:
-        st.warning("🚫 Lecture materials are only visible after you mark your attendance successfully.")
+# 📥 Lecture PDF Section
+pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
+if os.path.exists(pdf_path):
+    with open(pdf_path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+    st.download_button(
+        label=f"📥 Download {lecture_info.get('Week', 'Lecture')} Module PDF",
+        data=pdf_bytes,
+        file_name=f"{course_code}_{lecture_info.get('Week', 'Lecture')}.pdf",
+        mime="application/pdf"
+    )
+else:
+    st.info("Lecture note not uploaded yet.")
 
     
     st.divider()
@@ -975,6 +976,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
