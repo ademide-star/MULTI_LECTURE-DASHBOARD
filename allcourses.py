@@ -729,19 +729,36 @@ if mode == "Teacher/Admin":
         close_classwork_after_20min(course_code)
 
 # ---- Records ----
-        for file,label in [(ATTENDANCE_FILE,"Attendance Records"),
-                           (CLASSWORK_FILE,"Classwork Submissions"),
-                           (SEMINAR_FILE,"Seminar Submissions")]:
-            st.divider()
-            st.markdown(f"### {label}")
-            if os.path.exists(file):
-                df = pd.read_csv(file)
-                st.dataframe(df)
-                st.download_button(f"Download {label} CSV", df.to_csv(index=False).encode(), file)
-            else: st.info(f"No {label.lower()} yet.")
+st.header("📋 Student Records")
+
+base_dir = "student_uploads"
+records = {
+    "Attendance Records": os.path.join(base_dir, f"{course_code}_attendance.csv"),
+    "Classwork Submissions": os.path.join(base_dir, f"{course_code}_classwork.csv"),
+    "Seminar Submissions": os.path.join(base_dir, f"{course_code}_seminar.csv")
+}
+
+for label, file_path in records.items():
+    st.divider()
+    st.markdown(f"### {label}")
+    if os.path.exists(file_path):
+        try:
+            df = pd.read_csv(file_path)
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+                st.download_button(
+                    label=f"⬇️ Download {label}",
+                    data=df.to_csv(index=False).encode("utf-8"),
+                    file_name=os.path.basename(file_path),
+                    mime="text/csv"
+                )
+            else:
+                st.info(f"{label} file is empty.")
+        except Exception as e:
+            st.error(f"⚠️ Error reading {label}: {e}")
     else:
-        if password: st.error("❌ Incorrect password. Try again.")
-       # ---------------------------------------------------------
+        st.info(f"No {label.lower()} yet.")
+
 # ---------------------------------------------------------
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
 # ---------------------------------------------------------
@@ -977,6 +994,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
