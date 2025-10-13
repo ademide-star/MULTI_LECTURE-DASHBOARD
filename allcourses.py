@@ -420,6 +420,8 @@ lectures_df = init_lectures(course_code, default_topics)
 if mode == "Student":
     st.subheader("🎓 Student Login and Attendance")
 
+    ok = False  # ✅ Initialize to avoid undefined variable error
+
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
@@ -459,6 +461,11 @@ if mode == "Student":
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
+
+    # ✅ Now safe to use ok here
+    if submit_attendance and ok:
+        st.session_state["attended_week"] = week
+
 
     # ---------------------------------------------
 # ---------------------------------------------
@@ -1005,6 +1012,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
