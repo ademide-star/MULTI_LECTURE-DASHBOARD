@@ -414,13 +414,12 @@ default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
 
 # -----------------------------
-# -----------------------------
-# 🎓 STUDENT LOGIN, ATTENDANCE & LECTURE ACCESS
-# -----------------------------
+# ---------------------------------------------
+# 🎓 STUDENT SECTION – Attendance + Lecture Access
+# ---------------------------------------------
 if mode == "Student":
     st.subheader("🎓 Student Login and Attendance")
 
-    # 🧾 Attendance Form
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
@@ -428,7 +427,6 @@ if mode == "Student":
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
         submit_attendance = st.form_submit_button("✅ Mark Attendance")
 
-    # 🎯 Validate Attendance Submission
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
@@ -436,7 +434,7 @@ if mode == "Student":
             st.warning("Please enter the attendance code for today.")
         else:
             COURSE_TIMINGS = {
-                "BIO203": {"valid_code": "BIO203-ZT7", "start": "10:00", "end": "12:00"},
+                "BIO203": {"valid_code": "BIO203-ZT7", "start": "10:00", "end": "13:00"},
                 "BCH201": {"valid_code": "BCH201-ZT8", "start": "14:00", "end": "16:00"},
                 "MCB221": {"valid_code": "MCB221-ZT9", "start": "10:00", "end": "10:20"},
             }
@@ -448,8 +446,7 @@ if mode == "Student":
                 end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
                 valid_code = COURSE_TIMINGS[course_code]["valid_code"]
 
-                # Adjust for Nigeria timezone (UTC+1)
-                now_t = (datetime.utcnow() + timedelta(hours=1)).time()
+                now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria timezone (UTC+1)
 
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
@@ -458,94 +455,83 @@ if mode == "Student":
                     st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
                 elif has_marked_attendance(course_code, week, name):
                     st.info("✅ Attendance already marked. You can’t mark it again.")
-                    st.session_state[f"{course_code}_{week}_att_marked"] = True
                 else:
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
-                        st.session_state[f"{course_code}_{week}_att_marked"] = True
-        if "attended_week" in st.session_state:
-            week = st.session_state["attended_week"]
-            st.success(f"Access granted for {week}")
-            lecture_info = lectures_df[lectures_df["Week"]==week].iloc[0]
-            st.subheader(f"📖 {week}: {lecture_info['Topic']}")
-            if lecture_info["Brief"].strip(): st.write(f"**Lecture Brief:** {lecture_info['Brief']}")
-        else: st.info("Lecture brief not yet available.")
 
-        if lecture_info["Assignment"].strip():
+    # ---------------------------------------------
+    # 📘 Lecture Briefs and Classwork
+    # ---------------------------------------------
+    st.divider()
+    st.subheader("📘 Lecture Briefs and Classwork")
+    st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
+
+    # Safely select the week's lecture row
+    selected_week = week if 'week' in locals() else lectures_df.iloc[0]['Week']
+    lecture_row = lectures_df[lectures_df["Week"] == selected_week]
+
+    if lecture_row.empty:
+        st.error("No lecture data found for the selected week.")
+    else:
+        lecture_info = lecture_row.iloc[0]
+        st.divider()
+        st.subheader(f"📖 {lecture_info.get('Week', 'Lecture')}: {lecture_info.get('Topic', 'No topic available')}")
+
+        # 🧩 Safely extract text fields
+        brief = str(lecture_info.get("Brief", "")).strip() if pd.notnull(lecture_info.get("Brief", "")) else ""
+        assignment = str(lecture_info.get("Assignment", "")).strip() if pd.notnull(lecture_info.get("Assignment", "")) else ""
+        classwork_text = str(lecture_info.get("Classwork", "")).strip() if pd.notnull(lecture_info.get("Classwork", "")) else ""
+
+        # 🧾 Lecture Brief
+        if brief:
+            st.markdown(f"**Lecture Brief:** {brief}")
+        else:
+            st.info("Lecture brief not available yet.")
+
+        # 🧩 Classwork Section
+        if classwork_text:
+            st.markdown("### 🧩 Classwork Questions")
+            questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+            with st.form("cw_form"):
+                answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
+                submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
+                if submit_cw:
+                    save_classwork(name, matric, week, answers)
+                    st.success("✅ Classwork submitted successfully.")
+        else:
+            st.info("Classwork not yet released.")
+
+        # 📝 Assignment Section
+        if assignment:
             st.subheader("📚 Assignment")
-            st.markdown(f"**Assignment:** {lecture_info['Assignment']}")
+            st.markdown(f"**Assignment:** {assignment}")
         else:
             st.info("Assignment not released yet.")
 
-    # 🧠 Check if attendance marked before showing materials
-    if st.session_state.get(f"{course_code}_{week}_att_marked", False):
-        st.divider()
-        st.subheader("📘 Lecture Briefs and Classwork")
-        st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
-
-        lecture_row = lectures_df[lectures_df["Week"] == week]
-        if lecture_row.empty:
-            st.error("No lecture data found for the selected week.")
+        # 📥 Lecture PDF Section
+        pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_bytes = pdf_file.read()
+            st.download_button(
+                label=f"📥 Download {lecture_info.get('Week', 'Lecture')} Module PDF",
+                data=pdf_bytes,
+                file_name=f"{course_code}_{lecture_info.get('Week', 'Lecture')}.pdf",
+                mime="application/pdf"
+            )
         else:
-            lecture_info = lecture_row.iloc[0]
-            st.divider()
-            st.subheader(f"📖 {lecture_info['Week']}: {lecture_info['Topic']}")
+            st.info("Lecture note not uploaded yet.")
 
-            # 🧩 Safely extract lecture content
-brief = str(lecture_info.get("Brief", "")).strip() if pd.notnull(lecture_info.get("Brief", "")) else ""
-assignment = str(lecture_info.get("Assignment", "")).strip() if pd.notnull(lecture_info.get("Assignment", "")) else ""
-classwork_text = str(lecture_info.get("Classwork", "")).strip() if pd.notnull(lecture_info.get("Classwork", "")) else ""
-
-# 🧾 Lecture Brief
-if brief:
-    st.markdown(f"**Lecture Brief:** {brief}")
-else:
-    st.info("Lecture brief not available yet.")
-
-# 🧩 Classwork Section
-if classwork_text:
-    st.markdown("### 🧩 Classwork Questions")
-    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-    with st.form("cw_form"):
-        answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-        submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
-        if submit_cw:
-            save_classwork(name, matric, week, answers)
-            st.success("✅ Classwork submitted successfully.")
-else:
-    st.info("Classwork not yet released.")
-
-# 📝 Assignment Section
-if assignment:
-    st.subheader("📚 Assignment")
-    st.markdown(f"**Assignment:** {assignment}")
-else:
-    st.info("Assignment not released yet.")
-
-# 📥 Lecture PDF Section
-pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
-if os.path.exists(pdf_path):
-    with open(pdf_path, "rb") as pdf_file:
-        pdf_bytes = pdf_file.read()
-    st.download_button(
-        label=f"📥 Download {lecture_info.get('Week', 'Lecture')} Module PDF",
-        data=pdf_bytes,
-        file_name=f"{course_code}_{lecture_info.get('Week', 'Lecture')}.pdf",
-        mime="application/pdf"
-    )
-else:
-    st.info("Lecture note not uploaded yet.")
-
-    
+    # ---------------------------------------------
+    # 📈 Student Continuous Assessment (CA) Summary
+    # ---------------------------------------------
     st.divider()
     st.subheader("📈 Your Continuous Assessment (CA) Summary")
 
-    # Student CA summary (optional central scores file)
     scores_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
     if os.path.exists(scores_file):
         df_scores = pd.read_csv(scores_file)
-        # try to protect against missing name/matric when not set
         if 'name' in locals() and 'matric' in locals() and name.strip() and matric.strip():
             student_scores = df_scores[
                 (df_scores["StudentName"].str.lower() == name.strip().lower()) &
@@ -558,7 +544,11 @@ else:
                 ass_total = student_scores["AssignmentScore"].mean() if "AssignmentScore" in student_scores else 0
                 total_CA = (cw_total * 0.3) + (sem_total * 0.2) + (ass_total * 0.5)
 
-                st.dataframe(student_scores[[col for col in ["Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"] if col in student_scores.columns]], use_container_width=True)
+                st.dataframe(
+                    student_scores[[col for col in ["Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"] if col in student_scores.columns]],
+                    use_container_width=True
+                )
+
                 st.markdown(f"""
                     <div style='background-color:#f0f9ff;padding:15px;border-radius:10px;margin-top:10px;'>
                         <h4>📘 <b>Performance Summary</b></h4>
@@ -577,7 +567,6 @@ else:
     else:
         st.warning("📁 Scores file not yet available for this course.")
 
-    
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (STUDENT SECTION)
 # ===============================================================
@@ -976,6 +965,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
