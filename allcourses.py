@@ -476,51 +476,51 @@ if mode == "Teacher/Admin":
             st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
         close_classwork_after_20min(course_code)
  
-st.header("📋 Student Records")
+        st.header("📋 Student Records")
 
-base_dir = "student_uploads"
-records = {
-    "Attendance Records": os.path.join(base_dir, f"{course_code}_attendance.csv"),
-    "Classwork Submissions": os.path.join(base_dir, f"{course_code}_classwork.csv"),
-    "Seminar Submissions": os.path.join(base_dir, f"{course_code}_seminar.csv")
-}
+        base_dir = "student_uploads"
+        records = {
+        "Attendance Records": os.path.join(base_dir, f"{course_code}_attendance.csv"),
+        "Classwork Submissions": os.path.join(base_dir, f"{course_code}_classwork.csv"),
+        "Seminar Submissions": os.path.join(base_dir, f"{course_code}_seminar.csv")
+            }
 
-for label, file_path in records.items():
-    st.divider()
-    st.markdown(f"### {label}")
-    if os.path.exists(file_path):
-        try:
-            df = pd.read_csv(file_path)
-            if not df.empty:
-                st.dataframe(df, use_container_width=True)
-                st.download_button(
-                    label=f"⬇️ Download {label}",
-                    data=df.to_csv(index=False).encode("utf-8"),
-                    file_name=os.path.basename(file_path),
-                    mime="text/csv"
-                )
+        for label, file_path in records.items():
+            st.divider()
+            st.markdown(f"### {label}")
+            if os.path.exists(file_path):
+                try:
+                df = pd.read_csv(file_path)
+                    if not df.empty:
+                        st.dataframe(df, use_container_width=True)
+                        st.download_button(
+                        label=f"⬇️ Download {label}",
+                        data=df.to_csv(index=False).encode("utf-8"),
+                        file_name=os.path.basename(file_path),
+                        mime="text/csv"
+                        )
+                    else:
+                        st.info(f"{label} file is empty.")
+                    except Exception as e:
+                        st.error(f"⚠️ Error reading {label}: {e}")
             else:
-                st.info(f"{label} file is empty.")
-        except Exception as e:
-            st.error(f"⚠️ Error reading {label}: {e}")
-    else:
-        st.info(f"No {label.lower()} yet.")
+                st.info(f"No {label.lower()} yet.")
 
 # ---------------------------------------------------------
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
 # ---------------------------------------------------------
-if st.session_state.get("role") == "admin":
-    st.subheader("📂 View Student Submissions & Grade Them")
+    if st.session_state.get("role") == "admin":
+        st.subheader("📂 View Student Submissions & Grade Them")
 
-    upload_types = ["assignment", "drawing", "seminar"]
-    base_dir = "student_uploads"
-    scores_dir = "scores"
-    os.makedirs(scores_dir, exist_ok=True)
+        upload_types = ["assignment", "drawing", "seminar"]
+        base_dir = "student_uploads"
+        scores_dir = "scores"
+        os.makedirs(scores_dir, exist_ok=True)
 
-    for upload_type in upload_types:
-        st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+        for upload_type in upload_types:
+            st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
 
-        upload_dir = os.path.join(base_dir, course_code, upload_type)
+            upload_dir = os.path.join(base_dir, course_code, upload_type)
         if os.path.exists(upload_dir):
             files = sorted(os.listdir(upload_dir))
             if files:
@@ -710,23 +710,23 @@ if st.session_state.get("role") == "admin":
 # ---------------------------------------------------------
 # 🎥 ADMIN: Upload Video Lectures
 # ---------------------------------------------------------
-if st.session_state.get("role") == "admin":
-    st.subheader("🎥 Upload & Manage Video Lectures")
+    if st.session_state.get("role") == "admin":
+        st.subheader("🎥 Upload & Manage Video Lectures")
 
-    video_dir = os.path.join("video_lectures", course_code)
-    os.makedirs(video_dir, exist_ok=True)
+        video_dir = os.path.join("video_lectures", course_code)
+        os.makedirs(video_dir, exist_ok=True)
 
-    uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
+        uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
 
-    if uploaded_video:
-        save_path = os.path.join(video_dir, uploaded_video.name)
+        if uploaded_video:
+            save_path = os.path.join(video_dir, uploaded_video.name)
         with open(save_path, "wb") as f:
             f.write(uploaded_video.read())
-        st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
+            st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
 
     # Display list of uploaded videos
-    if os.path.exists(video_dir):
-        video_files = sorted(os.listdir(video_dir))
+        if os.path.exists(video_dir):
+            video_files = sorted(os.listdir(video_dir))
         if video_files:
             st.markdown("### 📚 Uploaded Lecture Videos")
             for video in video_files:
@@ -1012,6 +1012,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
