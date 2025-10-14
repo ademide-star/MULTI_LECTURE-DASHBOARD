@@ -395,15 +395,17 @@ def close_classwork_after_20min(course_code):
     if changed:
         df.to_csv(CLASSWORK_STATUS_FILE, index=False)
         
-UPLOADS_DIR = "student_uploads"  # Adjust if you already defined elsewhere
-os.makedirs(UPLOADS_DIR, exist_ok=True)
+
 
 def save_file(course_code, student_name, week, uploaded_file, folder_name):
-    """Save uploaded file to the appropriate course and folder."""
-    upload_dir = os.path.join(UPLOADS_DIR, course_code, folder_name)
+    """Safely save uploaded file to the appropriate course and folder."""
+    if uploaded_file is None:
+        return None  # handled at caller level
+
+    upload_dir = os.path.join("student_uploads", course_code, folder_name)
     os.makedirs(upload_dir, exist_ok=True)
 
-    safe_name = student_name.replace(" ", "_")
+    safe_name = re.sub(r'[^A-Za-z0-9_-]', '_', student_name.strip())
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_path = os.path.join(upload_dir, f"{safe_name}_{week}_{timestamp}_{uploaded_file.name}")
 
@@ -411,8 +413,7 @@ def save_file(course_code, student_name, week, uploaded_file, folder_name):
         f.write(uploaded_file.getbuffer())
 
     return file_path
-
-
+    
 def log_submission(course_code, matric, student_name, week, file_name, upload_type):
     """Log each upload to a CSV file for admin tracking."""
     log_file = os.path.join(UPLOADS_DIR, f"{course_code}_submissions_log.csv")
@@ -431,8 +432,6 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
     else:
         updated = new_entry
     updated.to_csv(log_file, index=False)
-
-
 
 # -----------------------------
 # STUDENT MODE
@@ -607,9 +606,6 @@ def student_view():
         st.divider()
         st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 
-    # =======================
-    # ASSIGNMENT UPLOAD
-    # =======================
         st.divider()
         st.subheader("📝 Assignment Upload")
 
@@ -618,8 +614,9 @@ def student_view():
             lectures_df["Week"].tolist(),
             key="assignment_week_select"
     )
-        matric_a = st.text_input("Matric Number", key="matric_a")
+        # 👩‍🎓 Student details
         student_name_a = st.text_input("Full Name", key="student_name_a")
+        matric_a = st.text_input("Matric Number", key="matric_a")
         uploaded_assignment = st.file_uploader(
             f"Upload Assignment for {selected_week_a}",
             type=["pdf", "docx", "jpg", "png"],
@@ -640,8 +637,12 @@ def student_view():
     # DRAWING UPLOAD
     # =======================
         st.divider()
-        st.subheader("🎨 Drawing Upload")
-
+        st.subheader("🎨 Drawing Claas Work Upload")
+        selected_week_d = st.selectbox(
+            "Select Week for Drawing Class Work",
+            lectures_df["Week"].tolist(),
+            key="assignment_week_select"
+    )
         selected_week_d = st.selectbox("Select Week for Drawing", lectures_df["Week"].tolist(), key="drawing_week_select")
         matric_d = st.text_input("Matric Number", key="matric_d")
         student_name_d = st.text_input("Full Name", key="student_name_d")
@@ -1128,6 +1129,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
