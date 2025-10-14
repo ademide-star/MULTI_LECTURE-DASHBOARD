@@ -486,25 +486,26 @@ if mode == "Teacher/Admin":
             }
 
         for label, file_path in records.items():
-            st.divider()
-            st.markdown(f"### {label}")
-            if os.path.exists(file_path):
-                try:
-                df = pd.read_csv(file_path)
-                    if not df.empty:
-                        st.dataframe(df, use_container_width=True)
-                        st.download_button(
-                        label=f"⬇️ Download {label}",
-                        data=df.to_csv(index=False).encode("utf-8"),
-                        file_name=os.path.basename(file_path),
-                        mime="text/csv"
-                        )
-                    else:
-                        st.info(f"{label} file is empty.")
-                    except Exception as e:
-                        st.error(f"⚠️ Error reading {label}: {e}")
+    st.divider()
+    st.markdown(f"### {label}")
+
+    if os.path.exists(file_path):
+        try:
+            df = pd.read_csv(file_path)
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+                st.download_button(
+                    label=f"⬇️ Download {label}",
+                    data=df.to_csv(index=False).encode("utf-8"),
+                    file_name=os.path.basename(file_path),
+                    mime="text/csv"
+                )
             else:
-                st.info(f"No {label.lower()} yet.")
+                st.info(f"{label} file is empty.")
+        except Exception as e:
+            st.error(f"⚠️ Error reading {label}: {e}")
+    else:
+        st.info(f"No {label.lower()} yet.")
 
 # ---------------------------------------------------------
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
@@ -1026,6 +1027,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
