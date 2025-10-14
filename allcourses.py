@@ -986,12 +986,12 @@ def admin_view():
                         key=f"{course_code}_sort_order"
                 )
 
-                        filtered_df = scores_df.copy()
-                        if type_filter != "All":
-                        filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+                filtered_df = scores_df.copy()
+                if type_filter != "All":
+                    filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
-                        filtered_df = filtered_df.sort_values(
-                        "Date Graded", ascending=(sort_order == "Oldest First")
+                filtered_df = filtered_df.sort_values(
+                    "Date Graded", ascending=(sort_order == "Oldest First")
             )
 
             # ✅ Display filtered table
@@ -1133,6 +1133,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
