@@ -738,7 +738,17 @@ if mode == "Teacher/Admin":
             open_classwork(course_code, week_to_control)
             st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
         close_classwork_after_20min(course_code)
-
+ # ---- Records ----
+        for file,label in [(ATTENDANCE_FILE,"Attendance Records"),
+                           (CLASSWORK_FILE,"Classwork Submissions"),
+                           (SEMINAR_FILE,"Seminar Submissions")]:
+            st.divider()
+            st.markdown(f"### {label}")
+            if os.path.exists(file):
+                df = pd.read_csv(file)
+                st.dataframe(df)
+                st.download_button(f"Download {label} CSV", df.to_csv(index=False).encode(), file)
+            else: st.info(f"No {label.lower()} yet.")
 # ---- Records ----
 st.header("📋 Student Records")
 
@@ -1005,6 +1015,7 @@ if st.session_state.get("role") == "admin":
                 )
         else:
             st.info("No videos uploaded yet.")
+
 
 
 
