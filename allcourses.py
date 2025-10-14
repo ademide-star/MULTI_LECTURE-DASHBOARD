@@ -28,16 +28,12 @@ if role != "Select":
 else:
     st.session_state["role"] = None
 # -----------------------------
-# BASIC CONFIG + DIRECTORIES
-# -----------------------------
-st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
-st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
 # -----------------------------
 # APP LAYOUT
 # -----------------------------
 st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
-
+st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
@@ -1133,6 +1129,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
