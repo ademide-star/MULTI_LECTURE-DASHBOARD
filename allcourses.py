@@ -454,60 +454,68 @@ if mode == "Teacher/Admin":
             lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
             st.success(f"{lecture_to_edit} updated successfully!")
 
-        # -------------------------------------
-        # 📄 UPLOAD LECTURE PDF MODULE
-        # -------------------------------------
-        st.header("📄 Upload Lecture PDF Module")
-        pdf_file = st.file_uploader("Upload Lecture Module", type=["pdf"], key="admin_pdf_upload")
-        if pdf_file:
-            pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_to_edit.replace(' ', '_')}.pdf")
-            with open(pdf_path, "wb") as f:
-                f.write(pdf_file.getbuffer())
-            st.success(f"✅ PDF uploaded for {lecture_to_edit}")
+       # -------------------------------------
+# 📄 UPLOAD LECTURE PDF MODULE
+# -------------------------------------
+st.header("📄 Upload Lecture PDF Module")
+pdf_file = st.file_uploader("Upload Lecture Module", type=["pdf"], key="admin_pdf_upload")
 
-        # -------------------------------------
-        # 🧩 CLASSWORK CONTROL
-        # -------------------------------------
-        st.header("🧩 Classwork Control")
-        week_to_control = st.selectbox("Select Week to Open/Close Classwork", 
-                                       lectures_df["Week"].unique(), key="admin_cw_control")
-        if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
-            open_classwork(course_code, week_to_control)
-            st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
-        close_classwork_after_20min(course_code)
- 
-        st.header("📋 Student Records")
+if pdf_file:
+    pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_to_edit.replace(' ', '_')}.pdf")
+    with open(pdf_path, "wb") as f:
+        f.write(pdf_file.getbuffer())
+    st.success(f"✅ PDF uploaded for {lecture_to_edit}")
 
-        base_dir = "student_uploads"
-        records = {
-        "Attendance Records": os.path.join(base_dir, f"{course_code}_attendance.csv"),
-        "Classwork Submissions": os.path.join(base_dir, f"{course_code}_classwork.csv"),
-        "Seminar Submissions": os.path.join(base_dir, f"{course_code}_seminar.csv")
-            }
+# -------------------------------------
+# 🧩 CLASSWORK CONTROL
+# -------------------------------------
+st.header("🧩 Classwork Control")
 
-        for label, file_path in records.items():
-        
-        st.divider()
-        st.markdown(f"### {label}")
+week_to_control = st.selectbox(
+    "Select Week to Open/Close Classwork", 
+    lectures_df["Week"].unique(), 
+    key="admin_cw_control"
+)
 
-        if os.path.exists(file_path):
-            try:
-                df = pd.read_csv(file_path)
-                if not df.empty:
-                    st.dataframe(df, use_container_width=True)
-                    st.download_button(
-                        label=f"⬇️ Download {label}",
-                        data=df.to_csv(index=False).encode("utf-8"),
-                        file_name=os.path.basename(file_path),
-                        mime="text/csv"
-            )
-                else:
-                    st.info(f"{label} file is empty.")
-            except Exception as e:
-                st.error(f"⚠️ Error reading {label}: {e}")
-        else:
-            st.info(f"No {label.lower()} yet.")
+if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
+    open_classwork(course_code, week_to_control)
+    st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
 
+close_classwork_after_20min(course_code)
+
+# -------------------------------------
+# 📋 STUDENT RECORDS
+# -------------------------------------
+st.header("📋 Student Records")
+
+base_dir = "student_uploads"
+records = {
+    "Attendance Records": os.path.join(base_dir, f"{course_code}_attendance.csv"),
+    "Classwork Submissions": os.path.join(base_dir, f"{course_code}_classwork.csv"),
+    "Seminar Submissions": os.path.join(base_dir, f"{course_code}_seminar.csv")
+}
+
+for label, file_path in records.items():
+    st.divider()
+    st.markdown(f"### {label}")
+
+    if os.path.exists(file_path):
+        try:
+            df = pd.read_csv(file_path)
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+                st.download_button(
+                    label=f"⬇️ Download {label}",
+                    data=df.to_csv(index=False).encode("utf-8"),
+                    file_name=os.path.basename(file_path),
+                    mime="text/csv"
+                )
+            else:
+                st.info(f"{label} file is empty.")
+        except Exception as e:
+            st.error(f"⚠️ Error reading {label}: {e}")
+    else:
+        st.info(f"No {label.lower()} yet.")
 
 # ---------------------------------------------------------
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
@@ -1029,6 +1037,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
