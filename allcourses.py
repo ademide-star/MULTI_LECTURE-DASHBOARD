@@ -1072,12 +1072,6 @@ def admin_view():
         else:
             st.info("🔒 No scores recorded yet.")
 
-# -----------------------------------------------------
-# 🚫 Hidden for Non-Admins
-# -----------------------------------------------------
-else:
-    st.info("🔒 This section is restricted to administrators.")
-
 # ---------------------------------------------------------
 # ---------------------------------------------------------
 # 🎥 ADMIN: Upload & Manage Video Lectures
@@ -1134,6 +1128,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
