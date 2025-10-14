@@ -633,7 +633,7 @@ for label, file_path in records.items():
         st.divider()
         st.header("📊 Review Graded Scores")
 
-    log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
+        log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
 
     if os.path.exists(log_file):
         scores_df = pd.read_csv(log_file)
@@ -660,20 +660,20 @@ filtered_df = scores_df.copy()
 if type_filter != "All":
     filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
-filtered_df = filtered_df.sort_values(
-    "Date Graded", ascending=(sort_order == "Oldest First")
+    filtered_df = filtered_df.sort_values(
+        "Date Graded", ascending=(sort_order == "Oldest First")
 )
 
 # ✅ Display filtered table
-st.dataframe(filtered_df, use_container_width=True)
+    st.dataframe(filtered_df, use_container_width=True)
 
 # ✅ Download option
-st.download_button(
-    label="⬇️ Download All Scores (CSV)",
-    data=filtered_df.to_csv(index=False).encode(),
-    file_name=f"{course_code}_graded_scores.csv",
-    mime="text/csv",
-    key=f"{course_code}_download_scores"
+    st.download_button(
+        label="⬇️ Download All Scores (CSV)",
+        data=filtered_df.to_csv(index=False).encode(),
+        file_name=f"{course_code}_graded_scores.csv",
+        mime="text/csv",
+        key=f"{course_code}_download_scores"
 )
 
 else:
@@ -1047,6 +1047,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
