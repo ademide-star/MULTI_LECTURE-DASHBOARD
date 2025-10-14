@@ -71,7 +71,6 @@ COURSES = {
 
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
-mode = st.radio("Select Mode:", ["Student", "Admin"])
 
 # ===============================================================
 # 📂 DIRECTORY SETUP
@@ -439,9 +438,10 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
 # STUDENT MODE
 # -----------------------------
 def student_view():
-    st.title("🎓 Student Dashboard")
-    st.info("Welcome, Student! Access your lectures, upload assignments, and mark attendance here.")
-    st.subheader("🎓 Student Login and Attendance")
+    if st.session_state.get("role") == "Admin":
+        st.title("🎓 Student Dashboard")
+        st.info("Welcome, Student! Access your lectures, upload assignments, and mark attendance here.")
+        st.subheader("🎓 Student Login and Attendance")
 
     # Initialize safe variables
     submit_attendance = False
@@ -708,17 +708,18 @@ if st.session_state.get("role") == "Student":
 
 
 def admin_view():
-    st.title("👩‍🏫 Admin Dashboard")
-    st.success("Welcome, Admin! Manage lectures, attendance, and student uploads here.")
-    st.subheader("🔐 Teacher / Admin Panel")
+    if st.session_state.get("role") == "Admin":
+        st.title("👩‍🏫 Admin Dashboard")
+        st.success("Welcome, Admin! Manage lectures, attendance, and student uploads here.")
+        st.subheader("🔐 Teacher / Admin Panel")
 
-    ADMIN_PASS = "bimpe2025class"
-    password = st.text_input("Enter Admin Password", type="password")
+        ADMIN_PASS = "bimpe2025class"
+        password = st.text_input("Enter Admin Password", type="password")
 
     if password == ADMIN_PASS:
         st.session_state["role"] = "admin"
         st.success(f"✅ Logged in as Admin for {course}")
-
+    
         # -------------------------------------
         # 📚 LECTURE MANAGEMENT
         # -------------------------------------
@@ -961,7 +962,7 @@ if st.session_state.get("role") == "Admin":
    # -----------------------------------------------------
 # 📊 LIVE SCORE REVIEW TABLE (Admin-Only Section)
 # -----------------------------------------------------
-if st.session_state.get("role") == "admin":
+if st.session_state.get("role") == "Admin":
     with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
 
         st.header("📊 Review Graded Scores")
@@ -1128,14 +1129,13 @@ if st.session_state.get("role") == "admin":
 
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
-if st.session_state["role"] == "admin":
+if st.session_state["role"] == "Admin":
     admin_view()
-
 elif st.session_state["role"] == "Student":
     student_view()
-
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
