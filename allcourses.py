@@ -228,8 +228,6 @@ def view_and_download_files(course_code, file_type, week):
         st.info(f"No {file_type} submission directory found yet.")
 
 
-# -----------------------------
-
 def get_file(course_code, filename):
     """Return filename of the form <COURSECODE>_<filename>.csv (in current dir)."""
     return f"{course_code}_{filename}.csv"
@@ -688,14 +686,14 @@ def admin_view():
         # 📚 LECTURE MANAGEMENT
         # -------------------------------------
     st.header("📚 Lecture Management")
-    lecture_to_edit = st.selectbox("Select Lecture", lectures_df["Week"].unique(), key="admin_select_lecture")
+    lecture_to_edit = st.selectbox("Select Lecture", lectures_df["Week"].unique(), key="Admin_select_lecture")
     row_idx = lectures_df[lectures_df["Week"] == lecture_to_edit].index[0]
     brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"], key="admin_brief")
-    assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key="admin_assignment")
+    assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key="Admin_assignment")
     classwork = st.text_area("Classwork (Separate questions with ;)", 
-    value=lectures_df.at[row_idx, "Classwork"], key="admin_classwork")
+    value=lectures_df.at[row_idx, "Classwork"], key="Admin_classwork")
 
-    if st.button("💾 Update Lecture", key="admin_update_lecture"):
+    if st.button("💾 Update Lecture", key="Admin_update_lecture"):
         lectures_df.at[row_idx, "Brief"] = brief
         lectures_df.at[row_idx, "Assignment"] = assignment
         lectures_df.at[row_idx, "Classwork"] = classwork
@@ -1087,6 +1085,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
