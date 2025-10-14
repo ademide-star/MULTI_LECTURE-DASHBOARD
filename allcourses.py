@@ -87,75 +87,272 @@ course_dir = os.path.join(MODULES_DIR, course_code)
 os.makedirs(course_dir, exist_ok=True)
 
 # ===============================================================
-def get_file(course_code, filename):
-    return f"{course_code}_{filename}.csv"
+# 📁 HELPER FUNCTION
+# ===============================================================
+def get_file(course_code, filetype):
+    """Return the file path for a given course and file type."""
+    filename = f"{course_code}_{filetype}.csv"
+    return os.path.join(LOG_DIR, filename)
 
+# ===============================================================
+# 📘 LECTURE INITIALIZATION
+# ===============================================================
 def init_lectures(course_code, default_weeks):
+    """Create or load lectures CSV for a course. Returns DataFrame."""
     LECTURE_FILE = get_file(course_code, "lectures")
     if not os.path.exists(LECTURE_FILE):
         lecture_data = {
             "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
             "Topic": default_weeks,
-            "Brief": [""]*len(default_weeks),
-            "Assignment": [""]*len(default_weeks),
-            "Classwork": [""]*len(default_weeks)
+            "Brief": [""] * len(default_weeks),
+            "Assignment": [""] * len(default_weeks),
+            "Classwork": [""] * len(default_weeks),
         }
         pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
     df = pd.read_csv(LECTURE_FILE)
-    # Fill NaN with empty string
-    df["Brief"] = df["Brief"].fillna("")
-    df["Assignment"] = df["Assignment"].fillna("")
-    df["Classwork"] = df["Classwork"].fillna("")
+    for col in ["Brief", "Assignment", "Classwork"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("")
     return df
-    
-def display_seminar_upload(name, matric):
-    today = date.today()
-    if today >= date(today.year,10,20):
-        seminar_file = st.file_uploader("Upload Seminar PPT", type=["ppt","pptx"])
-        if seminar_file:
-            save_seminar(name, matric, seminar_file)
-        st.info("Seminar presentations will hold in the **3rd week of November**.")
-    else:
-        st.warning("Seminar submissions will open mid-semester.")
-        
-def mark_attendance(course_code, name, matric, week):
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-    df = pd.read_csv(ATTENDANCE_FILE) if os.path.exists(ATTENDANCE_FILE) else pd.DataFrame(columns=["Timestamp","Matric Number","Name","Week"])
-    if ((df["Matric Number"] == matric) & (df["Week"] == week)).any():
-        st.warning(f"Attendance already marked for {week}.")
-        return True
-    df = pd.concat([df, pd.DataFrame([{
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Matric Number": matric, "Name": name, "Week": week
-    }])], ignore_index=True)
-    df.to_csv(ATTENDANCE_FILE, index=False)
-    st.success(f"Attendance marked for {name} ({matric}) - {week}")
-    return True
 
-def save_classwork(course_code, name, matric, week, answers):
-    CLASSWORK_FILE = get_file(course_code, "classwork_submissions")
-    df = pd.read_csv(CLASSWORK_FILE) if os.path.exists(CLASSWORK_FILE) else pd.DataFrame(columns=["Timestamp","Matric Number","Name","Week","Answers"])
-    if ((df["Matric Number"] == matric) & (df["Week"] == week)).any():
-        st.warning("You’ve already submitted this classwork.")
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
+
+# -----------------------------
+# --- Helper Function: View/Download Files ---
+def init_lectures(course_code, topics):
+    """Initialize lecture weeks dataframe."""
+    df_path = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
+    if os.path.exists(df_path):
+        return pd.read_csv(df_path)
+    else:
+        df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
+        df.to_csv(df_path, index=False)
+        return df
+
+
+def save_file(course_code, student_name, week, uploaded_file, upload_type):
+    """Save uploaded file persistently."""
+    folder = os.path.join(UPLOAD_DIR, course_code, upload_type)
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{student_name}_{week}_{uploaded_file.name}"
+    file_path = os.path.join(folder, filename)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return file_path
+
+
+def log_submission(course_code, matric, student_name, week, file_name, upload_type):
+    """Log each submission permanently."""
+    log_path = os.path.join(LOG_DIR, f"{course_code}_uploads.csv")
+    log_data = {
+        "Matric": [matric],
+        "Name": [student_name],
+        "Week": [week],
+        "File": [file_name],
+        "Type": [upload_type],
+        "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+    }
+    new_entry = pd.DataFrame(log_data)
+    if os.path.exists(log_path):
+        df = pd.read_csv(log_path)
+        df = pd.concat([df, new_entry], ignore_index=True)
+    else:
+        df = new_entry
+    df.to_csv(log_path, index=False)
+
+
+def has_marked_attendance(course_code, week, name):
+    """Check if student already marked attendance."""
+    path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
+    if not os.path.exists(path):
         return False
-    entry = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-             "Matric Number": matric, "Name": name, "Week": week, "Answers": "; ".join(answers)}
-    df = pd.concat([df, pd.DataFrame([entry])], ignore_index=True)
-    df.to_csv(CLASSWORK_FILE, index=False)
-    st.success("✅ Classwork submitted successfully!")
+    df = pd.read_csv(path)
+    return ((df["Name"] == name) & (df["Week"] == week)).any()
+
+
+def mark_attendance_entry(course_code, name, matric, week):
+    """Mark student attendance and save persistently."""
+    path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
+    data = {
+        "Name": [name],
+        "Matric": [matric],
+        "Week": [week],
+        "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+    }
+    new_row = pd.DataFrame(data)
+    if os.path.exists(path):
+        df = pd.read_csv(path)
+        df = pd.concat([df, new_row], ignore_index=True)
+    else:
+        df = new_row
+    df.to_csv(path, index=False)
     return True
 
-# PDF and seminar helpers
-# -----------------------------
-def display_module_pdf(week):
-    pdf_path = f"{MODULES_DIR}/{week.replace(' ','_')}.pdf"
-    if os.path.exists(pdf_path):
-        with open(pdf_path,"rb") as f:
-            st.download_button(label=f"📥 Download {week} Module PDF", data=f, file_name=f"{week}_module.pdf", mime="application/pdf")
+
+def view_and_download_files(course_code, file_type, week):
+    """Displays uploaded files for a given type and week, with ZIP download."""
+    base_dir = os.path.join("student_uploads", course_code, file_type)
+
+    if os.path.exists(base_dir):
+        all_files = []
+        for root, dirs, files in os.walk(base_dir):
+            for file in files:
+                if week.replace(" ", "_") in file or week in root:
+                    file_path = os.path.join(root, file)
+                    uploader_name = os.path.basename(root)
+                    all_files.append({
+                        "Student": uploader_name,
+                        "File Name": file,
+                        "File Path": file_path
+                    })
+
+        if all_files:
+            df_files = pd.DataFrame(all_files)
+            st.dataframe(df_files[["Student", "File Name"]])
+
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                for item in all_files:
+                    zipf.write(item["File Path"], arcname=f"{item['Student']}/{item['File Name']}")
+            st.download_button(
+                label=f"📦 Download All {file_type.capitalize()}s for {week}",
+                data=zip_buffer.getvalue(),
+                file_name=f"{course_code}_{week.replace(' ', '_')}_{file_type}s.zip",
+                mime="application/zip"
+            )
+        else:
+            st.info(f"No {file_type} submissions found for {week}.")
     else:
-        st.info("Lecture PDF module not yet uploaded.")
+        st.info(f"No {file_type} submission directory found yet.")
+
+
+def get_file(course_code, filename):
+    """Return filename of the form <COURSECODE>_<filename>.csv (in current dir)."""
+    return f"{course_code}_{filename}.csv"
+
+def ensure_data_files():
+    """Create a few CSVs with headers if they don't exist (safe to call repeatedly)."""
+    data_dir = "data"
+    os.makedirs(data_dir, exist_ok=True)
+
+    files = {
+        "attendance_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Status", "Timestamp"],
+        "assignment_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "FilePath", "Score", "Timestamp"],
+        "classwork_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Score", "Timestamp"],
+        "seminar_records.csv": ["StudentName", "Matric", "CourseCode", "Week", "Topic", "Score", "Timestamp"],
+        "scores.csv": ["StudentName", "Matric", "CourseCode", "ClassworkAvg", "SeminarAvg", "AssignmentAvg", "TotalCA", "LastUpdated"],
+    }
+
+    for filename, headers in files.items():
+        file_path = os.path.join(data_dir, filename)
+        if not os.path.exists(file_path):
+            pd.DataFrame(columns=headers).to_csv(file_path, index=False)
+
+# call once
+ensure_data_files()
+
 # -----------------------------
-# CLASSWORK CONTROL
+# ATTENDANCE + SUBMISSION HELPERS
+# -----------------------------
+def has_marked_attendance(course_code, week, name):
+    """Return True if student already has attendance for the week."""
+    ATTENDANCE_FILE = get_file(course_code, "attendance")
+    if not os.path.exists(ATTENDANCE_FILE):
+        return False
+    df = pd.read_csv(ATTENDANCE_FILE)
+    if "StudentName" not in df.columns or "Week" not in df.columns:
+        return False
+    return ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any()
+
+def mark_attendance_entry(course_code, name, matric, week):
+    """Mark attendance (returns True on success, False if already marked)."""
+    ATTENDANCE_FILE = get_file(course_code, "attendance")
+    if not os.path.exists(ATTENDANCE_FILE):
+        pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"]).to_csv(ATTENDANCE_FILE, index=False)
+
+    df = pd.read_csv(ATTENDANCE_FILE)
+    if ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any():
+        return False
+    new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Status": "Present", "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df.to_csv(ATTENDANCE_FILE, index=False)
+    return True
+
+
+def save_file(course_code, name, week, uploaded_file, file_type):
+    """Save an uploaded file to submissions/<course>/<file_type>/ and log it."""
+    folder_path = os.path.join("submissions", course_code, file_type)
+    os.makedirs(folder_path, exist_ok=True)
+    safe_name = re.sub(r"\s+", "_", name.strip())
+    file_path = os.path.join(folder_path, f"{safe_name}_{week}_{uploaded_file.name}")
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    # Log upload summary
+    csv_log = os.path.join("records", f"{course_code}_{file_type}_uploads.csv")
+    log_df = pd.DataFrame([[datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, week, uploaded_file.name]],
+                          columns=["Timestamp", "Name", "Week", "File"])
+    if os.path.exists(csv_log):
+        old = pd.read_csv(csv_log)
+        log_df = pd.concat([old, log_df], ignore_index=True)
+    log_df.to_csv(csv_log, index=False)
+
+    # Keep a central submissions log for the course
+    record_file = os.path.join("submissions", f"{course_code}_submissions.csv")
+    record = pd.DataFrame([{"Name": name, "Week": week, "FileName": uploaded_file.name, "Type": file_type, "Path": file_path}])
+
+    if os.path.exists(record_file):
+        existing = pd.read_csv(record_file)
+        updated = pd.concat([existing, record], ignore_index=True)
+        updated.to_csv(record_file, index=False)
+    else:
+        record.to_csv(record_file, index=False)
+
+# -----------------------------
+# SCORES HELPERS
+# -----------------------------
+def get_score_file(course_code, score_type):
+    folder_path = os.path.join("submissions", course_code)
+    os.makedirs(folder_path, exist_ok=True)
+    return os.path.join(folder_path, f"{score_type}_scores.csv")
+
+def record_score(course_code, score_type, name, matric, week, score, remarks=""):
+    score_file = get_score_file(course_code, score_type)
+    df = pd.read_csv(score_file) if os.path.exists(score_file) else pd.DataFrame(columns=["StudentName", "Matric", "Week", "Score", "Remarks"])
+
+    existing = (
+        (df["Matric"].astype(str).str.lower() == matric.strip().lower()) &
+        (df["Week"] == week)
+    )
+    if existing.any():
+        df.loc[existing, ["Score", "Remarks"]] = [score, remarks]
+    else:
+        new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Score": score, "Remarks": remarks}
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+    df.to_csv(score_file, index=False)
+    st.success(f"✅ {score_type.capitalize()} score updated for {name} ({week})")
+
+@st.cache_data(ttl=30)
+def get_student_scores_cached(course_code, matric):
+    score_types = ["classwork", "seminar", "assignment"]
+    results = {}
+
+    for stype in score_types:
+        f = get_score_file(course_code, stype)
+        if os.path.exists(f):
+            df = pd.read_csv(f)
+            df = df[df["Matric"].astype(str).str.lower() == matric.strip().lower()]
+            results[stype] = df[["Week", "Score"]].to_dict("records") if not df.empty else []
+        else:
+            results[stype] = []
+
+    return results
+
+# -----------------------------
+# CLASSWORK WINDOW CONTROL
 # -----------------------------
 def is_classwork_open(course_code, week):
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork_status")
@@ -165,17 +362,19 @@ def is_classwork_open(course_code, week):
     if week not in df["Week"].values:
         return False
     row = df[df["Week"] == week].iloc[0]
-    return row["IsOpen"] == 1
+    return int(row.get("IsOpen", 0)) == 1
+
 
 def open_classwork(course_code, week):
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork_status")
-    now = datetime.now()
-    df = pd.read_csv(CLASSWORK_STATUS_FILE) if os.path.exists(CLASSWORK_STATUS_FILE) else pd.DataFrame(columns=["Week","IsOpen","OpenTime"])
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df = pd.read_csv(CLASSWORK_STATUS_FILE) if os.path.exists(CLASSWORK_STATUS_FILE) else pd.DataFrame(columns=["Week", "IsOpen", "OpenTime"])
     if week in df["Week"].values:
-        df.loc[df["Week"]==week, ["IsOpen","OpenTime"]] = [1, now]
+        df.loc[df["Week"] == week, ["IsOpen", "OpenTime"]] = [1, now]
     else:
-        df = pd.concat([df, pd.DataFrame([{"Week":week,"IsOpen":1,"OpenTime":now}])], ignore_index=True)
+        df = pd.concat([df, pd.DataFrame([{"Week": week, "IsOpen": 1, "OpenTime": now}])], ignore_index=True)
     df.to_csv(CLASSWORK_STATUS_FILE, index=False)
+
 
 def close_classwork_after_20min(course_code):
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork_status")
@@ -183,120 +382,54 @@ def close_classwork_after_20min(course_code):
         return
     df = pd.read_csv(CLASSWORK_STATUS_FILE)
     now = datetime.now()
+    changed = False
     for idx, row in df.iterrows():
-        if row["IsOpen"]==1 and pd.notnull(row["OpenTime"]):
-            open_time = pd.to_datetime(row["OpenTime"])
-            if (now - open_time).total_seconds() > 20*60:
-                df.at[idx,"IsOpen"]=0
-                df.at[idx,"OpenTime"]=None
-    df.to_csv(CLASSWORK_STATUS_FILE,index=False)
-    
-def save_file(course_code, name, week, uploaded_file, file_type):
-    # Create directory structure
-    folder_path = os.path.join("submissions", course_code, file_type)
-    os.makedirs(folder_path, exist_ok=True)
-    # Save uploaded file
-    file_path = os.path.join(folder_path, f"{name}_{week}_{uploaded_file.name}")
+        if int(row.get("IsOpen", 0)) == 1 and pd.notnull(row.get("OpenTime")):
+            open_time = pd.to_datetime(row["OpenTime"]).to_pydatetime()
+            if (now - open_time).total_seconds() > 20 * 60:
+                df.at[idx, "IsOpen"] = 0
+                df.at[idx, "OpenTime"] = None
+                changed = True
+    if changed:
+        df.to_csv(CLASSWORK_STATUS_FILE, index=False)
+        
+
+
+def save_file(course_code, student_name, week, uploaded_file, folder_name):
+    """Safely save uploaded file to the appropriate course and folder."""
+    if uploaded_file is None:
+        return None  # handled at caller level
+
+    upload_dir = os.path.join("student_uploads", course_code, folder_name)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_name = re.sub(r'[^A-Za-z0-9_-]', '_', student_name.strip())
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = os.path.join(upload_dir, f"{safe_name}_{week}_{timestamp}_{uploaded_file.name}")
+
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    # Log upload in CSV
-    csv_log = os.path.join("records", f"{course_code}_{file_type}_uploads.csv")
-    log_df = pd.DataFrame([[datetime.now(), name, week, uploaded_file.name]], 
-                          columns=["Timestamp", "Name", "Week", "File"])
-    if os.path.exists(csv_log):
-        old = pd.read_csv(csv_log)
-        log_df = pd.concat([old, log_df], ignore_index=True)
-    log_df.to_csv(csv_log, index=False)
-    # Log record in CSV
-    record_file = os.path.join("submissions", f"{course_code}_submissions.csv")
-    record = pd.DataFrame([{
-        "Name": name,
+
+    return file_path
+    
+def log_submission(course_code, matric, student_name, week, file_name, upload_type):
+    """Log each upload to a CSV file for admin tracking."""
+    log_file = os.path.join(UPLOADS_DIR, f"{course_code}_submissions_log.csv")
+    new_entry = pd.DataFrame([{
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Matric": matric,
+        "Student Name": student_name,
         "Week": week,
-        "FileName": uploaded_file.name,
-        "Type": file_type,
-        "Path": file_path
+        "File": file_name,
+        "Type": upload_type
     }])
 
-    if os.path.exists(record_file):
-        existing = pd.read_csv(record_file)
-        updated = pd.concat([existing, record], ignore_index=True)
-        updated.to_csv(record_file, index=False)
+    if os.path.exists(log_file):
+        existing = pd.read_csv(log_file)
+        updated = pd.concat([existing, new_entry], ignore_index=True)
     else:
-        record.to_csv(record_file, index=False)
-        
-def mark_attendance(course_code, name, matric, week):
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-
-    # Create file if it doesn't exist
-    if not os.path.exists(ATTENDANCE_FILE):
-        df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status"])
-        df.to_csv(ATTENDANCE_FILE, index=False)
-
-    df = pd.read_csv(ATTENDANCE_FILE)
-
-    # Check if attendance already exists
-    if ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any():
-        return False  # Already marked
-
-    # Record new attendance
-    new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Status": "Present"}
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(ATTENDANCE_FILE, index=False)
-    return True
-
-import os
-import pandas as pd
-from datetime import datetime
-
-# ============================
-# FILE HELPERS
-# ============================
-def get_score_file(course_code, score_type):
-    folder_path = os.path.join("submissions", course_code)
-    os.makedirs(folder_path, exist_ok=True)
-    return os.path.join(folder_path, f"{score_type}_scores.csv")
-
-# --- Record or Update Student Score ---
-def record_score(course_code, score_type, name, matric, week, score, remarks=""):
-    score_file = get_score_file(course_code, score_type)
-    df = pd.read_csv(score_file) if os.path.exists(score_file) else pd.DataFrame(columns=["StudentName", "Matric", "Week", "Score", "Remarks"])
-
-    # Check existing entry
-    existing = (
-        (df["Matric"].astype(str).str.lower() == matric.strip().lower()) &
-        (df["Week"] == week)
-    )
-    if existing.any():
-        df.loc[existing, ["Score", "Remarks"]] = [score, remarks]
-    else:
-        new_row = {
-            "StudentName": name.strip(),
-            "Matric": matric.strip(),
-            "Week": week,
-            "Score": score,
-            "Remarks": remarks,
-        }
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-    df.to_csv(score_file, index=False)
-    st.success(f"✅ {score_type.capitalize()} score updated for {name} ({week})")
-
-# --- Cached retrieval (auto-refreshable) ---
-@st.cache_data(ttl=30)  # cache refreshes every 30 seconds
-def get_student_scores(course_code, matric):
-    score_types = ["classwork", "seminar", "assignment"]
-    results = {}
-
-    for stype in score_types:
-        f = get_score_file(course_code, stype)
-        if os.path.exists(f):
-            df = pd.read_csv(f)
-            df = df[df["Matric"].astype(str).str.lower() == matric.strip().lower()]
-            results[stype] = df[["Week", "Score"]].to_dict("records")
-        else:
-            results[stype] = []
-
-    return results
+        updated = new_entry
+    updated.to_csv(log_file, index=False)
 
 def student_view():
     if st.session_state.get("role") == "Student":
