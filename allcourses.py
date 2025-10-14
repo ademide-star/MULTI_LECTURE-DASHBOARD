@@ -8,6 +8,12 @@ import zipfile
 import io
 from datetime import datetime, timedelta, time
 
+# ✅ PAGE CONFIGURATION (must come before any Streamlit UI elements)
+st.set_page_config(
+    page_title="Multi-Course Dashboard",
+    page_icon="📚",
+    layout="wide"
+)
 # -----------------------------
 # STYLES / FOOTER
 # -----------------------------
@@ -37,12 +43,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 # -----------------------------
-# ✅ PAGE CONFIGURATION (must come before any Streamlit UI elements)
-st.set_page_config(
-    page_title="Multi-Course Dashboard",
-    page_icon="📚",
-    layout="wide"
-)
+
 # COURSES
 # -----------------------------
 COURSES = {
@@ -1139,6 +1140,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
