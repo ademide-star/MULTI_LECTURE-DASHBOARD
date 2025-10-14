@@ -618,8 +618,9 @@ if mode == "Teacher/Admin":
     # -----------------------------------------------------
     # 📊 LIVE SCORE REVIEW TABLE (New Feature)
     # -----------------------------------------------------
-    st.divider()
-    st.header("📊 Review Graded Scores")
+    if st.session_state.get("role") == "admin":
+        st.divider()
+        st.header("📊 Review Graded Scores")
 
     log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
 
@@ -708,44 +709,52 @@ if mode == "Teacher/Admin":
     else:
         st.info("🔒 No scores recorded yet.")
 # ---------------------------------------------------------
-# 🎥 ADMIN: Upload Video Lectures
 # ---------------------------------------------------------
-    if st.session_state.get("role") == "admin":
-        st.subheader("🎥 Upload & Manage Video Lectures")
+# 🎥 ADMIN: Upload & Manage Video Lectures
+# ---------------------------------------------------------
+if st.session_state.get("role") == "admin":
+    st.subheader("🎥 Upload & Manage Video Lectures")
 
-        video_dir = os.path.join("video_lectures", course_code)
-        os.makedirs(video_dir, exist_ok=True)
+    video_dir = os.path.join("video_lectures", course_code)
+    os.makedirs(video_dir, exist_ok=True)
 
-        uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
+    # Upload video file
+    uploaded_video = st.file_uploader(
+        "Upload Lecture Video (MP4 only)",
+        type=["mp4"],
+        key=f"{course_code}_video_upload"
+    )
 
-        if uploaded_video:
-            save_path = os.path.join(video_dir, uploaded_video.name)
+    if uploaded_video is not None:
+        save_path = os.path.join(video_dir, uploaded_video.name)
         with open(save_path, "wb") as f:
             f.write(uploaded_video.read())
-            st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
+        st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
 
     # ---------------------------------------------
-# 🎥 Display list of uploaded lecture videos
-# ---------------------------------------------
-        video_files = []  # ✅ Always initialize
+    # 🎥 Display list of uploaded lecture videos
+    # ---------------------------------------------
+    video_files = []  # ✅ Always initialize
 
-        if os.path.exists(video_dir):
-            video_files = sorted(os.listdir(video_dir))
+    if os.path.exists(video_dir):
+        video_files = sorted(os.listdir(video_dir))
 
-        if video_files:
-            st.markdown("### 📚 Uploaded Lecture Videos")
-            for video in video_files:
-                video_path = os.path.join(video_dir, video)
-                st.video(video_path)
+    if video_files:
+        st.markdown("### 📚 Uploaded Lecture Videos")
+        for video in video_files:
+            video_path = os.path.join(video_dir, video)
+            st.video(video_path)
+            with open(video_path, "rb") as vid_file:
                 st.download_button(
                     label=f"⬇️ Download {video}",
-                    data=open(video_path, "rb").read(),
+                    data=vid_file.read(),
                     file_name=video,
                     mime="video/mp4",
                     key=f"{video}_download"
-        )
-        else:
-            st.info("No videos uploaded yet.")
+                )
+    else:
+        st.info("No videos uploaded yet.")
+
 
 
 # -----------------------------
@@ -921,22 +930,23 @@ elif mode == "Student":
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (STUDENT SECTION)
 # ===============================================================
-st.divider()
-st.subheader("📄 Assignment, Drawing & Seminar Uploads")
+if st.session_state.get("role") == "Student":
+    st.divider()
+    st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 
 # =======================
 # ASSIGNMENT UPLOAD
 # =======================
-st.divider()
-st.subheader("📝 Assignment Upload")
+    st.divider()
+    st.subheader("📝 Assignment Upload")
 
-selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
-matric_a = st.text_input("Matric Number", key="matric_a")
-student_name_a = st.text_input("Full Name", key="student_name_a")
-uploaded_assignment = st.file_uploader(
-    f"Upload Assignment for {selected_week_a}",
-    type=["pdf", "docx", "jpg", "png"],
-    key=f"{course_code}_assignment"
+    selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
+    matric_a = st.text_input("Matric Number", key="matric_a")
+    student_name_a = st.text_input("Full Name", key="student_name_a")
+    uploaded_assignment = st.file_uploader(
+        f"Upload Assignment for {selected_week_a}",
+        type=["pdf", "docx", "jpg", "png"],
+        key=f"{course_code}_assignment"
 )
 
 if st.button(f"📤 Submit Assignment for {selected_week_a}", key="submit_assignment_btn"):
@@ -1016,6 +1026,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
