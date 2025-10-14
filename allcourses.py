@@ -639,35 +639,45 @@ for label, file_path in records.items():
         scores_df = pd.read_csv(log_file)
 
         # ✅ Filters for easier viewing
-        col1, col2 = st.columns(2)
-        with col1:
-            type_filter = st.selectbox("Filter by Upload Type", ["All"] + sorted(scores_df["Type"].unique().tolist()))
-        with col2:
-            sort_order = st.radio("Sort by Date", ["Newest First", "Oldest First"])
+col1, col2 = st.columns(2)
 
-        filtered_df = scores_df.copy()
-        if type_filter != "All":
-            filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+with col1:
+    type_filter = st.selectbox(
+        "Filter by Upload Type",
+        ["All"] + sorted(scores_df["Type"].unique().tolist()),
+        key=f"{course_code}_type_filter"
+    )
 
-        filtered_df = filtered_df.sort_values(
-            "Date Graded", ascending=(sort_order == "Oldest First")
-        )
+with col2:
+    sort_order = st.radio(
+        "Sort by Date",
+        ["Newest First", "Oldest First"],
+        key=f"{course_code}_sort_order"
+    )
 
-        # ✅ Display filtered table
-        st.dataframe(filtered_df, use_container_width=True)
+filtered_df = scores_df.copy()
 
-        # ✅ Download option
-        st.download_button(
-            label="⬇️ Download All Scores (CSV)",
-            data=filtered_df.to_csv(index=False).encode(),
-            file_name=f"{course_code}_graded_scores.csv",
-            mime="text/csv",
-            key=f"{course_code}_download_scores"
-        )
+if type_filter != "All":
+    filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
-    else:
-        st.info("No graded scores yet. Once you grade a file, it will appear here.")
+filtered_df = filtered_df.sort_values(
+    "Date Graded", ascending=(sort_order == "Oldest First")
+)
 
+# ✅ Display filtered table
+st.dataframe(filtered_df, use_container_width=True)
+
+# ✅ Download option
+st.download_button(
+    label="⬇️ Download All Scores (CSV)",
+    data=filtered_df.to_csv(index=False).encode(),
+    file_name=f"{course_code}_graded_scores.csv",
+    mime="text/csv",
+    key=f"{course_code}_download_scores"
+)
+
+else:
+    st.info("No graded scores yet. Once you grade a file, it will appear here.")
 
     # -------------------------------------
     # 🧮 GRADING AND SCORE MANAGEMENT
@@ -1037,6 +1047,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
