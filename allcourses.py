@@ -724,9 +724,14 @@ if mode == "Teacher/Admin":
             f.write(uploaded_video.read())
             st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
 
-    # Display list of uploaded videos
+    # ---------------------------------------------
+# 🎥 Display list of uploaded lecture videos
+# ---------------------------------------------
+        video_files = []  # ✅ Always initialize
+
         if os.path.exists(video_dir):
             video_files = sorted(os.listdir(video_dir))
+
         if video_files:
             st.markdown("### 📚 Uploaded Lecture Videos")
             for video in video_files:
@@ -738,10 +743,9 @@ if mode == "Teacher/Admin":
                     file_name=video,
                     mime="video/mp4",
                     key=f"{video}_download"
-                )
+        )
         else:
             st.info("No videos uploaded yet.")
-
 
 
 # -----------------------------
@@ -1012,6 +1016,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
