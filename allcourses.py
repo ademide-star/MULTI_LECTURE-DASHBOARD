@@ -19,6 +19,13 @@ st.set_page_config(
     page_icon="📚",
     layout="wide"
 )
+# COURSES
+# -----------------------------
+COURSES = {
+    "MCB 221 – General Microbiology": "MCB221",
+    "BCH 201 – General Biochemistry": "BCH201",
+    "BIO 203 – General Physiology": "BIO203",
+}
 
 # ===============================================================
 # 🧭 SESSION ROLE SELECTOR
@@ -92,13 +99,6 @@ st.markdown(
 )
 
 # -----------------------------
-# COURSES
-# -----------------------------
-COURSES = {
-    "MCB 221 – General Microbiology": "MCB221",
-    "BCH 201 – General Biochemistry": "BCH201",
-    "BIO 203 – General Physiology": "BIO203",
-}
 
 # -----------------------------
 # FILE HELPERS
@@ -442,10 +442,6 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
 
 # 🔐 TEACHER / ADMIN DASHBOARD (FULL + SCORE VIEWER)
 # ====================================================
-# 🧭 ROLE-BASED DASHBOARD CONTROL
-# ---------------------------------------------
-
-
 # ---------------------------------------------
 # 👩‍🏫 ADMIN SECTION
 # -------------------------------------------
@@ -1143,6 +1139,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
