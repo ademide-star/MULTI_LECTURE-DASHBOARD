@@ -438,7 +438,7 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
 # STUDENT MODE
 # -----------------------------
 def student_view():
-    if st.session_state.get("role") == "Admin":
+    if st.session_state.get("role") == "Student":
         st.title("🎓 Student Dashboard")
         st.info("Welcome, Student! Access your lectures, upload assignments, and mark attendance here.")
         st.subheader("🎓 Student Login and Attendance")
@@ -1135,6 +1135,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
