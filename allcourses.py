@@ -997,17 +997,18 @@ def admin_view():
             # ✅ Display filtered table
                 st.dataframe(filtered_df, use_container_width=True)
 
-            # ✅ Download option
+            ## ✅ Download option
                 st.download_button(
                     label="⬇️ Download All Scores (CSV)",
                     data=filtered_df.to_csv(index=False).encode(),
                     file_name=f"{course_code}_graded_scores.csv",
                     mime="text/csv",
                     key=f"{course_code}_download_scores"
-            )
+)
 
             else:
                 st.info("No graded scores yet. Once you grade a file, it will appear here.")
+
 
         # -------------------------------------
         # 🧮 GRADING AND SCORE MANAGEMENT
@@ -1133,6 +1134,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
