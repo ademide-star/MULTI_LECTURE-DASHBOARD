@@ -15,6 +15,32 @@ st.set_page_config(
     layout="wide"
 )
 # -----------------------------
+# -----------------------------
+
+# COURSES
+# -----------------------------
+COURSES = {
+    "MCB 221 – General Microbiology": "MCB221",
+    "BCH 201 – General Biochemistry": "BCH201",
+    "BIO 203 – General Physiology": "BIO203",
+}
+# -----------------------------
+# ===============================================================
+# 🔐 ROLE SELECTION & ACCESS CONTROL
+# ===============================================================
+if "role" not in st.session_state:
+    st.session_state["role"] = None
+
+st.sidebar.title("🔐 Login Panel")
+role = st.sidebar.radio("Select Role", ["Select", "Student", "admin"], key="role_selector")
+
+if role != "Select":
+    st.session_state["role"] = role
+else:
+    st.session_state["role"] = None
+
+# =========================================
+
 # STYLES / FOOTER
 # -----------------------------
 st.markdown(
@@ -42,33 +68,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-# -----------------------------
-
-# COURSES
-# -----------------------------
-COURSES = {
-    "MCB 221 – General Microbiology": "MCB221",
-    "BCH 201 – General Biochemistry": "BCH201",
-    "BIO 203 – General Physiology": "BIO203",
-}
-# -----------------------------
-# ===============================================================
-# 🔐 ROLE SELECTION & ACCESS CONTROL
-# ===============================================================
-if "role" not in st.session_state:
-    st.session_state["role"] = None
-
-st.sidebar.title("🔐 Login Panel")
-role = st.sidebar.radio("Select Role", ["Select", "Student", "admin"], key="role_selector")
-
-if role != "Select":
-    st.session_state["role"] = role
-else:
-    st.session_state["role"] = None
-
-# ===============================================================
-
-
+#======================
 
 # -----------------------------
 # APP LAYOUT
@@ -1140,6 +1140,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
