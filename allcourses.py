@@ -130,121 +130,6 @@ def init_lectures(course_code, topics):
         df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
         df.to_csv(df_path, index=False)
         return df
-# ===============================================================
-# 🌍 UNIVERSAL PERSISTENT DATA SYSTEM
-# ===============================================================
-import os
-import json
-import pandas as pd
-from datetime import datetime
-
-# -----------------------------
-# ✅ GLOBAL STORAGE DIRECTORY
-# -----------------------------
-DATA_DIR = "persistent_data"
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# -----------------------------
-# 🧩 UNIVERSAL SAVE/LOAD HELPERS
-# -----------------------------
-def save_json(data, filename):
-    """Save dictionary/list to JSON (persistent)."""
-    file_path = os.path.join(DATA_DIR, filename)
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-    return file_path
-
-def load_json(filename):
-    """Load JSON or return empty dict."""
-    file_path = os.path.join(DATA_DIR, filename)
-    if os.path.exists(file_path):
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-def save_csv(df, filename):
-    """Save DataFrame to CSV (persistent)."""
-    file_path = os.path.join(DATA_DIR, filename)
-    df.to_csv(file_path, index=False)
-    return file_path
-
-def load_csv(filename):
-    """Load CSV or return empty DataFrame."""
-    file_path = os.path.join(DATA_DIR, filename)
-    if os.path.exists(file_path):
-        return pd.read_csv(file_path)
-    return pd.DataFrame()
-
-# ===============================================================
-# 📘 LECTURE BRIEFS (Persistent)
-# ===============================================================
-LECTURE_FILE = "lecture_briefs.json"
-
-def load_lectures():
-    return load_json(LECTURE_FILE)
-
-def save_lecture(course_code, week, content):
-    """Save or update lecture brief persistently."""
-    data = load_json(LECTURE_FILE)
-    if course_code not in data:
-        data[course_code] = {}
-    data[course_code][week] = content
-    save_json(data, LECTURE_FILE)
-    return data
-
-# ===============================================================
-# 📂 SUBMISSIONS (Assignments, Drawings, Seminars)
-# ===============================================================
-def log_submission(course_code, matric, name, week, filename, upload_type):
-    """Log any student submission persistently."""
-    log_file = f"{course_code}_uploads.csv"
-    new_entry = pd.DataFrame([{
-        "Matric": matric,
-        "Name": name,
-        "Week": week,
-        "Filename": filename,
-        "Type": upload_type,
-        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }])
-
-    old_df = load_csv(log_file)
-    combined = pd.concat([old_df, new_entry], ignore_index=True)
-    save_csv(combined, log_file)
-
-# ===============================================================
-# 🧮 SCORES AND GRADES (Persistent)
-# ===============================================================
-def log_score(course_code, matric, name, score, remark, graded_by="Admin"):
-    """Save graded scores persistently."""
-    log_file = f"{course_code}_scores.csv"
-    new_entry = pd.DataFrame([{
-        "Matric": matric,
-        "Name": name,
-        "Score": score,
-        "Remark": remark,
-        "Graded By": graded_by,
-        "Date Graded": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }])
-
-    old_df = load_csv(log_file)
-    combined = pd.concat([old_df, new_entry], ignore_index=True)
-    save_csv(combined, log_file)
-
-# ===============================================================
-# 🕓 ATTENDANCE LOG (Persistent)
-# ===============================================================
-def log_attendance(course_code, matric, name, week, status):
-    """Record attendance persistently."""
-    log_file = f"{course_code}_attendance.csv"
-    entry = pd.DataFrame([{
-        "Matric": matric,
-        "Name": name,
-        "Week": week,
-        "Status": status,
-        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }])
-    old = load_csv(log_file)
-    save_csv(pd.concat([old, entry], ignore_index=True), log_file)
 
 
 def save_file(course_code, student_name, week, uploaded_file, upload_type):
@@ -1202,6 +1087,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
