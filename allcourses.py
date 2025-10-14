@@ -2,18 +2,13 @@ import streamlit as st
 import pandas as pd
 import os
 import re
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
 import zipfile
 import io
-from datetime import datetime, timedelta, time
 
-# ✅ PAGE CONFIGURATION (must come before any Streamlit UI elements)
-st.set_page_config(
-    page_title="Multi-Course Dashboard",
-    page_icon="📚",
-    layout="wide"
-)
+# ✅ PAGE CONFIGURATION
+st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
 
 # ===============================================================
 # 🔐 ROLE SELECTION & ACCESS CONTROL
@@ -29,7 +24,9 @@ if role != "Select":
 else:
     st.session_state["role"] = None
 
-# Hide Streamlit UI & Footer
+# ===============================================================
+# 🧩 UI STYLE
+# ===============================================================
 st.markdown(
     """
     <style>
@@ -61,8 +58,7 @@ st.markdown(
 # ===============================================================
 st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
-
-st_autorefresh(interval=86_400_000, key="daily_refresh")  # once per day
+st_autorefresh(interval=86_400_000, key="daily_refresh")  # refresh daily
 
 # ===============================================================
 # 📘 COURSE SELECTION
@@ -77,18 +73,52 @@ course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 mode = st.radio("Select Mode:", ["Student", "Admin"])
 
+# ===============================================================
+# 📂 DIRECTORY SETUP
+# ===============================================================
 MODULES_DIR = "modules"
 LECTURE_DIR = "lectures"
 UPLOAD_DIR = "student_uploads"
-LOG_DIR = "logs"
+LOG_DIR = "records"
 
 for folder in [MODULES_DIR, LECTURE_DIR, UPLOAD_DIR, LOG_DIR]:
     os.makedirs(folder, exist_ok=True)
 
 course_dir = os.path.join(MODULES_DIR, course_code)
-if not os.path.exists(course_dir):
-    st.error(f"Course directory for {course_code} does not exist.")
-    st.stop()
+os.makedirs(course_dir, exist_ok=True)
+
+# ===============================================================
+# 📁 HELPER FUNCTION
+# ===============================================================
+def get_file(course_code, filetype):
+    """Return the file path for a given course and file type."""
+    filename = f"{course_code}_{filetype}.csv"
+    return os.path.join(LOG_DIR, filename)
+
+# ===============================================================
+# 📘 LECTURE INITIALIZATION
+# ===============================================================
+def init_lectures(course_code, default_weeks):
+    """Create or load lectures CSV for a course. Returns DataFrame."""
+    LECTURE_FILE = get_file(course_code, "lectures")
+    if not os.path.exists(LECTURE_FILE):
+        lecture_data = {
+            "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
+            "Topic": default_weeks,
+            "Brief": [""] * len(default_weeks),
+            "Assignment": [""] * len(default_weeks),
+            "Classwork": [""] * len(default_weeks),
+        }
+        pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
+    df = pd.read_csv(LECTURE_FILE)
+    for col in ["Brief", "Assignment", "Classwork"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("")
+    return df
+
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
 
 # -----------------------------
 # --- Helper Function: View/Download Files ---
@@ -225,29 +255,6 @@ def ensure_data_files():
 
 # call once
 ensure_data_files()
-
-# -----------------------------
-# LECTURES INITIALISATION
-# -----------------------------
-def init_lectures(course_code, default_weeks):
-    """Create or load lectures CSV for a course. Returns DataFrame."""
-    LECTURE_FILE = get_file(course_code, "lectures")
-    if not os.path.exists(LECTURE_FILE):
-        lecture_data = {
-            "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
-            "Topic": default_weeks,
-            "Brief": [""] * len(default_weeks),
-            "Assignment": [""] * len(default_weeks),
-            "Classwork": [""] * len(default_weeks),
-        }
-        pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
-    df = pd.read_csv(LECTURE_FILE)
-    # ensure columns exist and fillna
-    for col in ["Brief", "Assignment", "Classwork"]:
-        if col not in df.columns:
-            df[col] = ""
-        df[col] = df[col].fillna("")
-    return df
 
 # -----------------------------
 # ATTENDANCE + SUBMISSION HELPERS
@@ -426,19 +433,7 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
         updated = new_entry
     updated.to_csv(log_file, index=False)
 
-# Load or init lectures for the selected course
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
 
-# Ensure required folders exist
-for d in ["data", "submissions", "records", "scores", "modules"]:
-    os.makedirs(d, exist_ok=True)
-LECTURE_DIR = "modules"
-UPLOAD_DIR = "student_uploads"
-LOG_DIR = "records"
-os.makedirs(LECTURE_DIR, exist_ok=True)
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(LOG_DIR, exist_ok=True)
 
 # -----------------------------
 # STUDENT MODE
@@ -1141,6 +1136,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
