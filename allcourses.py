@@ -627,108 +627,126 @@ for label, file_path in records.items():
             st.info(f"No directory found for {upload_type}.")
 
     # -----------------------------------------------------
-    # 📊 LIVE SCORE REVIEW TABLE (New Feature)
-    # -----------------------------------------------------
-    if st.session_state.get("role") == "admin":
-        st.divider()
+   # -----------------------------------------------------
+# 📊 LIVE SCORE REVIEW TABLE (Admin-Only Section)
+# -----------------------------------------------------
+if st.session_state.get("role") == "admin":
+    with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
+
         st.header("📊 Review Graded Scores")
 
+        base_dir = "student_uploads"
         log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
 
-    if os.path.exists(log_file):
-        scores_df = pd.read_csv(log_file)
+        if os.path.exists(log_file):
+            scores_df = pd.read_csv(log_file)
 
-        # ✅ Filters for easier viewing
-col1, col2 = st.columns(2)
+            # ✅ Filters for easier viewing
+            col1, col2 = st.columns(2)
+            with col1:
+                type_filter = st.selectbox(
+                    "Filter by Upload Type",
+                    ["All"] + sorted(scores_df["Type"].unique().tolist()),
+                    key=f"{course_code}_type_filter"
+                )
+            with col2:
+                sort_order = st.radio(
+                    "Sort by Date",
+                    ["Newest First", "Oldest First"],
+                    key=f"{course_code}_sort_order"
+                )
 
-with col1:
-    type_filter = st.selectbox(
-        "Filter by Upload Type",
-        ["All"] + sorted(scores_df["Type"].unique().tolist()),
-        key=f"{course_code}_type_filter"
-    )
+            filtered_df = scores_df.copy()
+            if type_filter != "All":
+                filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
-with col2:
-    sort_order = st.radio(
-        "Sort by Date",
-        ["Newest First", "Oldest First"],
-        key=f"{course_code}_sort_order"
-    )
+            filtered_df = filtered_df.sort_values(
+                "Date Graded", ascending=(sort_order == "Oldest First")
+            )
 
-filtered_df = scores_df.copy()
+            # ✅ Display filtered table
+            st.dataframe(filtered_df, use_container_width=True)
 
-if type_filter != "All":
-    filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+            # ✅ Download option
+            st.download_button(
+                label="⬇️ Download All Scores (CSV)",
+                data=filtered_df.to_csv(index=False).encode(),
+                file_name=f"{course_code}_graded_scores.csv",
+                mime="text/csv",
+                key=f"{course_code}_download_scores"
+            )
 
-    filtered_df = filtered_df.sort_values(
-        "Date Graded", ascending=(sort_order == "Oldest First")
-)
-
-# ✅ Display filtered table
-    st.dataframe(filtered_df, use_container_width=True)
-
-# ✅ Download option
-    st.download_button(
-        label="⬇️ Download All Scores (CSV)",
-        data=filtered_df.to_csv(index=False).encode(),
-        file_name=f"{course_code}_graded_scores.csv",
-        mime="text/csv",
-        key=f"{course_code}_download_scores"
-)
-
-else:
-    st.info("No graded scores yet. Once you grade a file, it will appear here.")
-
-    # -------------------------------------
-    # 🧮 GRADING AND SCORE MANAGEMENT
-    # -------------------------------------
-    st.divider()
-    st.header("🧮 Manual Score Entry & Review")
-    name = st.text_input("Student Name", key="manual_name")
-    matric = st.text_input("Matric Number", key="manual_matric")
-    week = st.selectbox("Select Week", lectures_df["Week"].tolist(), key="manual_week")
-    score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
-    remarks = st.text_input("Remarks (optional)", key="manual_remarks")
-    score_type = st.radio("Select Assessment Type", ["classwork", "seminar", "assignment"], key="manual_type")
-
-    if st.button("💾 Save / Update Score", key="save_manual_score"):
-        if not name or not matric:
-            st.warning("Please enter student name and matric number.")
         else:
-            record_score(course_code, score_type, name, matric, week, score, remarks)
-            st.cache_data.clear()
-            st.success("✅ Score recorded successfully!")
+            st.info("No graded scores yet. Once you grade a file, it will appear here.")
 
-    st.divider()
-    st.header("📊 Review Student Scores")
-    score_file = get_file(course_code, "scores")
-    if os.path.exists(score_file):
-        scores_df = pd.read_csv(score_file)
+        # -------------------------------------
+        # 🧮 GRADING AND SCORE MANAGEMENT
+        # -------------------------------------
+        st.divider()
+        st.header("🧮 Manual Score Entry & Review")
 
-        # Filters
-        col1, col2 = st.columns(2)
-        with col1:
-            week_filter = st.selectbox("Filter by Week", ["All"] + sorted(scores_df["Week"].unique().tolist()))
-        with col2:
-            type_filter = st.selectbox("Filter by Assessment Type", ["All"] + sorted(scores_df["Type"].unique().tolist()))
-
-        # Apply filters
-        filtered_df = scores_df.copy()
-        if week_filter != "All":
-            filtered_df = filtered_df[filtered_df["Week"] == week_filter]
-        if type_filter != "All":
-            filtered_df = filtered_df[filtered_df["Type"] == type_filter]
-
-        st.dataframe(filtered_df)
-
-        st.download_button(
-            "⬇️ Download Filtered Scores",
-            filtered_df.to_csv(index=False).encode(),
-            file_name=f"{course_code}_filtered_scores.csv",
-            mime="text/csv"
+        name = st.text_input("Student Name", key="manual_name")
+        matric = st.text_input("Matric Number", key="manual_matric")
+        week = st.selectbox("Select Week", lectures_df["Week"].tolist(), key="manual_week")
+        score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
+        remarks = st.text_input("Remarks (optional)", key="manual_remarks")
+        score_type = st.radio(
+            "Select Assessment Type", ["classwork", "seminar", "assignment"], key="manual_type"
         )
-    else:
-        st.info("🔒 No scores recorded yet.")
+
+        if st.button("💾 Save / Update Score", key="save_manual_score"):
+            if not name or not matric:
+                st.warning("Please enter student name and matric number.")
+            else:
+                record_score(course_code, score_type, name, matric, week, score, remarks)
+                st.cache_data.clear()
+                st.success("✅ Score recorded successfully!")
+
+        # -------------------------------------
+        # 📊 Review Student Scores (All)
+        # -------------------------------------
+        st.divider()
+        st.header("📊 Review Student Scores")
+        score_file = get_file(course_code, "scores")
+
+        if os.path.exists(score_file):
+            scores_df = pd.read_csv(score_file)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                week_filter = st.selectbox(
+                    "Filter by Week",
+                    ["All"] + sorted(scores_df["Week"].unique().tolist())
+                )
+            with col2:
+                type_filter = st.selectbox(
+                    "Filter by Assessment Type",
+                    ["All"] + sorted(scores_df["Type"].unique().tolist())
+                )
+
+            filtered_df = scores_df.copy()
+            if week_filter != "All":
+                filtered_df = filtered_df[filtered_df["Week"] == week_filter]
+            if type_filter != "All":
+                filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+
+            st.dataframe(filtered_df, use_container_width=True)
+
+            st.download_button(
+                "⬇️ Download Filtered Scores",
+                filtered_df.to_csv(index=False).encode(),
+                file_name=f"{course_code}_filtered_scores.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("🔒 No scores recorded yet.")
+
+# -----------------------------------------------------
+# 🚫 Hidden for Non-Admins
+# -----------------------------------------------------
+else:
+    st.info("🔒 This section is restricted to administrators.")
+
 # ---------------------------------------------------------
 # ---------------------------------------------------------
 # 🎥 ADMIN: Upload & Manage Video Lectures
@@ -1047,6 +1065,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
