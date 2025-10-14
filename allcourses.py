@@ -14,17 +14,7 @@ st.set_page_config(
     page_icon="📚",
     layout="wide"
 )
-# -----------------------------
-# -----------------------------
 
-# COURSES
-# -----------------------------
-COURSES = {
-    "MCB 221 – General Microbiology": "MCB221",
-    "BCH 201 – General Biochemistry": "BCH201",
-    "BIO 203 – General Physiology": "BIO203",
-}
-# -----------------------------
 # ===============================================================
 # 🔐 ROLE SELECTION & ACCESS CONTROL
 # ===============================================================
@@ -32,17 +22,14 @@ if "role" not in st.session_state:
     st.session_state["role"] = None
 
 st.sidebar.title("🔐 Login Panel")
-role = st.sidebar.radio("Select Role", ["Select", "Student", "admin"], key="role_selector")
+role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin"], key="role_selector")
 
 if role != "Select":
     st.session_state["role"] = role
 else:
     st.session_state["role"] = None
 
-# =========================================
-
-# STYLES / FOOTER
-# -----------------------------
+# Hide Streamlit UI & Footer
 st.markdown(
     """
     <style>
@@ -68,27 +55,41 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-#======================
 
-# -----------------------------
-# APP LAYOUT
-# -----------------------------
+# ===============================================================
+# 🎓 MAIN APP HEADER
+# ===============================================================
 st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
-st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
+
+st_autorefresh(interval=86_400_000, key="daily_refresh")  # once per day
+
+# ===============================================================
+# 📘 COURSE SELECTION
+# ===============================================================
+COURSES = {
+    "MCB 221 – General Microbiology": "MCB221",
+    "BCH 201 – General Biochemistry": "BCH201",
+    "BIO 203 – General Physiology": "BIO203",
+}
 
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
-mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
+mode = st.radio("Select Mode:", ["Student", "Admin"])
 
 MODULES_DIR = "modules"
+LECTURE_DIR = "lectures"
+UPLOAD_DIR = "student_uploads"
+LOG_DIR = "logs"
+
+for folder in [MODULES_DIR, LECTURE_DIR, UPLOAD_DIR, LOG_DIR]:
+    os.makedirs(folder, exist_ok=True)
+
 course_dir = os.path.join(MODULES_DIR, course_code)
 if not os.path.exists(course_dir):
     st.error(f"Course directory for {course_code} does not exist.")
     st.stop()
-# -----------------------------
 
-# FILE HELPERS
 # -----------------------------
 # --- Helper Function: View/Download Files ---
 def init_lectures(course_code, topics):
@@ -1140,6 +1141,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
