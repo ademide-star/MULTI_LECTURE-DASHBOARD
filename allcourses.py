@@ -32,7 +32,19 @@ else:
 # -----------------------------
 st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
 st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
+# -----------------------------
+# APP LAYOUT
+# -----------------------------
+st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
+st.title("📚 Multi-Course Portal")
 
+course = st.selectbox("Select Course:", list(COURSES.keys()))
+course_code = COURSES[course]
+mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
+
+# Load or init lectures for the selected course
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
 
 # Ensure required folders exist
 for d in ["data", "submissions", "records", "scores", "modules"]:
@@ -417,28 +429,12 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
     updated.to_csv(log_file, index=False)
 
 
-# -----------------------------
-# APP LAYOUT
-# -----------------------------
-st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
-st.title("📚 Multi-Course Portal")
-
-course = st.selectbox("Select Course:", list(COURSES.keys()))
-course_code = COURSES[course]
-mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
-
-# Load or init lectures for the selected course
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-
 
 # 🔐 TEACHER / ADMIN DASHBOARD (FULL + SCORE VIEWER)
 # ====================================================
 # 🧭 ROLE-BASED DASHBOARD CONTROL
 # ---------------------------------------------
-# Example: mode can be "Admin" or "Student"
-# You probably already have a selectbox or login to set this:
-# mode = st.sidebar.selectbox("Login Mode", ["Student", "Admin"])
+
 
 # ---------------------------------------------
 # 👩‍🏫 ADMIN SECTION
@@ -1137,6 +1133,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
