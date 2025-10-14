@@ -709,7 +709,7 @@ if st.session_state.get("role") == "Student":
         st.warning("📁 No video directory found for this course.")
 
 
-:
+
 def admin_view():
     st.title("👩‍🏫 Admin Dashboard")
     st.success("Welcome, Admin! Manage lectures, attendance, and student uploads here.")
@@ -1139,6 +1139,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
