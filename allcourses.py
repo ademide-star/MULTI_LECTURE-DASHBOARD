@@ -960,54 +960,54 @@ def admin_view():
    # -----------------------------------------------------
 # 📊 LIVE SCORE REVIEW TABLE (Admin-Only Section)
 # -----------------------------------------------------
-if st.session_state.get("role") == "Admin":
-    with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
+    if st.session_state.get("role") == "Admin":
+        with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
 
-        st.header("📊 Review Graded Scores")
+            st.header("📊 Review Graded Scores")
 
-        base_dir = "student_uploads"
-        log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
+            base_dir = "student_uploads"
+            log_file = os.path.join(base_dir, f"{course_code}_scores.csv")
 
-        if os.path.exists(log_file):
-            scores_df = pd.read_csv(log_file)
+            if os.path.exists(log_file):
+                scores_df = pd.read_csv(log_file)
 
             # ✅ Filters for easier viewing
-            col1, col2 = st.columns(2)
-            with col1:
-                type_filter = st.selectbox(
-                    "Filter by Upload Type",
-                    ["All"] + sorted(scores_df["Type"].unique().tolist()),
-                    key=f"{course_code}_type_filter"
+                col1, col2 = st.columns(2)
+                with col1:
+                    type_filter = st.selectbox(
+                        "Filter by Upload Type",
+                        ["All"] + sorted(scores_df["Type"].unique().tolist()),
+                        key=f"{course_code}_type_filter"
                 )
-            with col2:
-                sort_order = st.radio(
-                    "Sort by Date",
-                    ["Newest First", "Oldest First"],
-                    key=f"{course_code}_sort_order"
+                with col2:
+                    sort_order = st.radio(
+                        "Sort by Date",
+                        ["Newest First", "Oldest First"],
+                        key=f"{course_code}_sort_order"
                 )
 
-            filtered_df = scores_df.copy()
-            if type_filter != "All":
-                filtered_df = filtered_df[filtered_df["Type"] == type_filter]
+                        filtered_df = scores_df.copy()
+                        if type_filter != "All":
+                        filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
-            filtered_df = filtered_df.sort_values(
-                "Date Graded", ascending=(sort_order == "Oldest First")
+                        filtered_df = filtered_df.sort_values(
+                        "Date Graded", ascending=(sort_order == "Oldest First")
             )
 
             # ✅ Display filtered table
-            st.dataframe(filtered_df, use_container_width=True)
+                st.dataframe(filtered_df, use_container_width=True)
 
             # ✅ Download option
-            st.download_button(
-                label="⬇️ Download All Scores (CSV)",
-                data=filtered_df.to_csv(index=False).encode(),
-                file_name=f"{course_code}_graded_scores.csv",
-                mime="text/csv",
-                key=f"{course_code}_download_scores"
+                st.download_button(
+                    label="⬇️ Download All Scores (CSV)",
+                    data=filtered_df.to_csv(index=False).encode(),
+                    file_name=f"{course_code}_graded_scores.csv",
+                    mime="text/csv",
+                    key=f"{course_code}_download_scores"
             )
 
-        else:
-            st.info("No graded scores yet. Once you grade a file, it will appear here.")
+            else:
+                st.info("No graded scores yet. Once you grade a file, it will appear here.")
 
         # -------------------------------------
         # 🧮 GRADING AND SCORE MANAGEMENT
@@ -1133,6 +1133,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
