@@ -58,7 +58,7 @@ if "role" not in st.session_state:
     st.session_state["role"] = None
 
 st.sidebar.title("🔐 Login Panel")
-role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin"], key="role_selector")
+role = st.sidebar.radio("Select Role", ["Select", "Student", "admin"], key="role_selector")
 
 if role != "Select":
     st.session_state["role"] = role
@@ -1131,7 +1131,7 @@ if st.session_state.get("role") == "admin":
 
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
-if st.session_state["role"] == "Admin":
+if st.session_state["role"] == "admin":
     admin_view()
 
 elif st.session_state["role"] == "Student":
@@ -1139,6 +1139,7 @@ elif st.session_state["role"] == "Student":
 
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
