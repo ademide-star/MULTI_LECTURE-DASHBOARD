@@ -8,7 +8,25 @@ import zipfile
 import io
 from datetime import datetime, timedelta, time
 
+# ===============================================================
+# 🧭 SESSION ROLE SELECTOR
+# ===============================================================
 
+# Initialize session role if not set
+if "role" not in st.session_state:
+    st.session_state["role"] = None
+
+st.sidebar.title("🔐 Login Panel")
+role = st.sidebar.radio(
+    "Select Role",
+    ["Select", "Student", "Admin"],
+    key="role_selector"
+)
+
+if role != "Select":
+    st.session_state["role"] = role
+else:
+    st.session_state["role"] = None
 # -----------------------------
 # BASIC CONFIG + DIRECTORIES
 # -----------------------------
@@ -517,6 +535,54 @@ for label, file_path in records.items():
     else:
         st.info(f"No {label.lower()} yet.")
 
+# ===============================================================
+# 🧑‍🏫 ADMIN SECTION — VIEW & MANAGE STUDENT SUBMISSIONS
+# ===============================================================
+if st.session_state.get("role") == "Admin":
+    st.divider()
+    st.subheader("🗂️ Manage Student Submissions")
+
+    # Automatically refresh submissions every 30 seconds
+    st_autorefresh(interval=30 * 1000, key="auto_refresh")
+
+    # Define the path to the submissions log
+    log_file = f"submissions_{course_code}.csv"
+
+    if os.path.exists(log_file):
+        submissions_df = pd.read_csv(log_file)
+
+        st.success(f"📦 Total Submissions: {len(submissions_df)}")
+        selected_type = st.selectbox("Filter by Submission Type", ["All", "Assignment", "Drawing", "Seminar"])
+
+        # Filter data
+        if selected_type != "All":
+            submissions_df = submissions_df[submissions_df["Submission Type"] == selected_type]
+
+        # Display submissions
+        st.dataframe(submissions_df)
+
+        # Download option
+        csv = submissions_df.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Download Submissions CSV", csv, file_name=f"{course_code}_submissions.csv")
+
+        # Option to view or delete
+        st.divider()
+        st.subheader("🧾 Manage Files")
+
+        selected_week = st.selectbox("Select Week to View Files", submissions_df["Week"].unique())
+        selected_week_files = submissions_df[submissions_df["Week"] == selected_week]
+
+        for idx, row in selected_week_files.iterrows():
+            st.write(f"📘 **{row['Student Name']} ({row['Matric Number']})** — {row['Submission Type']}")
+            file_path = os.path.join("uploads", course_code, row["Week"], row["File Name"])
+            if os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    st.download_button(f"⬇️ Download {row['File Name']}", f, file_name=row["File Name"], key=f"dl_{idx}")
+            else:
+                st.warning(f"⚠️ File not found: {row['File Name']}")
+    else:
+        st.info("No submissions found yet for this course.")
+    
 # ---------------------------------------------------------
 # 🧑‍🏫 ADMIN DASHBOARD: View + Grade + Review Scores
 # ---------------------------------------------------------
@@ -584,7 +650,7 @@ for label, file_path in records.items():
                         # --- Check if student-week entry exists ---
                         existing_idx = df[
                             (df["StudentName"].str.lower() == student_name.lower()) &
-                            (df["Matricno"].str.lower() == matric.lower()) &
+                            (df["MatricNo"].str.lower() == matric.lower()) &
                             (df["Week"].str.lower() == week.lower())
                         ].index
 
@@ -980,7 +1046,11 @@ if st.session_state.get("role") == "Student":
     st.divider()
     st.subheader("📝 Assignment Upload")
 
-    selected_week_a = st.selectbox("Select Week for Assignment", lectures_df["Week"].tolist(), key="assignment_week_select")
+    selected_week_a = st.selectbox(
+        "Select Week for Assignment",
+        lectures_df["Week"].tolist(),
+        key="assignment_week_select"
+    )
     matric_a = st.text_input("Matric Number", key="matric_a")
     student_name_a = st.text_input("Full Name", key="student_name_a")
     uploaded_assignment = st.file_uploader(
@@ -1046,7 +1116,9 @@ if st.session_state.get("role") == "Student":
             st.warning("Please upload your seminar file before submitting.")
         else:
             file_path = save_file(course_code, student_name_s, selected_week_s, uploaded_seminar, "seminar")
-            log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_semin
+            log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
+            st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
+
 
 # ---------------------------------------------------------
 # 🎓 STUDENT SECTION: Watch Lecture Videos
@@ -1065,6 +1137,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
