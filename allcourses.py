@@ -58,14 +58,6 @@ course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
 
-# Load or init lectures for the selected course
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-
-# Ensure required folders exist
-for d in ["data", "submissions", "records", "scores", "modules"]:
-    os.makedirs(d, exist_ok=True)
-
 MODULES_DIR = "modules"
 
 
@@ -438,6 +430,13 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
         updated = new_entry
     updated.to_csv(log_file, index=False)
 
+# Load or init lectures for the selected course
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
+
+# Ensure required folders exist
+for d in ["data", "submissions", "records", "scores", "modules"]:
+    os.makedirs(d, exist_ok=True)
 
 
 # 🔐 TEACHER / ADMIN DASHBOARD (FULL + SCORE VIEWER)
@@ -1139,6 +1138,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
