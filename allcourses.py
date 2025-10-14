@@ -8,6 +8,18 @@ import zipfile
 import io
 from datetime import datetime, timedelta, time
 
+import streamlit as st
+import os
+import pandas as pd
+from streamlit_autorefresh import st_autorefresh
+
+# ✅ PAGE CONFIGURATION (must come before any Streamlit UI elements)
+st.set_page_config(
+    page_title="Multi-Course Dashboard",
+    page_icon="📚",
+    layout="wide"
+)
+
 # ===============================================================
 # 🧭 SESSION ROLE SELECTOR
 # ===============================================================
@@ -27,13 +39,14 @@ if role != "Select":
     st.session_state["role"] = role
 else:
     st.session_state["role"] = None
-# -----------------------------
+
 # -----------------------------
 # APP LAYOUT
 # -----------------------------
 st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
 st.title("📚 Multi-Course Portal")
 st_autorefresh(interval=43_200_000, key="halfday_auto_refresh")
+
 course = st.selectbox("Select Course:", list(COURSES.keys()))
 course_code = COURSES[course]
 mode = st.radio("Select Mode:", ["Student", "Teacher/Admin"]) 
@@ -47,6 +60,7 @@ for d in ["data", "submissions", "records", "scores", "modules"]:
     os.makedirs(d, exist_ok=True)
 
 MODULES_DIR = "modules"
+
 
 # -----------------------------
 # STYLES / FOOTER
@@ -1129,6 +1143,7 @@ if os.path.exists(video_dir):
         st.info("No lecture videos have been uploaded yet.")
 else:
     st.warning("📁 No video directory found for this course.")
+
 
 
 
