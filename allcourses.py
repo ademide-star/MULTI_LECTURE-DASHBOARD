@@ -494,47 +494,45 @@ def student_view():
     st.subheader("📘 Lecture Briefs and Classwork")
     st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
-    lecture_row = pd.DataFrame()
-
-    if "attended_week" in st.session_state and not lectures_df.empty:
-        week = st.session_state["attended_week"]
-        st.success(f"Access granted for {week}")
-        lecture_row = lectures_df[lectures_df["Week"] == week]
-    else:
-        st.warning("No lecture selected or attendance not recorded yet.")
-
+    # Safely get lecture info
+    lecture_row = lectures_df[lectures_df["Week"] == week]
     if not lecture_row.empty:
         lecture_info = lecture_row.iloc[0]
-        st.divider()
-        st.subheader(f"📖 {lecture_info.get('Week', 'Lecture')}: {lecture_info.get('Topic', 'No topic available')}")
-
+    
+    # Lecture brief
         brief = str(lecture_info.get("Brief", "")).strip()
         if brief:
             st.markdown(f"**Lecture Brief:** {brief}")
         else:
             st.info("Lecture brief not available yet.")
 
-        # 🧩 Classwork Section
+    # Classwork
         classwork_text = str(lecture_info.get("Classwork", "")).strip()
         if classwork_text:
             st.markdown("### 🧩 Classwork Questions")
             questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-            with st.form(f"{course_code}_cw_form"):
-                answers = [st.text_input(f"Q{i+1}: {q}", key=f"{course_code}_cw_q{i}") for i, q in enumerate(questions)]
-                submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
-                if submit_cw:
-                    save_classwork(name, matric, week, answers)
-                    st.success("✅ Classwork submitted successfully.")
+            if questions:
+                with st.form(f"{course_code}_cw_form"):
+                    answers = [st.text_input(f"Q{i+1}: {q}", key=f"{course_code}_cw_q{i}") for i, q in enumerate(questions)]
+                    submit_cw = st.form_submit_button("Submit Answers", disabled=not is_classwork_open(course_code, week))
+                    if submit_cw:
+                        save_classwork(name, matric, week, answers)
+                        st.success("✅ Classwork submitted successfully.")
+            else:
+                st.info("Classwork format is incorrect. Contact admin.")
         else:
             st.info("Classwork not yet released.")
 
-        # 📝 Assignment
+    # Assignment
         assignment = str(lecture_info.get("Assignment", "")).strip()
         if assignment:
             st.subheader("📚 Assignment")
             st.markdown(f"**Assignment:** {assignment}")
         else:
             st.info("Assignment not released yet.")
+    else:
+        st.warning("Lecture info not found. Please check the week selection.")
+
 
         # 📥 PDF Download
         pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
@@ -1085,6 +1083,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
