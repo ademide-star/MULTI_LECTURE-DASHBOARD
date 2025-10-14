@@ -602,35 +602,35 @@ def student_view():
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (STUDENT SECTION)
 # ===============================================================
-if st.session_state.get("role") == "Student":
+    if st.session_state.get("role") == "Student":
 
-    st.divider()
-    st.subheader("📄 Assignment, Drawing & Seminar Uploads")
+        st.divider()
+        st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 
     # =======================
     # ASSIGNMENT UPLOAD
     # =======================
-    st.divider()
-    st.subheader("📝 Assignment Upload")
+        st.divider()
+        st.subheader("📝 Assignment Upload")
 
-    selected_week_a = st.selectbox(
-        "Select Week for Assignment",
-        lectures_df["Week"].tolist(),
-        key="assignment_week_select"
+        selected_week_a = st.selectbox(
+            "Select Week for Assignment",
+            lectures_df["Week"].tolist(),
+            key="assignment_week_select"
     )
-    matric_a = st.text_input("Matric Number", key="matric_a")
-    student_name_a = st.text_input("Full Name", key="student_name_a")
-    uploaded_assignment = st.file_uploader(
-        f"Upload Assignment for {selected_week_a}",
-        type=["pdf", "docx", "jpg", "png"],
-        key=f"{course_code}_assignment"
+        matric_a = st.text_input("Matric Number", key="matric_a")
+        student_name_a = st.text_input("Full Name", key="student_name_a")
+        uploaded_assignment = st.file_uploader(
+            f"Upload Assignment for {selected_week_a}",
+            type=["pdf", "docx", "jpg", "png"],
+            key=f"{course_code}_assignment"
     )
 
-    if st.button(f"📤 Submit Assignment for {selected_week_a}", key="submit_assignment_btn"):
-        if not matric_a or not student_name_a:
-            st.warning("Please enter your name and matric number before submitting.")
-        elif not uploaded_assignment:
-            st.warning("Please upload your assignment file before submitting.")
+        if st.button(f"📤 Submit Assignment for {selected_week_a}", key="submit_assignment_btn"):
+            if not matric_a or not student_name_a:
+                st.warning("Please enter your name and matric number before submitting.")
+            elif not uploaded_assignment:
+                st.warning("Please upload your assignment file before submitting.")
         else:
             file_path = save_file(course_code, student_name_a, selected_week_a, uploaded_assignment, "assignment")
             log_submission(course_code, matric_a, student_name_a, selected_week_a, uploaded_assignment.name, "Assignment")
@@ -639,23 +639,23 @@ if st.session_state.get("role") == "Student":
     # =======================
     # DRAWING UPLOAD
     # =======================
-    st.divider()
-    st.subheader("🎨 Drawing Upload")
+        st.divider()
+        st.subheader("🎨 Drawing Upload")
 
-    selected_week_d = st.selectbox("Select Week for Drawing", lectures_df["Week"].tolist(), key="drawing_week_select")
-    matric_d = st.text_input("Matric Number", key="matric_d")
-    student_name_d = st.text_input("Full Name", key="student_name_d")
-    uploaded_drawing = st.file_uploader(
-        f"Upload Drawing for {selected_week_d}",
-        type=["pdf", "jpg", "png"],
-        key=f"{course_code}_drawing"
+        selected_week_d = st.selectbox("Select Week for Drawing", lectures_df["Week"].tolist(), key="drawing_week_select")
+        matric_d = st.text_input("Matric Number", key="matric_d")
+        student_name_d = st.text_input("Full Name", key="student_name_d")
+        uploaded_drawing = st.file_uploader(
+            f"Upload Drawing for {selected_week_d}",
+            type=["pdf", "jpg", "png"],
+            key=f"{course_code}_drawing"
     )
 
-    if st.button(f"📤 Submit Drawing for {selected_week_d}", key="submit_drawing_btn"):
-        if not matric_d or not student_name_d:
-            st.warning("Please enter your name and matric number before submitting.")
-        elif not uploaded_drawing:
-            st.warning("Please upload your drawing file before submitting.")
+        if st.button(f"📤 Submit Drawing for {selected_week_d}", key="submit_drawing_btn"):
+            if not matric_d or not student_name_d:
+                st.warning("Please enter your name and matric number before submitting.")
+            elif not uploaded_drawing:
+                st.warning("Please upload your drawing file before submitting.")
         else:
             file_path = save_file(course_code, student_name_d, selected_week_d, uploaded_drawing, "drawing")
             log_submission(course_code, matric_d, student_name_d, selected_week_d, uploaded_drawing.name, "Drawing")
@@ -664,23 +664,23 @@ if st.session_state.get("role") == "Student":
     # =======================
     # SEMINAR UPLOAD
     # =======================
-    st.divider()
-    st.subheader("🎤 Seminar Upload")
+        st.divider()
+        st.subheader("🎤 Seminar Upload")
 
-    selected_week_s = st.selectbox("Select Week for Seminar", lectures_df["Week"].tolist(), key="seminar_week_select")
-    matric_s = st.text_input("Matric Number", key="matric_s")
-    student_name_s = st.text_input("Full Name", key="student_name_s")
-    uploaded_seminar = st.file_uploader(
-        f"Upload Seminar File for {selected_week_s}",
-        type=["pdf", "pptx", "docx"],
-        key=f"{course_code}_seminar"
+        selected_week_s = st.selectbox("Select Week for Seminar", lectures_df["Week"].tolist(), key="seminar_week_select")
+        matric_s = st.text_input("Matric Number", key="matric_s")
+        student_name_s = st.text_input("Full Name", key="student_name_s")
+        uploaded_seminar = st.file_uploader(
+            f"Upload Seminar File for {selected_week_s}",
+            type=["pdf", "pptx", "docx"],
+            key=f"{course_code}_seminar"
     )
 
-    if st.button(f"📤 Submit Seminar for {selected_week_s}", key="submit_seminar_btn"):
-        if not matric_s or not student_name_s:
-            st.warning("Please enter your name and matric number before submitting.")
-        elif not uploaded_seminar:
-            st.warning("Please upload your seminar file before submitting.")
+        if st.button(f"📤 Submit Seminar for {selected_week_s}", key="submit_seminar_btn"):
+            if not matric_s or not student_name_s:
+                st.warning("Please enter your name and matric number before submitting.")
+            elif not uploaded_seminar:
+                st.warning("Please upload your seminar file before submitting.")
         else:
             file_path = save_file(course_code, student_name_s, selected_week_s, uploaded_seminar, "seminar")
             log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
@@ -690,20 +690,20 @@ if st.session_state.get("role") == "Student":
 # ---------------------------------------------------------
 # 🎓 STUDENT SECTION: Watch Lecture Videos
 # ---------------------------------------------------------
-    st.divider()
-    st.subheader("🎬 Watch Lecture Videos")
+        st.divider()
+        st.subheader("🎬 Watch Lecture Videos")
 
-    video_dir = os.path.join("video_lectures", course_code)
-    if os.path.exists(video_dir):
-        video_files = sorted(os.listdir(video_dir))
-        if video_files:
-            selected_video = st.selectbox("Select a lecture to watch:", video_files)
-            video_path = os.path.join(video_dir, selected_video)
-            st.video(video_path)
+        video_dir = os.path.join("video_lectures", course_code)
+        if os.path.exists(video_dir):
+            video_files = sorted(os.listdir(video_dir))
+            if video_files:
+                selected_video = st.selectbox("Select a lecture to watch:", video_files)
+                video_path = os.path.join(video_dir, selected_video)
+                st.video(video_path)
+            else:
+                st.info("No lecture videos have been uploaded yet.")
         else:
-            st.info("No lecture videos have been uploaded yet.")
-    else:
-        st.warning("📁 No video directory found for this course.")
+            st.warning("📁 No video directory found for this course.")
 
 
 
@@ -1128,6 +1128,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
