@@ -730,8 +730,8 @@ def student_view():
                 COURSE_TIMINGS = {
                     "BIO203": {"valid_code": "BIO203-ZT7", "start": "13:00", "end": "22:00"},
                     "BCH201": {"valid_code": "BCH201-ZT8", "start": "13:00", "end": "22:00"},
-                    "MCB221": {"valid_code": "MCB221-ZT9", "start": "10:00", "end": "22:20"},
-                    "BIO113": {"valid_code": "BIO113-ZT1", "start": "09:00", "end": "22:00"},
+                    "MCB221": {"valid_code": "MCB221-ZT9", "start": "10:00", "end": "10:15"},
+                    "BIO113": {"valid_code": "BIO113-ZT1", "start": "07:00", "end": "22:00"},
                     "BIO306": {"valid_code": "BIO306-ZT2", "start": "14:00", "end": "22:00"},
                 }
 
@@ -1574,6 +1574,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
