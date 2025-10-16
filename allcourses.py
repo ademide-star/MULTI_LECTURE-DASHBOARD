@@ -228,12 +228,26 @@ lectures_df = init_lectures(course_code, default_topics)
 
 
 
+import os
+import pandas as pd
+
 def init_lectures(lecture_data, lecture_file):
-    # Ensure directory exists on server
+    """
+    Initialize lectures by saving the lecture_data to a CSV file.
+    Ensures that the parent directory exists before saving (works locally and on deployment).
+    
+    Parameters:
+    - lecture_data: dict or list of dicts containing lecture info
+    - lecture_file: str, path to the CSV file to save
+    """
+    # Ensure the parent directory exists
     os.makedirs(os.path.dirname(lecture_file), exist_ok=True)
     
-    # Save the lecture data
+    # Convert the data to DataFrame and save
     pd.DataFrame(lecture_data).to_csv(lecture_file, index=False)
+    
+    print(f"Lecture data successfully saved to: {lecture_file}")
+
 
 # -----------------------------
 # --- Helper Function: View/Download Files ---
@@ -1436,4 +1450,5 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
