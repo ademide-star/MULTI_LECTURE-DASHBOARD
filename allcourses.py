@@ -926,7 +926,7 @@ def student_view():
                 if submitted_file:
                     st.warning(f"You have already submitted your **{sub_type}** for {selected_week}.")
                 else:
-                uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
+                    uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
                     if uploaded_file:
                 # Save file
                         extension = uploaded_file.name.split('.')[-1]
@@ -1505,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
