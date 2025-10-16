@@ -882,7 +882,7 @@ def student_view():
                 st.info("Assignment not released yet.")
 
     # PDF Viewer
-                display_module_pdf(week)
+            display_module_pdf(week)
 
     # Classwork
             classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
@@ -1633,6 +1633,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
