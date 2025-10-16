@@ -814,6 +814,8 @@ def student_view():
     except Exception as e:
             st.error(f"⚠️ Error displaying lecture details: {e}")
 
+if os.path.dirname(LECTURE_FILE):
+    os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
     # ===============================================================
 
@@ -1038,8 +1040,9 @@ def admin_view():
             lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
 
     # Ensure the parent directory exists
-            import os
+            if os.path.dirname(LECTURE_FILE):
             os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+
 
     # Save the CSV
             lectures_df.to_csv(LECTURE_FILE, index=False)
@@ -1338,7 +1341,7 @@ def admin_view():
 # Ensure the 'scores' folder exists
     score_dir = "scores"
     os.makedirs(score_dir, exist_ok=True)
-
+    
 # Define file path and columns
     score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
     columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
@@ -1473,6 +1476,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
