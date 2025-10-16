@@ -872,15 +872,15 @@ def student_view():
             for file in uploaded_files:
                 file_path = os.path.join(UPLOAD_DIR, file)
         # Display a download button for each file
-            with open(file_path, "rb") as f:
-                st.download_button(
-                label=f"📥 {file}",
-                data=f,
-                file_name=file,
-                mime=None  # Let Streamlit detect automatically
+                with open(file_path, "rb") as f:
+                    st.download_button(
+                    label=f"📥 {file}",
+                    data=f,
+                    file_name=file,
+                    mime=None  # Let Streamlit detect automatically
             )
-    else:
-        st.info("No lecture files have been uploaded yet.")
+        else:
+            st.info("No lecture files have been uploaded yet.")
 
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (ONE-TIME SUBMISSION)
@@ -1529,6 +1529,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
