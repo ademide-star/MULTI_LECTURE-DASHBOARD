@@ -1026,12 +1026,18 @@ def admin_view():
 
         # Save lecture & uploads
         if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
-            lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [
-                topic, brief, classwork, assignment
-            ]
+            lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
+
+    # Ensure the parent directory exists
+            import os
+            os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+
+    # Save the CSV
             lectures_df.to_csv(LECTURE_FILE, index=False)
+
             st.session_state["lectures_df"] = lectures_df
             st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
+
 
             # Save PDFs
             if lecture_pdf:
@@ -1447,6 +1453,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
