@@ -1328,61 +1328,59 @@ def admin_view():
                 st.error(f"Failed to record manual score: {e}")
 
                  # -------------------------
-import os
-import pandas as pd
-import streamlit as st
+
 
 # -------------------------
 # Student Grading
 # -------------------------
-st.header("📝 Grade Students for Session")
+    st.header("📝 Grade Students for Session")
 
 # Ensure the 'scores' folder exists
-score_dir = "scores"
-os.makedirs(score_dir, exist_ok=True)
+    score_dir = "scores"
+    os.makedirs(score_dir, exist_ok=True)
 
 # Define file path and columns
-score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
-columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
+    score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
+    columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
 
 # Load existing CSV or create new DataFrame
-if os.path.exists(score_file):
-    df = pd.read_csv(score_file)
+    if os.path.exists(score_file):
+        df = pd.read_csv(score_file)
     # Ensure all expected columns exist
-    for col in columns:
-        if col not in df.columns:
-            df[col] = 0
-else:
+        for col in columns:
+            if col not in df.columns:
+                df[col] = 0
+    else:
     # Create empty DataFrame with proper columns
-    df = pd.DataFrame(columns=columns)
+        df = pd.DataFrame(columns=columns)
 
 # Loop through students
-for idx, row in df.iterrows():
-    st.markdown(f"### {row.get('StudentName','Unknown')} ({row.get('MatricNo','Unknown')})")
+    for idx, row in df.iterrows():
+        st.markdown(f"### {row.get('StudentName','Unknown')} ({row.get('MatricNo','Unknown')})")
 
-    attendance = st.number_input(f"Attendance (out of 5)", 0, 5, value=int(row.get("Attendance", 0)), key=f"{idx}_att")
-    classwork = st.number_input(f"Classwork (out of 10)", 0, 10, value=int(row.get("Classwork", 0)), key=f"{idx}_cw")
-    test = st.number_input(f"Test (out of 10)", 0, 10, value=int(row.get("Test", 0)), key=f"{idx}_test")
-    practical = st.number_input(f"Practical (out of 5)", 0, 5, value=int(row.get("Practical", 0)), key=f"{idx}_prac")
-    exam = st.number_input(f"Exam (out of 70)", 0, 70, value=int(row.get("Exam", 0)), key=f"{idx}_exam")
+        attendance = st.number_input(f"Attendance (out of 5)", 0, 5, value=int(row.get("Attendance", 0)), key=f"{idx}_att")
+        classwork = st.number_input(f"Classwork (out of 10)", 0, 10, value=int(row.get("Classwork", 0)), key=f"{idx}_cw")
+        test = st.number_input(f"Test (out of 10)", 0, 10, value=int(row.get("Test", 0)), key=f"{idx}_test")
+        practical = st.number_input(f"Practical (out of 5)", 0, 5, value=int(row.get("Practical", 0)), key=f"{idx}_prac")
+        exam = st.number_input(f"Exam (out of 70)", 0, 70, value=int(row.get("Exam", 0)), key=f"{idx}_exam")
 
     # Update DataFrame
-    df.at[idx, "Attendance"] = attendance
-    df.at[idx, "Classwork"] = classwork
-    df.at[idx, "Test"] = test
-    df.at[idx, "Practical"] = practical
-    df.at[idx, "Exam"] = exam
+        df.at[idx, "Attendance"] = attendance
+        df.at[idx, "Classwork"] = classwork
+        df.at[idx, "Test"] = test
+        df.at[idx, "Practical"] = practical
+        df.at[idx, "Exam"] = exam
 
     # Calculate total score
-    df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
+        df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
 
 # Save updated CSV
-if st.button("💾 Save All Student Scores"):
-    df.to_csv(score_file, index=False)
-    st.success("✅ All scores saved successfully!")
+    if st.button("💾 Save All Student Scores"):
+        df.to_csv(score_file, index=False)
+        st.success("✅ All scores saved successfully!")
 
 # Display table
-st.dataframe(df, use_container_width=True)
+    st.dataframe(df, use_container_width=True)
 
 
     # -------------------------
@@ -1475,6 +1473,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
