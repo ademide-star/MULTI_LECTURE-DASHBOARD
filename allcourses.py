@@ -904,46 +904,46 @@ def student_view():
                 (tracker_df["MatricNo"] == matric_no) &
                 (tracker_df["Week"] == selected_week)
     ]
-                if existing.empty:
-                    student_row = len(tracker_df)
-                    tracker_df.loc[student_row] = [student_name, matric_no, selected_week, "", "", ""]
-                else:
-                    student_row = existing.index[0]
+            if existing.empty:
+                student_row = len(tracker_df)
+                tracker_df.loc[student_row] = [student_name, matric_no, selected_week, "", "", ""]
+            else:
+                student_row = existing.index[0]
 
     # -----------------------------
     # Submission types
     # -----------------------------
-                submission_info = {
-                    "Assignment": ["pdf", "docx", "jpg", "png"],
-                    "Drawing": ["pdf", "jpg", "png"],
-                     "Seminar": ["pdf", "pptx", "docx"]
+            submission_info = {
+                "Assignment": ["pdf", "docx", "jpg", "png"],
+                "Drawing": ["pdf", "jpg", "png"],
+                "Seminar": ["pdf", "pptx", "docx"]
     }
 
-                for sub_type, allowed_types in submission_info.items():
-                    submitted_file = tracker_df.at[student_row, sub_type]
-                    key_suffix = f"{sub_type}_{matric_no}_{selected_week}"
+            for sub_type, allowed_types in submission_info.items():
+                submitted_file = tracker_df.at[student_row, sub_type]
+                key_suffix = f"{sub_type}_{matric_no}_{selected_week}"
 
-                     if submitted_file:
-                        st.warning(f"You have already submitted your **{sub_type}** for {selected_week}.")
-                    else:
-                        uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
-                        if uploaded_file:
+                if submitted_file:
+                    st.warning(f"You have already submitted your **{sub_type}** for {selected_week}.")
+                else:
+                uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
+                    if uploaded_file:
                 # Save file
-                            extension = uploaded_file.name.split('.')[-1]
-                            filename = f"{student_name}_{matric_no}_{selected_week}_{sub_type}.{extension}"
-                            file_path = os.path.join(UPLOAD_DIR, filename)
-                            with open(file_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
+                        extension = uploaded_file.name.split('.')[-1]
+                        filename = f"{student_name}_{matric_no}_{selected_week}_{sub_type}.{extension}"
+                        file_path = os.path.join(UPLOAD_DIR, filename)
+                        with open(file_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
 
                 # Update tracker CSV
-                            tracker_df.at[student_row, sub_type] = filename
-                            tracker_df.to_csv(TRACK_FILE, index=False)
+                        tracker_df.at[student_row, sub_type] = filename
+                        tracker_df.to_csv(TRACK_FILE, index=False)
 
                 # Optional: call existing logging function if available
-                            if "log_submission" in globals():
-                                log_submission(course_code, matric_no, student_name, selected_week, uploaded_file.name, sub_type)
+                         if "log_submission" in globals():
+                            log_submission(course_code, matric_no, student_name, selected_week, uploaded_file.name, sub_type)
 
-                            st.success(f"✅ {sub_type} uploaded successfully!")
+                        st.success(f"✅ {sub_type} uploaded successfully!")
 
 
     # 🎬 Lecture Videos
@@ -1505,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
