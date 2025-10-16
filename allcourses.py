@@ -778,7 +778,7 @@ def student_view():
                 st.info("Assignment not released yet.")
 
     # PDF Viewer
-            display_module_pdf(week)
+                display_module_pdf(week)
 
     # Classwork
             classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
@@ -900,9 +900,9 @@ def student_view():
                 if student_name and matric_no:
     # Check if student-week exists
                     existing = tracker_df[
-                    (tracker_df["StudentName"] == student_name) &
-                    (tracker_df["MatricNo"] == matric_no) &
-                    (tracker_df["Week"] == selected_week)
+                        (tracker_df["StudentName"] == student_name) &
+                        (tracker_df["MatricNo"] == matric_no) &
+                        (tracker_df["Week"] == selected_week)
     ]
                     if existing.empty:
                         student_row = len(tracker_df)
@@ -1505,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
