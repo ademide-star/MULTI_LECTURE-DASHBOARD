@@ -223,9 +223,6 @@ def init_lectures(course_code, default_weeks):
         df[col] = df[col].fillna("")
     return df
 
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-
 
 
 import os
@@ -1450,5 +1447,6 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
