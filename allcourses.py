@@ -1322,351 +1322,319 @@ def admin_view():
 
                 st.dataframe(lectures_df, use_container_width=True)
 
-    # -------------------------
-    # Student Records (Attendance / Classwork / Seminar)
-    # -------------------------
-                st.header("📋 Student Records")
-                for file, label in [
-                (ATTENDANCE_FILE, "Attendance Records"),
-                (CLASSWORK_FILE, "Classwork Submissions"),
-                (SEMINAR_FILE, "Seminar Submissions")
+    # admin_dashboard.py
+"""
+Streamlit Admin / Student Dashboard
+- Handles attendance/classwork/seminar CSV displays & downloads
+- Lists & grades uploaded student files (assignment/drawing/seminar)
+- Manual score entry & batch grading interface
+- Video lecture upload/list/download
+- Simple classwork open/close control with 20-minute expiry
+"""
+import streamlit as st
+import pandas as pd
+import os
+import json
+from pathlib import Path
+from datetime import datetime, timedelta
+
+st.set_page_config(page_title="Course Admin Dashboard", layout="wide")
+
+# -------------------------
+# Config / Paths
+# -------------------------
+BASE_DIR = Path.cwd()
+DATA_DIR = BASE_DIR / "data"
+UPLOADS_DIR = BASE_DIR / "student_uploads"
+SCORES_DIR = BASE_DIR / "scores"
+VIDEO_DIR_ROOT = BASE_DIR / "video_lectures"
+CLASSWORK_CONTROL_FILE = DATA_DIR / "classwork_control.json"
+
+# Files for generic records (attendance/classwork/seminar)
+ATTENDANCE_FILE = DATA_DIR / "attendance.csv"
+CLASSWORK_FILE = DATA_DIR / "classwork.csv"
+SEMINAR_FILE = DATA_DIR / "seminar.csv"
+LECTURE_FILE = DATA_DIR / "lectures.csv"
+
+# Ensure dirs exist
+for d in [DATA_DIR, UPLOADS_DIR, SCORES_DIR, VIDEO_DIR_ROOT]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# Helper functions
+def safe_read_csv(path, default_df=None):
+    """Return dataframe if exists & readable, else default_df (or empty DF)."""
+    try:
+        if path and Path(path).exists():
+            return pd.read_csv(path)
+    except Exception as e:
+        st.warning(f"Failed to read {path}: {e}")
+    return default_df if default_df is not None else pd.DataFrame()
+
+def write_csv_safely(df, path):
+    try:
+        df.to_csv(path, index=False)
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+def load_classwork_control():
+    if CLASSWORK_CONTROL_FILE.exists():
+        try:
+            return json.loads(CLASSWORK_CONTROL_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+def save_classwork_control(data):
+    CLASSWORK_CONTROL_FILE.write_text(json.dumps(data))
+
+def open_classwork(course_code, week, minutes=20):
+    data = load_classwork_control()
+    key = f"{course_code}_{week}"
+    expires_at = (datetime.utcnow() + timedelta(minutes=minutes)).isoformat()
+    data[key] = {"open": True, "expires_at": expires_at}
+    save_classwork_control(data)
+
+def close_expired_classworks():
+    data = load_classwork_control()
+    changed = False
+    now = datetime.utcnow()
+    for k, v in list(data.items()):
+        try:
+            if v.get("open") and v.get("expires_at"):
+                if datetime.fromisoformat(v["expires_at"]) <= now:
+                    data[k]["open"] = False
+                    changed = True
+        except Exception:
+            continue
+    if changed:
+        save_classwork_control(data)
+
+def is_classwork_open(course_code, week):
+    data = load_classwork_control()
+    key = f"{course_code}_{week}"
+    v = data.get(key)
+    if not v:
+        return False
+    try:
+        return v.get("open") and datetime.fromisoformat(v.get("expires_at")) > datetime.utcnow()
+    except Exception:
+        return False
+
+def ensure_scores_df(course_code):
+    score_file = SCORES_DIR / f"{course_code.lower()}_scores.csv"
+    if score_file.exists():
+        df = safe_read_csv(score_file, pd.DataFrame())
+    else:
+        df = pd.DataFrame(columns=[
+            "StudentName", "MatricNo", "Week",
+            "ClassworkScore", "SeminarScore", "AssignmentScore",
+            "TotalScore", "Type", "Date Graded", "Remarks"
+        ])
+    # ensure numeric columns exist
+    for col in ["ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]:
+        if col not in df.columns:
+            df[col] = 0
+    return df, score_file
+
+def compute_total(df):
+    df["ClassworkScore"] = pd.to_numeric(df.get("ClassworkScore", 0)).fillna(0).astype(float)
+    df["SeminarScore"] = pd.to_numeric(df.get("SeminarScore", 0)).fillna(0).astype(float)
+    df["AssignmentScore"] = pd.to_numeric(df.get("AssignmentScore", 0)).fillna(0).astype(float)
+    # weights: classwork 30%, seminar 20%, assignment 50%
+    df["TotalScore"] = (
+        df["ClassworkScore"] * 0.3 +
+        df["SeminarScore"] * 0.2 +
+        df["AssignmentScore"] * 0.5
+    ).round(1)
+    return df
+
+def record_score(course_code, score_type, student_name, matric, week, score, remarks=""):
+    df, score_file = ensure_scores_df(course_code)
+    mask = (
+        (df["StudentName"].astype(str).str.lower() == student_name.lower()) &
+        (df["MatricNo"].astype(str).str.lower() == matric.lower()) &
+        (df["Week"].astype(str).str.lower() == str(week).lower())
+    )
+    col_map = {"classwork":"ClassworkScore", "seminar":"SeminarScore", "assignment":"AssignmentScore"}
+    col = col_map.get(score_type, "AssignmentScore")
+    if mask.any():
+        df.loc[mask, col] = float(score)
+        df.loc[mask, "Date Graded"] = datetime.utcnow().isoformat()
+        df.loc[mask, "Remarks"] = remarks
+    else:
+        new_row = {
+            "StudentName": student_name.title(),
+            "MatricNo": matric.upper(),
+            "Week": week,
+            "ClassworkScore": 0,
+            "SeminarScore": 0,
+            "AssignmentScore": 0,
+            "TotalScore": 0,
+            "Type": score_type,
+            "Date Graded": datetime.utcnow().isoformat(),
+            "Remarks": remarks
+        }
+        new_row[col] = float(score)
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df = compute_total(df)
+    ok, err = write_csv_safely(df, score_file)
+    return ok, err
+
+# -------------------------
+# UI components
+# -------------------------
+def admin_view():
+    st.title("📋 Admin Dashboard")
+    st.info("Manage student records, uploads, grading and videos.")
+
+    # Show generic records
+    st.header("📋 Student Records")
+    for file_path, label in [
+        (ATTENDANCE_FILE, "Attendance Records"),
+        (CLASSWORK_FILE, "Classwork Submissions"),
+        (SEMINAR_FILE, "Seminar Submissions")
     ]:
-                st.divider()
-                st.markdown(f"### {label}")
-                if os.path.exists(file):
-                    df = pd.read_csv(file)
-                    st.dataframe(df, use_container_width=True)
-                    st.download_button(
-                    label=f"⬇️ Download {label} CSV",
-                    data=df.to_csv(index=False).encode(),
-                    file_name=os.path.basename(file),
-                    mime="text/csv",
-                    key=f"{label}_download"
+        st.divider()
+        st.markdown(f"### {label}")
+        df = safe_read_csv(file_path, pd.DataFrame())
+        if df.empty:
+            st.info(f"No {label.lower()} yet.")
+        else:
+            st.dataframe(df, use_container_width=True)
+            st.download_button(
+                label=f"⬇️ Download {label} CSV",
+                data=df.to_csv(index=False).encode(),
+                file_name=file_path.name,
+                mime="text/csv",
+                key=f"{label}_download"
             )
+
+    # Submissions listing & grading
+    st.divider()
+    st.subheader("📂 View Student Submissions & Grade Them")
+    with st.expander("Expand to view and grade student submissions", expanded=True):
+        upload_types = ["assignment", "drawing", "seminar"]
+        course_code = st.text_input("Course code (for file naming / scoring)", value="BIO101", key="admin_course_code")
+        base_dir = UPLOADS_DIR / course_code
+        for upload_type in upload_types:
+            st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+            upload_dir = base_dir / upload_type
+            if upload_dir.exists():
+                files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(upload_dir / f)])
+                if not files:
+                    st.info(f"No {upload_type} uploaded yet.")
                 else:
-                    st.info(f"No {label.lower()} yet.")
-
-    # -------------------------
-    # View & Grade Uploaded Files (assignment/drawing/seminar)
-    # -------------------------
-                st.divider()
-                st.subheader("📂 View Student Submissions & Grade Them")
-                with st.expander("Expand to view and grade student submissions", expanded=True):
-                    upload_types = ["assignment", "drawing", "seminar"]
-                    for upload_type in upload_types:
-                    st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
-                    upload_dir = os.path.join(base_dir, course_code, upload_type)
-                    if os.path.exists(upload_dir):
-                        files = sorted([
-                        f for f in os.listdir(upload_dir)
-                        if os.path.isfile(os.path.join(upload_dir, f))
-            ])
-                        if not files:
-                            st.info(f"No {upload_type} uploaded yet.")
-                    else:
-                        for file in files:
-                            file_path = os.path.join(upload_dir, file)
-                            unique_key = f"{course_code}_{upload_type}_{file}"
-
-                            st.write(f"📎 **{file}**")
-
-                            try:
-                                with open(file_path, "rb") as fh:
-                                    st.download_button(
+                    for file in files:
+                        file_path = upload_dir / file
+                        unique_key = f"{course_code}_{upload_type}_{file}"
+                        st.write(f"📎 **{file}**")
+                        try:
+                            with open(file_path, "rb") as fh:
+                                st.download_button(
                                     label=f"⬇️ Download {file}",
                                     data=fh,
                                     file_name=file,
                                     mime="application/octet-stream",
                                     key=f"{unique_key}_download"
-                            )
-                            except Exception:
-                                st.warning("⚠️ Cannot open file for download.")
+                                )
+                        except Exception:
+                            st.warning("⚠️ Cannot open file for download.")
 
-                                score = st.number_input(
-                                    f"Enter score for {file}",
-                                    min_value=0,
-                                    max_value=100,
-                                    key=f"{unique_key}_score"
-                    )
+                        # default parse (Name_Matric_Week.ext)
+                        parts = file.rsplit(".", 1)[0].split("_")
+                        student_name = parts[0].strip().title() if len(parts) > 0 else "Unknown"
+                        matric = parts[1].strip().upper() if len(parts) > 1 else "Unknown"
+                        week = parts[2].strip().title() if len(parts) > 2 else "Unknown"
 
-                            if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
-                        # Parse filename format: Name_Matric_Week.ext
-                                parts = file.rsplit(".", 1)[0].split("_")
-                                student_name = parts[0].strip().title() if len(parts) > 0 else "Unknown"
-                                matric = parts[1].strip().upper() if len(parts) > 1 else "Unknown"
-                                week = parts[2].strip().title() if len(parts) > 2 else "Unknown"
+                        score = st.number_input(f"Enter score for {file}", min_value=0, max_value=100, key=f"{unique_key}_score")
+                        remarks = st.text_input(f"Remarks for {file} (optional)", key=f"{unique_key}_remarks")
 
-                        # Score file path
-                                score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
-                        # Load or create scores DataFrame safely
-                                score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
-                                required_columns = ["StudentName", "MatricNo", "Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]
-
-                                if os.path.exists(score_file):
-                                    df = pd.read_csv(score_file)
-                            # Add missing columns if any
-                                    for col in required_columns:
-                                        if col not in df.columns:
-                                            df[col] = 0 if "Score" in col else ""
+                        if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
+                            # Validate filename
+                            if len(parts) < 3:
+                                st.warning(f"Invalid filename format: {file}. Expected Name_Matric_Week.ext")
+                            else:
+                                ok, err = record_score(course_code, upload_type, student_name, matric, week, score, remarks)
+                                if ok:
+                                    st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
                                 else:
-    # Create empty DataFrame with required columns
-                                    df = pd.DataFrame(columns=required_columns)
-
-                        # parse filename expected: Name_Matric_Week.ext
-                                    parts = file.rsplit(".", 1)[0].split("_")
-
-# Validate filename format
-                                if len(parts) < 3:
-                                    st.warning(f"Invalid filename format: {file}. Use Name_Matric_Week.ext")
-                                continue  # Skip this file if format is wrong
-
-# Extract student info
-                                student_name = parts[0].strip().title()
-                                matric = parts[1].strip().upper()
-                                week = parts[2].strip().title()
-
-# Map upload type to column
-                                column_map = {"assignment": "AssignmentScore", "drawing": "ClassworkScore", "seminar": "SeminarScore"}
-                                col = column_map.get(upload_type, "AssignmentScore")
-
-                        # Locate existing record
-                                existing_idx = df[
-                                    (df["StudentName"].astype(str).str.lower() == student_name.lower()) &
-                                    (df["MatricNo"].astype(str).str.lower() == matric.lower()) &
-                                    (df["Week"].astype(str).str.lower() == week.lower())
-                                    ].index
-
-                                column_map = {
-                                    "assignment": "AssignmentScore",
-                                    "drawing": "ClassworkScore",
-                                    "seminar": "SeminarScore"
-                        }
-                                col = column_map.get(upload_type, "AssignmentScore")
-
-                                if len(existing_idx) > 0:
-                                    df.loc[existing_idx, col] = score
-                                else:
-                                    new_row = {
-                                        "StudentName": student_name,
-                                        "MatricNo": matric,
-                                        "Week": week,
-                                        "ClassworkScore": 0,
-                                        "SeminarScore": 0,
-                                        "AssignmentScore": 0,
-                                        "TotalScore": 0
-                            }
-                                    new_row[col] = score
-                                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-                        # Compute total weighted score
-                                    df["TotalScore"] = (
-                                        df.get("ClassworkScore", 0).fillna(0).astype(float) * 0.3 +
-                                        df.get("SeminarScore", 0).fillna(0).astype(float) * 0.2 +
-                                        df.get("AssignmentScore", 0).fillna(0).astype(float) * 0.5
-                                    ).round(1)
-
-                            try:
-                                df.to_csv(score_file, index=False)
-                                st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
-                            except Exception as e:
-                                st.error(f"❌ Failed to save score file: {e}")
+                                    st.error(f"❌ Failed to save score: {err}")
             else:
-                st.info(f"No directory found for {upload_type}.")
+                st.info(f"No directory found for {upload_type} uploads for course {course_code}.")
 
-    # -------------------------
-    # Live Score Review / Manual Entry
-    # -------------------------
-       # ===============================================================
-# 📄 ADMIN DASHBOARD — MANAGE & REVIEW SCORES
-# ===============================================================
-        st.divider()
-        with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
-            st.header("📊 Review Graded Scores")
-
-            review_paths = [
-            os.path.join("student_uploads", f"{course_code}_scores.csv"),
-            os.path.join("scores", f"{course_code.lower()}_scores.csv")
-    ]
-
-            scores_df = None
-            for p in review_paths:
-                if os.path.exists(p):
-                    try:
-                        scores_df = pd.read_csv(p)
-                        break
-                    except Exception:
-                    continue
-
-                if scores_df is None or scores_df.empty:
-                    st.info("No graded scores yet. Once you grade a file, it will appear here.")
-                else:
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                    type_values = ["All"] + (
-                sorted(scores_df["Type"].dropna().unique().tolist())
-                if "Type" in scores_df.columns else []
-            )
-            type_filter = st.selectbox(
-                "Filter by Upload Type",
-                type_values,
-                key=f"{course_code}_type_filter"
-            )
-
+    # Review graded scores
+    st.divider()
+    st.header("📊 Review Graded Scores")
+    review_course_code = st.text_input("Course code to review scores", value="BIO101", key="review_course_code")
+    scores_df, score_file = ensure_scores_df(review_course_code)
+    if scores_df.empty:
+        st.info("No graded scores yet. Once you grade a file, it will appear here.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            type_values = ["All"] + sorted(scores_df["Type"].dropna().unique().tolist()) if "Type" in scores_df.columns else ["All"]
+            type_filter = st.selectbox("Filter by Upload Type", type_values, key=f"{review_course_code}_type_filter")
         with col2:
-            sort_order = st.radio(
-                "Sort by Date",
-                ["Newest First", "Oldest First"],
-                key=f"{course_code}_sort_order"
-            )
+            sort_order = st.radio("Sort by Date", ["Newest First", "Oldest First"], key=f"{review_course_code}_sort_order")
 
         filtered_df = scores_df.copy()
         if type_filter != "All" and "Type" in filtered_df.columns:
             filtered_df = filtered_df[filtered_df["Type"] == type_filter]
 
         if "Date Graded" in filtered_df.columns:
-            filtered_df = filtered_df.sort_values(
-                "Date Graded", ascending=(sort_order == "Oldest First")
-            )
+            filtered_df = filtered_df.sort_values("Date Graded", ascending=(sort_order == "Oldest First"))
 
         st.dataframe(filtered_df, use_container_width=True)
         st.download_button(
             label="⬇️ Download All Scores (CSV)",
             data=filtered_df.to_csv(index=False).encode(),
-            file_name=f"{course_code}_graded_scores.csv",
+            file_name=f"{review_course_code}_graded_scores.csv",
             mime="text/csv",
-            key=f"{course_code}_graded_scores_download"
+            key=f"{review_course_code}_graded_scores_download"
         )
 
-
-# ===============================================================
-# 🧮 MANUAL SCORE ENTRY
-# ===============================================================
-        st.divider()
-st.header("🧮 Manual Score Entry & Review")
-
-# ✅ Ensure lectures_df is defined before using it
-if "lectures_df" not in st.session_state:
-    if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
+    # Manual score entry
+    st.divider()
+    st.header("🧮 Manual Score Entry & Review")
+    # Ensure lectures_df exists in session state
+    if "lectures_df" not in st.session_state:
+        lectures_df = safe_read_csv(LECTURE_FILE, pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"]))
         st.session_state["lectures_df"] = lectures_df
     else:
-        # Create a default empty DataFrame if file doesn't exist
-        lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
-        st.session_state["lectures_df"] = lectures_df
-else:
-    lectures_df = st.session_state["lectures_df"]
+        lectures_df = st.session_state["lectures_df"]
 
-# 🧾 Input fields
-name = st.text_input("Student Name", key="manual_name")
-matric = st.text_input("Matric Number", key="manual_matric")
+    name = st.text_input("Student Name", key="manual_name")
+    matric = st.text_input("Matric Number", key="manual_matric")
+    week = st.selectbox(
+        "Select Week",
+        lectures_df["Week"].tolist() if not lectures_df.empty else ["Week 1"],
+        key="manual_week"
+    )
+    score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
+    remarks = st.text_input("Remarks (optional)", key="manual_remarks")
+    score_type = st.radio("Select Assessment Type", ["classwork", "seminar", "assignment"], key="manual_type")
 
-# ✅ Select week from lectures_df or fallback to “Week 1”
-week = st.selectbox(
-    "Select Week",
-    lectures_df["Week"].tolist() if not lectures_df.empty else ["Week 1"],
-    key="manual_week"
-)
-
-score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
-remarks = st.text_input("Remarks (optional)", key="manual_remarks")
-score_type = st.radio(
-    "Select Assessment Type",
-    ["classwork", "seminar", "assignment"],
-    key="manual_type"
-)
-
-# 💾 Save or update score
-if st.button("💾 Save / Update Score", key="save_manual_score"):
-    if not name or not matric:
-        st.warning("Please enter student name and matric number.")
-    else:
-        try:
-            if "record_score" in globals() and callable(record_score):
-                record_score(course_code, score_type, name, matric, week, score, remarks)
-            else:
-                # Fallback: save directly to scores CSV
-                scores_dir = "scores"
-                os.makedirs(scores_dir, exist_ok=True)
-                score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
-
-                if os.path.exists(score_file):
-                    df = pd.read_csv(score_file)
-                else:
-                    df = pd.DataFrame(columns=[
-                        "StudentName", "MatricNo", "Week",
-                        "ClassworkScore", "SeminarScore",
-                        "AssignmentScore", "TotalScore"
-                    ])
-
-                # Find matching record
-                mask = (
-                    (df["StudentName"].astype(str).str.lower() == name.lower()) &
-                    (df["MatricNo"].astype(str).str.lower() == matric.lower()) &
-                    (df["Week"].astype(str).str.lower() == week.lower())
-                )
-
-                # Update or create new record
-                if mask.any():
-                    if score_type == "classwork":
-                        df.loc[mask, "ClassworkScore"] = score
-                    elif score_type == "seminar":
-                        df.loc[mask, "SeminarScore"] = score
-                    else:
-                        df.loc[mask, "AssignmentScore"] = score
-                else:
-                    new_row = {
-                        "StudentName": name.title(),
-                        "MatricNo": matric.upper(),
-                        "Week": week,
-                        "ClassworkScore": 0,
-                        "SeminarScore": 0,
-                        "AssignmentScore": 0,
-                        "TotalScore": 0
-                    }
-                    if score_type == "classwork":
-                        new_row["ClassworkScore"] = score
-                    elif score_type == "seminar":
-                        new_row["SeminarScore"] = score
-                    else:
-                        new_row["AssignmentScore"] = score
-                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-                # Compute total score
-                df["TotalScore"] = (
-                    df.get("ClassworkScore", 0).fillna(0).astype(float) * 0.3 +
-                    df.get("SeminarScore", 0).fillna(0).astype(float) * 0.2 +
-                    df.get("AssignmentScore", 0).fillna(0).astype(float) * 0.5
-                ).round(1)
-
-                df.to_csv(score_file, index=False)
-
-            st.cache_data.clear()
-            st.success("✅ Score recorded successfully!")
-        except Exception as e:
-            st.error(f"Failed to record manual score: {e}")
-
-
-# ===============================================================
-# 📝 STUDENT GRADING SECTION
-# ===============================================================
-        st.header("📝 Grade Students for Session")
-
-        score_dir = "scores"
-        os.makedirs(score_dir, exist_ok=True)
-        score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
-
-        columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
-
-        if os.path.exists(score_file):
-            df = pd.read_csv(score_file)
-            for col in columns:
-                if col not in df.columns:
-                    df[col] = 0
+    if st.button("💾 Save / Update Score", key="save_manual_score"):
+        if not name or not matric:
+            st.warning("Please enter student name and matric number.")
         else:
-            df = pd.DataFrame(columns=columns)
+            ok, err = record_score(review_course_code, score_type, name, matric, week, score, remarks)
+            if ok:
+                st.success("✅ Score recorded successfully!")
+            else:
+                st.error(f"❌ Failed to record score: {err}")
 
-        for idx, row in df.iterrows():
+    # Batch grading section (edit & save)
+    st.divider()
+    st.header("📝 Grade Students for Session (Edit & Save)")
+    score_file_path = SCORES_DIR / f"{review_course_code.lower()}_scores.csv"
+    df = safe_read_csv(score_file_path, pd.DataFrame(columns=["StudentName","MatricNo","Attendance","Classwork","Test","Practical","Exam","TotalScore","Week"]))
+    if df.empty:
+        st.info("No student records found in scores file. Use manual entry or grade uploads first.")
+    else:
+        edited = df.copy()
+        for idx, row in edited.iterrows():
             st.markdown(f"### {row.get('StudentName', 'Unknown')} ({row.get('MatricNo', 'Unknown')})")
             attendance = st.number_input("Attendance (out of 5)", 0, 5, int(row.get("Attendance", 0)), key=f"{idx}_att")
             classwork = st.number_input("Classwork (out of 10)", 0, 10, int(row.get("Classwork", 0)), key=f"{idx}_cw")
@@ -1674,77 +1642,50 @@ if st.button("💾 Save / Update Score", key="save_manual_score"):
             practical = st.number_input("Practical (out of 5)", 0, 5, int(row.get("Practical", 0)), key=f"{idx}_prac")
             exam = st.number_input("Exam (out of 70)", 0, 70, int(row.get("Exam", 0)), key=f"{idx}_exam")
 
-            df.at[idx, "Attendance"] = attendance
-            df.at[idx, "Classwork"] = classwork
-            df.at[idx, "Test"] = test
-            df.at[idx, "Practical"] = practical
-            df.at[idx, "Exam"] = exam
-            df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
+            edited.at[idx, "Attendance"] = attendance
+            edited.at[idx, "Classwork"] = classwork
+            edited.at[idx, "Test"] = test
+            edited.at[idx, "Practical"] = practical
+            edited.at[idx, "Exam"] = exam
+            edited.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
 
         if st.button("💾 Save All Student Scores"):
-            df.to_csv(score_file, index=False)
-            st.success("✅ All scores saved successfully!")
+            ok, err = True, None
+            try:
+                edited.to_csv(score_file_path, index=False)
+            except Exception as e:
+                ok, err = False, str(e)
+            if ok:
+                st.success("✅ All scores saved successfully!")
+            else:
+                st.error(f"❌ Failed to save: {err}")
 
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(edited, use_container_width=True)
 
-
-    # -------------------------
-    # Review Student Scores (filtered)
-    # -------------------------
-    st.divider()
-    st.header("📊 Review Student Scores")
-    score_file_candidates = [
-        os.path.join("scores", f"{course_code.lower()}_scores.csv"),
-        os.path.join("student_uploads", f"{course_code}_scores.csv"),
-        (get_file(course_code, "scores") if "get_file" in globals() and callable(get_file) else None)
-    ]
-    score_file = next((p for p in score_file_candidates if p and os.path.exists(p)), None)
-
-    if score_file:
-        try:
-            scores_df = pd.read_csv(score_file)
-            col1, col2 = st.columns(2)
-            with col1:
-                week_filter = st.selectbox("Filter by Week", ["All"] + sorted(scores_df["Week"].dropna().unique().tolist()) if "Week" in scores_df.columns else ["All"])
-            with col2:
-                type_filter = st.selectbox("Filter by Assessment Type", ["All"] + sorted(scores_df["Type"].dropna().unique().tolist()) if "Type" in scores_df.columns else ["All"])
-            filtered_df = scores_df.copy()
-            if week_filter != "All" and "Week" in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df["Week"] == week_filter]
-            if type_filter != "All" and "Type" in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df["Type"] == type_filter]
-            st.dataframe(filtered_df, use_container_width=True)
-            st.download_button("⬇️ Download Filtered Scores", filtered_df.to_csv(index=False).encode(), file_name=f"{course_code}_filtered_scores.csv")
-        except Exception as e:
-            st.error(f"Error reading scores file: {e}")
-    else:
-        st.info("🔒 No scores recorded yet.")
-
-    # -------------------------
-    # Video upload & management
-    # -------------------------
+    # Video uploads
     st.divider()
     st.subheader("🎥 Upload & Manage Video Lectures")
-    video_dir = os.path.join("video_lectures", course_code)
-    os.makedirs(video_dir, exist_ok=True)
-    uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
+    vcourse = st.text_input("Course code for videos", value=review_course_code, key="video_course_code")
+    video_dir = VIDEO_DIR_ROOT / vcourse
+    video_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{vcourse}_video_upload")
     if uploaded_video is not None:
         try:
-            save_path = os.path.join(video_dir, uploaded_video.name)
+            save_path = video_dir / uploaded_video.name
             with open(save_path, "wb") as f:
                 f.write(uploaded_video.read())
             st.success(f"✅ Video uploaded successfully: {uploaded_video.name}")
         except Exception as e:
             st.error(f"Failed to save uploaded video: {e}")
 
-    # list existing videos
-    video_files = sorted(os.listdir(video_dir)) if os.path.exists(video_dir) else []
+    video_files = sorted(os.listdir(video_dir)) if video_dir.exists() else []
     if video_files:
         st.markdown("### 📚 Uploaded Lecture Videos")
         for video in video_files:
-            video_path = os.path.join(video_dir, video)
+            video_path = video_dir / video
             try:
-                st.video(video_path)
+                st.video(str(video_path))
                 with open(video_path, "rb") as vid_file:
                     st.download_button(label=f"⬇️ Download {video}", data=vid_file.read(), file_name=video, mime="video/mp4", key=f"{video}_download")
             except Exception:
@@ -1752,32 +1693,73 @@ if st.button("💾 Save / Update Score", key="save_manual_score"):
     else:
         st.info("No videos uploaded yet.")
 
-# -------------------------------------
-# 🧩 CLASSWORK CONTROL
-# -------------------------------------
+    # Classwork control
+    st.divider()
     st.header("🧩 Classwork Control")
+    # refresh close expired
+    close_expired_classworks()
+    weeks = lectures_df["Week"].unique().tolist() if not lectures_df.empty else ["Week 1"]
+    week_to_control = st.selectbox("Select Week to Open/Close Classwork", weeks, key="admin_cw_control")
+    course_for_control = st.text_input("Course code for classwork control", value=review_course_code, key="classwork_course_code")
 
-    week_to_control = st.selectbox(
-        "Select Week to Open/Close Classwork", 
-        lectures_df["Week"].unique(), 
-        key="admin_cw_control"
-)
-
-    if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
-        open_classwork(course_code, week_to_control)
+    if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)"):
+        open_classwork(course_for_control, week_to_control, minutes=20)
         st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
 
-    close_classwork_after_20min(course_code)
+    is_open = is_classwork_open(course_for_control, week_to_control)
+    st.write(f"Classwork status for {course_for_control} - {week_to_control}: **{'OPEN' if is_open else 'CLOSED'}**")
 
+def student_view():
+    st.title("🎓 Student View")
+    st.info("Student-facing view: upload assignments and view resources (basic).")
 
-# 🚪 SHOW VIEW BASED ON ROLE
-# ===============================================================
-if st.session_state["role"] == "Admin":
+    course_code = st.text_input("Course code", value="BIO101", key="student_course_code")
+    upload_type = st.selectbox("Upload Type", ["assignment", "drawing", "seminar"], key="student_upload_type")
+    upload_dir = UPLOADS_DIR / course_code / upload_type
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded_file = st.file_uploader(f"Upload {upload_type.capitalize()} file", key=f"student_upload_{upload_type}")
+    if uploaded_file:
+        # Expect filename format Name_Matric_Week.ext recommended but not enforced
+        save_path = upload_dir / uploaded_file.name
+        try:
+            with open(save_path, "wb") as f:
+                f.write(uploaded_file.read())
+            st.success(f"✅ Uploaded: {uploaded_file.name}")
+        except Exception as e:
+            st.error(f"Failed to save upload: {e}")
+
+    st.divider()
+    st.markdown("### Available Resources")
+    for file_path, label in [
+        (ATTENDANCE_FILE, "Attendance Records"),
+        (LECTURE_FILE, "Lectures")
+    ]:
+        df = safe_read_csv(file_path, pd.DataFrame())
+        if df.empty:
+            st.info(f"No {label.lower()} available.")
+        else:
+            st.dataframe(df, use_container_width=True)
+            st.download_button(
+                label=f"⬇️ Download {label} CSV",
+                data=df.to_csv(index=False).encode(),
+                file_name=file_path.name,
+                mime="text/csv",
+                key=f"student_{label}_download"
+            )
+
+# Main
+if "role" not in st.session_state:
+    st.session_state["role"] = "Student"  # default
+
+role = st.sidebar.selectbox("Select role", ["Admin", "Student"], index=0 if st.session_state["role"]=="Admin" else 1)
+st.session_state["role"] = role
+
+if role == "Admin":
     admin_view()
-elif st.session_state["role"] == "Student":
-    student_view()
 else:
-    st.warning("Please select your role from the sidebar to continue.")
+    student_view()
+
 
 
 
