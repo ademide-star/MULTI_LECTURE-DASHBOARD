@@ -717,18 +717,18 @@ def student_view():
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
-    st.divider()
-    st.subheader("📘 Lecture Briefs and Classwork")
-    st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
+        st.divider()
+        st.subheader("📘 Lecture Briefs and Classwork")
+        st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
     
     # Safely get lecture info
-    if "attended_week" in st.session_state:
+        if "attended_week" in st.session_state:
             st.warning("Please attend a lecture before accessing materials.")
             week = st.session_state["attended_week"]
             st.success(f"Access granted for {week}")
 
     # ✅ Ensure lectures_df is available
-    try:
+        try:
             if "lectures_df" not in st.session_state:
                 file_path = get_file(course_code, "lectures")
                 lectures_df = ensure_default_lectures_file(file_path)
@@ -749,7 +749,7 @@ def student_view():
             else:
         # Convert to dict to safely use .get()
                 lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict()   
-    except Exception as e:
+        except Exception as e:
             st.error(f"⚠️ Could not load lecture data for {course_code}: {e}")
             st.stop()
 
@@ -760,7 +760,7 @@ def student_view():
 
 
     # ✅ Display Topic
-    try:
+        try:
     # Topic and Brief
             st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
             brief = str(lecture_info.get("Brief", "") or "").strip()
@@ -811,50 +811,50 @@ def student_view():
             else:
                 st.info("Lecture note not uploaded yet.")
 
-    except Exception as e:
+        except Exception as e:
             st.error(f"⚠️ Error displaying lecture details: {e}")
 
-if os.path.dirname(LECTURE_FILE):
-    os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+        if os.path.dirname(LECTURE_FILE):
+            os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
     # ===============================================================
 
 # -------------------------
 # Student View
 # -------------------------
-    st.title("🎓 Student Dashboard — View Scores")
+        st.title("🎓 Student Dashboard — View Scores")
 # Path to scores file
-    courses = ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"]
+        courses = ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"]
 
 # Student selects the course
-    course_code = st.selectbox("Select Your Course", courses)
+        course_code = st.selectbox("Select Your Course", courses)
 # Ask student for their matric number
-    matric_no = st.text_input("Enter Your Matric Number").strip().upper()
-    score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+        matric_no = st.text_input("Enter Your Matric Number").strip().upper()
+        score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
 
-    if os.path.exists(score_file):
-        df = pd.read_csv(score_file)
+        if os.path.exists(score_file):
+            df = pd.read_csv(score_file)
     
-    if matric_no:
+        if matric_no:
         # Filter scores for this student
-        student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
+            student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
         
-        if not student_scores.empty:
-            st.success(f"✅ Scores for Matric Number: {matric_no}")
+            if not student_scores.empty:
+                st.success(f"✅ Scores for Matric Number: {matric_no}")
             # Show scores table
-            st.dataframe(student_scores, use_container_width=True)
+                st.dataframe(student_scores, use_container_width=True)
             
             # Optionally, download
-            st.download_button(
-                "⬇️ Download Your Scores as CSV",
-                student_scores.to_csv(index=False).encode(),
-                file_name=f"{matric_no}_scores.csv",
-                mime="text/csv"
+                st.download_button(
+                    "⬇️ Download Your Scores as CSV",
+                    student_scores.to_csv(index=False).encode(),
+                    file_name=f"{matric_no}_scores.csv",
+                    mime="text/csv"
             )
+            else:
+                st.info("No scores found for this matric number yet.")
         else:
-            st.info("No scores found for this matric number yet.")
-    else:
-        st.warning("Scores have not been uploaded for this course yet.")
+            st.warning("Scores have not been uploaded for this course yet.")
 
 
 
@@ -862,14 +862,14 @@ if os.path.dirname(LECTURE_FILE):
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (ONE-TIME SUBMISSION)
 # ===============================================================
 
-    st.divider()
-    st.subheader("📄 Assignment, Drawing & Seminar Uploads")
+        st.divider()
+        st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 
 # -----------------------------
 # Ensure lectures_df exists
 # -----------------------------
-    if "lectures_df" not in st.session_state:
-        if os.path.exists(LECTURE_FILE):
+        if "lectures_df" not in st.session_state:
+            if os.path.exists(LECTURE_FILE):
             st.session_state["lectures_df"] = pd.read_csv(LECTURE_FILE)
         else:
             st.session_state["lectures_df"] = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
@@ -1505,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
