@@ -1600,7 +1600,7 @@ def admin_view():
 # Ensure the 'scores' folder exists
     score_dir = "scores"
     os.makedirs(score_dir, exist_ok=True)
-    
+    student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
 # Define file path and columns
     score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
     columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
@@ -1735,6 +1735,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
