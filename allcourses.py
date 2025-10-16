@@ -1056,22 +1056,23 @@ def admin_view():
     # -------------------------
     # View & Grade Uploaded Files (assignment/drawing/seminar)
     # -------------------------
-    st.divider()
-    st.subheader("📂 View Student Submissions & Grade Them")
-    with st.expander("Expand to view and grade student submissions", expanded=True):
-        upload_types = ["assignment", "drawing", "seminar"]
-        for upload_type in upload_types:
-            st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
-            upload_dir = os.path.join(base_dir, course_code, upload_type)
-            files = [] 
-            if os.path.exists(upload_dir):
-                files = sorted([
-                f for f in os.listdir(upload_dir)
-                if os.path.isfile(os.path.join(upload_dir, f))
+        st.divider()
+        st.subheader("📂 View Student Submissions & Grade Them")
+        with st.expander("Expand to view and grade student submissions", expanded=True):
+            upload_types = ["assignment", "drawing", "seminar"]
+            for upload_type in upload_types:
+                st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+                upload_dir = os.path.join(base_dir, course_code, upload_type)
+                files = [] 
+                if os.path.exists(upload_dir):
+                    files = sorted([
+                    f for f in os.listdir(upload_dir)
+                    if os.path.isfile(os.path.join(upload_dir, f))
             ])
-            if not files:
-                st.info(f"No {upload_type} uploaded yet.")
-            else:
+                if not files:
+                    st.info(f"No {upload_type} uploaded yet.")
+                    continue  # Skip the rest of the loop safely
+               
                 for file in files:
                     file_path = os.path.join(upload_dir, file)
                     unique_key = f"{course_code}_{upload_type}_{file}"
@@ -1436,6 +1437,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
