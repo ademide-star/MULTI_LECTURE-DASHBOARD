@@ -1547,35 +1547,42 @@ with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=T
 # 🧮 MANUAL SCORE ENTRY
 # ===============================================================
         st.divider()
-        st.header("🧮 Manual Score Entry & Review")
+st.header("🧮 Manual Score Entry & Review")
 
-        name = st.text_input("Student Name", key="manual_name")
-        matric = st.text_input("Matric Number", key="manual_matric")
-        week = st.selectbox(
-            "Select Week",
-            # Ensure lectures_df is defined before usage
-        if "lectures_df" not in st.session_state:
-            if os.path.exists(LECTURE_FILE):
-                lectures_df = pd.read_csv(LECTURE_FILE)
-                st.session_state["lectures_df"] = lectures_df
-            else:
+# ✅ Ensure lectures_df is defined before using it
+if "lectures_df" not in st.session_state:
+    if os.path.exists(LECTURE_FILE):
+        lectures_df = pd.read_csv(LECTURE_FILE)
+        st.session_state["lectures_df"] = lectures_df
+    else:
         # Create a default empty DataFrame if file doesn't exist
-            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
-            st.session_state["lectures_df"] = lectures_df
-        else:
-        lectures_df = st.session_state["lectures_df"]
+        lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
+        st.session_state["lectures_df"] = lectures_df
+else:
+    lectures_df = st.session_state["lectures_df"]
 
-)
-        score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
-        remarks = st.text_input("Remarks (optional)", key="manual_remarks")
-        score_type = st.radio(
-            "Select Assessment Type",
-            ["classwork", "seminar", "assignment"],
-            key="manual_type"
+# 🧾 Input fields
+name = st.text_input("Student Name", key="manual_name")
+matric = st.text_input("Matric Number", key="manual_matric")
+
+# ✅ Select week from lectures_df or fallback to “Week 1”
+week = st.selectbox(
+    "Select Week",
+    lectures_df["Week"].tolist() if not lectures_df.empty else ["Week 1"],
+    key="manual_week"
 )
 
-        if st.button("💾 Save / Update Score", key="save_manual_score"):
-            if not name or not matric:
+score = st.number_input("Enter Score (0–100)", 0, 100, 0, key="manual_score")
+remarks = st.text_input("Remarks (optional)", key="manual_remarks")
+score_type = st.radio(
+    "Select Assessment Type",
+    ["classwork", "seminar", "assignment"],
+    key="manual_type"
+)
+
+# 💾 Save or update score
+if st.button("💾 Save / Update Score", key="save_manual_score"):
+    if not name or not matric:
         st.warning("Please enter student name and matric number.")
     else:
         try:
@@ -1603,6 +1610,7 @@ with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=T
                     (df["Week"].astype(str).str.lower() == week.lower())
                 )
 
+                # Update or create new record
                 if mask.any():
                     if score_type == "classwork":
                         df.loc[mask, "ClassworkScore"] = score
@@ -1774,6 +1782,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
