@@ -1041,7 +1041,7 @@ def admin_view():
 
     # Ensure the parent directory exists
             if os.path.dirname(LECTURE_FILE):
-            os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+                os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
 
     # Save the CSV
@@ -1476,6 +1476,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
