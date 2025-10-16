@@ -1636,42 +1636,42 @@ if st.button("💾 Save / Update Score", key="save_manual_score"):
 # ===============================================================
 # 📝 STUDENT GRADING SECTION
 # ===============================================================
-st.header("📝 Grade Students for Session")
+        st.header("📝 Grade Students for Session")
 
-score_dir = "scores"
-os.makedirs(score_dir, exist_ok=True)
-score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
+        score_dir = "scores"
+        os.makedirs(score_dir, exist_ok=True)
+        score_file = os.path.join(score_dir, f"{course_code.lower()}_scores.csv")
 
-columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
+        columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
 
-if os.path.exists(score_file):
-    df = pd.read_csv(score_file)
-    for col in columns:
-        if col not in df.columns:
-            df[col] = 0
-else:
-    df = pd.DataFrame(columns=columns)
+        if os.path.exists(score_file):
+            df = pd.read_csv(score_file)
+            for col in columns:
+                if col not in df.columns:
+                    df[col] = 0
+        else:
+            df = pd.DataFrame(columns=columns)
 
-for idx, row in df.iterrows():
-    st.markdown(f"### {row.get('StudentName', 'Unknown')} ({row.get('MatricNo', 'Unknown')})")
-    attendance = st.number_input("Attendance (out of 5)", 0, 5, int(row.get("Attendance", 0)), key=f"{idx}_att")
-    classwork = st.number_input("Classwork (out of 10)", 0, 10, int(row.get("Classwork", 0)), key=f"{idx}_cw")
-    test = st.number_input("Test (out of 10)", 0, 10, int(row.get("Test", 0)), key=f"{idx}_test")
-    practical = st.number_input("Practical (out of 5)", 0, 5, int(row.get("Practical", 0)), key=f"{idx}_prac")
-    exam = st.number_input("Exam (out of 70)", 0, 70, int(row.get("Exam", 0)), key=f"{idx}_exam")
+        for idx, row in df.iterrows():
+            st.markdown(f"### {row.get('StudentName', 'Unknown')} ({row.get('MatricNo', 'Unknown')})")
+            attendance = st.number_input("Attendance (out of 5)", 0, 5, int(row.get("Attendance", 0)), key=f"{idx}_att")
+            classwork = st.number_input("Classwork (out of 10)", 0, 10, int(row.get("Classwork", 0)), key=f"{idx}_cw")
+            test = st.number_input("Test (out of 10)", 0, 10, int(row.get("Test", 0)), key=f"{idx}_test")
+            practical = st.number_input("Practical (out of 5)", 0, 5, int(row.get("Practical", 0)), key=f"{idx}_prac")
+            exam = st.number_input("Exam (out of 70)", 0, 70, int(row.get("Exam", 0)), key=f"{idx}_exam")
 
-    df.at[idx, "Attendance"] = attendance
-    df.at[idx, "Classwork"] = classwork
-    df.at[idx, "Test"] = test
-    df.at[idx, "Practical"] = practical
-    df.at[idx, "Exam"] = exam
-    df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
+            df.at[idx, "Attendance"] = attendance
+            df.at[idx, "Classwork"] = classwork
+            df.at[idx, "Test"] = test
+            df.at[idx, "Practical"] = practical
+            df.at[idx, "Exam"] = exam
+            df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
 
-if st.button("💾 Save All Student Scores"):
-    df.to_csv(score_file, index=False)
-    st.success("✅ All scores saved successfully!")
+        if st.button("💾 Save All Student Scores"):
+            df.to_csv(score_file, index=False)
+            st.success("✅ All scores saved successfully!")
 
-st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True)
 
 
     # -------------------------
@@ -1764,6 +1764,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
