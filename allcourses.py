@@ -479,25 +479,6 @@ def ensure_data_files():
 # call once
 ensure_data_files()
 # -----------------------------
-# PDF and seminar helpers
-# -----------------------------
-def display_module_pdf(week):
-    pdf_path = f"{MODULES_DIR}/{week.replace(' ','_')}.pdf"
-    if os.path.exists(pdf_path):
-        with open(pdf_path,"rb") as f:
-            st.download_button(label=f"📥 Download {week} Module PDF", data=f, file_name=f"{week}_module.pdf", mime="application/pdf")
-    else:
-        st.info("Lecture PDF module not yet uploaded.")
-
-def display_seminar_upload(name, matric):
-    today = date.today()
-    if today >= date(today.year,10,20):
-        seminar_file = st.file_uploader("Upload Seminar PPT", type=["ppt","pptx"])
-        if seminar_file:
-            save_seminar(name, matric, seminar_file)
-        st.info("Seminar presentations will hold in the **3rd week of November**.")
-    else:
-        st.warning("Seminar submissions will open mid-semester.")
 # -----------------------------
 # ATTENDANCE + SUBMISSION HELPERS
 # -----------------------------
@@ -703,8 +684,18 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
 MODULES_DIR = "modules"
 os.makedirs(MODULES_DIR, exist_ok=True)
 
+import os
+import streamlit as st
+
+# Ensure directories exist
+os.makedirs("modules", exist_ok=True)
+os.makedirs("student_uploads", exist_ok=True)
+
+MODULES_DIR = "modules"
+UPLOAD_DIR = "student_uploads"
+
 # ------------------------------
-# Define the function first
+# Single module PDF for a week
 # ------------------------------
 def display_module_pdf(course_code, week):
     """
@@ -725,6 +716,10 @@ def display_module_pdf(course_code, week):
     else:
         st.info("Module PDF not yet uploaded.")
 
+
+# ------------------------------
+# Display all module PDFs for a course
+# ------------------------------
 def display_all_module_pdfs(course_code):
     """
     Lists all module PDFs for a course and provides download buttons.
@@ -735,7 +730,9 @@ def display_all_module_pdfs(course_code):
     # List all PDF files in MODULES_DIR that match the course code
     pdf_files = [
         f for f in os.listdir(MODULES_DIR)
-        if os.path.isfile(os.path.join(MODULES_DIR, f)) and f.lower().endswith(".pdf") and f.startswith(course_code)
+        if os.path.isfile(os.path.join(MODULES_DIR, f))
+        and f.lower().endswith(".pdf")
+        and f.startswith(course_code)
     ]
 
     if not pdf_files:
@@ -757,6 +754,7 @@ def display_all_module_pdfs(course_code):
                 )
         except Exception as e:
             st.error(f"Could not load file {pdf_file}: {e}")
+
 
 
 def mark_attendance_entry(course_code, name, matric, week):
@@ -1695,6 +1693,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
