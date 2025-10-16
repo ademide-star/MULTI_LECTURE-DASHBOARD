@@ -173,6 +173,51 @@ def get_file(course_code, file_type):
     }
     return os.path.join(base_path, file_map[file_type])
 
+
+def view_and_download_files(course_code, week=None, upload_type=None):
+    """
+    Displays and allows downloading of uploaded files for a course.
+
+    Args:
+        course_code (str): The course code folder.
+        week (str, optional): Filter files for a specific week. Defaults to None.
+        upload_type (str, optional): Filter files by type ('assignment', 'drawing', 'seminar'). Defaults to None.
+    """
+    # Folder where files are stored
+    UPLOAD_DIR = os.path.join("uploads", course_code)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    try:
+        files = os.listdir(UPLOAD_DIR)
+        if not files:
+            st.info("No files uploaded yet for this course.")
+            return
+
+        # Optionally filter by week or type
+        if week:
+            files = [f for f in files if week.replace(" ", "_") in f]
+        if upload_type:
+            files = [f for f in files if upload_type.lower() in f.lower()]
+
+        if not files:
+            st.info("No files match the selected criteria.")
+            return
+
+        st.subheader("📂 Available Files for Download")
+        for file in files:
+            file_path = os.path.join(UPLOAD_DIR, file)
+            with open(file_path, "rb") as f:
+                st.download_button(
+                    label=f"📥 Download {file}",
+                    data=f.read(),
+                    file_name=file,
+                    mime=None,  # Streamlit will auto-detect
+                    key=f"{course_code}_{file}_dl"
+                )
+    except Exception as e:
+        st.error(f"⚠️ Error displaying files: {e}")
+
+
 def admin_view():
     st.title("Admin Dashboard")
 
@@ -1529,6 +1574,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
