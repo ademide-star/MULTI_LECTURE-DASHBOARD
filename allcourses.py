@@ -1239,7 +1239,6 @@ def admin_view():
                 key=f"{course_code}_graded_scores_download"
             )
     
-
     # Manual score entry
     st.divider()
     st.header("🧮 Manual Score Entry & Review")
@@ -1320,32 +1319,32 @@ def admin_view():
 
 
 # Loop through students
-    for idx, row in df.iterrows():
-        st.markdown(f"### {row['StudentName']} ({row['MatricNo']})")
+        for idx, row in df.iterrows():
+            st.markdown(f"### {row['StudentName']} ({row['MatricNo']})")
 
-        attendance = st.number_input(f"Attendance (out of 5)", 0, 5, value=int(row.get("Attendance",0)), key=f"{idx}_att")
-        classwork = st.number_input(f"Classwork (out of 10)", 0, 10, value=int(row.get("Classwork",0)), key=f"{idx}_cw")
-        test = st.number_input(f"Test (out of 10)", 0, 10, value=int(row.get("Test",0)), key=f"{idx}_test")
-        practical = st.number_input(f"Practical (out of 5)", 0, 5, value=int(row.get("Practical",0)), key=f"{idx}_prac")
-        exam = st.number_input(f"Exam (out of 70)", 0, 70, value=int(row.get("Exam",0)), key=f"{idx}_exam")
+            attendance = st.number_input(f"Attendance (out of 5)", 0, 5, value=int(row.get("Attendance",0)), key=f"{idx}_att")
+            classwork = st.number_input(f"Classwork (out of 10)", 0, 10, value=int(row.get("Classwork",0)), key=f"{idx}_cw")
+            test = st.number_input(f"Test (out of 10)", 0, 10, value=int(row.get("Test",0)), key=f"{idx}_test")
+            practical = st.number_input(f"Practical (out of 5)", 0, 5, value=int(row.get("Practical",0)), key=f"{idx}_prac")
+            exam = st.number_input(f"Exam (out of 70)", 0, 70, value=int(row.get("Exam",0)), key=f"{idx}_exam")
 
     # Save back to DataFrame
-        df.at[idx, "Attendance"] = attendance
-        df.at[idx, "Classwork"] = classwork
-        df.at[idx, "Test"] = test
-        df.at[idx, "Practical"] = practical
-        df.at[idx, "Exam"] = exam
+            df.at[idx, "Attendance"] = attendance
+            df.at[idx, "Classwork"] = classwork
+            df.at[idx, "Test"] = test
+            df.at[idx, "Practical"] = practical
+            df.at[idx, "Exam"] = exam
 
     # Calculate total score
-        df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
+            df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
 
 # Save updated CSV
-    if st.button("💾 Save All Student Scores"):
-        df.to_csv(score_file, index=False)
-        st.success("✅ All scores saved successfully!")
+        if st.button("💾 Save All Student Scores"):
+            df.to_csv(score_file, index=False)
+            st.success("✅ All scores saved successfully!")
 
 # Show table
-        st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_container_width=True)
 
     # -------------------------
     # Review Student Scores (filtered)
@@ -1437,5 +1436,6 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
