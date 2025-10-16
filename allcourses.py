@@ -103,6 +103,19 @@ os.makedirs(course_dir, exist_ok=True)
 UPLOADS_DIR = os.path.join(UPLOAD_DIR, course_code)
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
+# Ensure all folders exist
+for folder in [MODULES_DIR, LECTURE_DIR, UPLOAD_DIR, LOG_DIR, SEMINAR_DIR]:
+    os.makedirs(folder, exist_ok=True)
+
+# Save student files in a consistent structure
+student_upload_path = os.path.join(UPLOAD_DIR, course_code)
+os.makedirs(student_upload_path, exist_ok=True)
+
+# Tracker CSV
+TRACK_FILE = os.path.join(student_upload_path, "submission_tracker.csv")
+if not os.path.exists(TRACK_FILE):
+    pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Drawing", "Seminar"]).to_csv(TRACK_FILE, index=False)
+
 import os
 import pandas as pd
 def save_file(course_code, student_name, matric, week, file_obj, upload_type):
@@ -1620,6 +1633,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
