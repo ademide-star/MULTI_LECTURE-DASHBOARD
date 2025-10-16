@@ -1303,7 +1303,7 @@ def admin_view():
 
     # Load or create scores DataFrame safely
                 score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
-                required_columns = "StudentName", "MatricNo", "Week","ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"
+                required_columns = ["StudentName", "MatricNo", "Week","ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"
 ]
 
 # ✅ Load or create DataFrame safely
@@ -1463,6 +1463,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
