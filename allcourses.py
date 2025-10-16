@@ -226,6 +226,15 @@ def init_lectures(course_code, default_weeks):
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
 
+
+
+def init_lectures(lecture_data, lecture_file):
+    # Ensure directory exists on server
+    os.makedirs(os.path.dirname(lecture_file), exist_ok=True)
+    
+    # Save the lecture data
+    pd.DataFrame(lecture_data).to_csv(lecture_file, index=False)
+
 # -----------------------------
 # --- Helper Function: View/Download Files ---
 def init_lectures(course_code, topics):
@@ -1427,3 +1436,4 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
