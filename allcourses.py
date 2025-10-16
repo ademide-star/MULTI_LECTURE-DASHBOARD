@@ -15,6 +15,18 @@ UPLOAD_DIR = "student_uploads"
 os.makedirs(MODULES_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+BASE_DIR = Path.cwd()
+DATA_DIR = BASE_DIR / "data"
+UPLOADS_DIR = BASE_DIR / "student_uploads"
+SCORES_DIR = BASE_DIR / "scores"
+VIDEO_DIR_ROOT = BASE_DIR / "video_lectures"
+CLASSWORK_CONTROL_FILE = DATA_DIR / "classwork_control.json"
+
+# Files for generic records (attendance/classwork/seminar)
+ATTENDANCE_FILE = DATA_DIR / "attendance.csv"
+CLASSWORK_FILE = DATA_DIR / "classwork.csv"
+SEMINAR_FILE = DATA_DIR / "seminar.csv"
+LECTURE_FILE = DATA_DIR / "lectures.csv"
 ATTENDANCE_FILE = "attendance.csv"
 LECTURE_FILE = "lectures.csv"
 CLASSWORK_FILE = "classwork_submissions.csv"
@@ -1322,43 +1334,11 @@ def admin_view():
 
                 st.dataframe(lectures_df, use_container_width=True)
 
-    # admin_dashboard.py
-"""
-Streamlit Admin / Student Dashboard
-- Handles attendance/classwork/seminar CSV displays & downloads
-- Lists & grades uploaded student files (assignment/drawing/seminar)
-- Manual score entry & batch grading interface
-- Video lecture upload/list/download
-- Simple classwork open/close control with 20-minute expiry
-"""
-import streamlit as st
-import pandas as pd
-import os
-import json
-from pathlib import Path
-from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Course Admin Dashboard", layout="wide")
-
-# -------------------------
-# Config / Paths
-# -------------------------
-BASE_DIR = Path.cwd()
-DATA_DIR = BASE_DIR / "data"
-UPLOADS_DIR = BASE_DIR / "student_uploads"
-SCORES_DIR = BASE_DIR / "scores"
-VIDEO_DIR_ROOT = BASE_DIR / "video_lectures"
-CLASSWORK_CONTROL_FILE = DATA_DIR / "classwork_control.json"
-
-# Files for generic records (attendance/classwork/seminar)
-ATTENDANCE_FILE = DATA_DIR / "attendance.csv"
-CLASSWORK_FILE = DATA_DIR / "classwork.csv"
-SEMINAR_FILE = DATA_DIR / "seminar.csv"
-LECTURE_FILE = DATA_DIR / "lectures.csv"
 
 # Ensure dirs exist
-for d in [DATA_DIR, UPLOADS_DIR, SCORES_DIR, VIDEO_DIR_ROOT]:
-    d.mkdir(parents=True, exist_ok=True)
+        for d in [DATA_DIR, UPLOADS_DIR, SCORES_DIR, VIDEO_DIR_ROOT]:
+            d.mkdir(parents=True, exist_ok=True)
 
 # Helper functions
 def safe_read_csv(path, default_df=None):
@@ -1759,6 +1739,7 @@ if role == "Admin":
     admin_view()
 else:
     student_view()
+
 
 
 
