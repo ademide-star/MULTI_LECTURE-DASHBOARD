@@ -1063,6 +1063,7 @@ def admin_view():
         for upload_type in upload_types:
             st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
             upload_dir = os.path.join(base_dir, course_code, upload_type)
+            files = [] 
             if os.path.exists(upload_dir):
                 files = sorted([
                 f for f in os.listdir(upload_dir)
@@ -1427,3 +1428,4 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
