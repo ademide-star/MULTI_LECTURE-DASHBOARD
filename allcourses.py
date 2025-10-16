@@ -1032,42 +1032,42 @@ def admin_view():
     # -------------------------
     # Student Records (Attendance / Classwork / Seminar)
     # -------------------------
-    st.header("📋 Student Records")
-    for file, label in [
-        (ATTENDANCE_FILE, "Attendance Records"),
-        (CLASSWORK_FILE, "Classwork Submissions"),
-        (SEMINAR_FILE, "Seminar Submissions")
+            st.header("📋 Student Records")
+            for file, label in [
+            (ATTENDANCE_FILE, "Attendance Records"),
+            (CLASSWORK_FILE, "Classwork Submissions"),
+            (SEMINAR_FILE, "Seminar Submissions")
     ]:
-        st.divider()
-        st.markdown(f"### {label}")
-        if os.path.exists(file):
-            df = pd.read_csv(file)
-            st.dataframe(df, use_container_width=True)
-            st.download_button(
-                label=f"⬇️ Download {label} CSV",
-                data=df.to_csv(index=False).encode(),
-                file_name=os.path.basename(file),
-                mime="text/csv",
-                key=f"{label}_download"
+            st.divider()
+            st.markdown(f"### {label}")
+            if os.path.exists(file):
+                df = pd.read_csv(file)
+                st.dataframe(df, use_container_width=True)
+                st.download_button(
+                    label=f"⬇️ Download {label} CSV",
+                    data=df.to_csv(index=False).encode(),
+                    file_name=os.path.basename(file),
+                    mime="text/csv",
+                    key=f"{label}_download"
             )
-        else:
-            st.info(f"No {label.lower()} yet.")
+            else:
+                st.info(f"No {label.lower()} yet.")
 
     # -------------------------
     # View & Grade Uploaded Files (assignment/drawing/seminar)
     # -------------------------
-        st.divider()
-        st.subheader("📂 View Student Submissions & Grade Them")
-        with st.expander("Expand to view and grade student submissions", expanded=True):
-            upload_types = ["assignment", "drawing", "seminar"]
-            for upload_type in upload_types:
-                st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
-                upload_dir = os.path.join(base_dir, course_code, upload_type)
-                files = [] 
-                if os.path.exists(upload_dir):
-                    files = sorted([
-                    f for f in os.listdir(upload_dir)
-                    if os.path.isfile(os.path.join(upload_dir, f))
+                st.divider()
+                st.subheader("📂 View Student Submissions & Grade Them")
+                with st.expander("Expand to view and grade student submissions", expanded=True):
+                    upload_types = ["assignment", "drawing", "seminar"]
+                    for upload_type in upload_types:
+                        st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+                        upload_dir = os.path.join(base_dir, course_code, upload_type)
+                        files = [] 
+                            if os.path.exists(upload_dir):
+                                files = sorted([
+                                    f for f in os.listdir(upload_dir)
+                                        if os.path.isfile(os.path.join(upload_dir, f))
             ])
                 if not files:
                     st.info(f"No {upload_type} uploaded yet.")
@@ -1463,6 +1463,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
