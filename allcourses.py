@@ -1295,56 +1295,83 @@ def admin_view():
                  # -------------------------
 # Student Grading
 # -------------------------
-    st.header("📝 Grade Students for Session")
+                st.header("📝 Grade Students for Session")
 
 # Load or create scores CSV
-    score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
-    columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
+                score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+                columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
 
     # Load or create scores DataFrame safely
-    score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
-    required_columns = ["StudentName", "MatricNo", "Week",
-                    "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]
+                score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+                required_columns = "StudentName", "MatricNo", "Week","ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"
+]
 
-    if os.path.exists(score_file):
-        df = pd.read_csv(score_file)
+# ✅ Load or create DataFrame safely
+                if os.path.exists(score_file):
+                    df = pd.read_csv(score_file)
 
     # ✅ Add any missing columns safely
-        for col in required_columns:
-            if col not in df.columns:
-                df[col] = 0 if "Score" in col else ""
-    else:
+                    for col in required_columns:
+                        if col not in df.columns:
+                            df[col] = 0 if "Score" in col else ""
+                else:
     # ✅ Create an empty DataFrame if file doesn’t exist
-        df = pd.DataFrame(columns=required_columns)
+                    df = pd.DataFrame(columns=required_columns)
 
+# -------------------------
+# 🧾 Loop through students
+# -------------------------
+                for idx, row in df.iterrows():
+                    st.markdown(f"### {row['StudentName']} ({row['MatricNo']})")
 
-# Loop through students
-        for idx, row in df.iterrows():
-            st.markdown(f"### {row['StudentName']} ({row['MatricNo']})")
+                    attendance = st.number_input(
+                        f"Attendance (out of 5)", 0, 5,
+                        value=int(row.get("Attendance", 0)),
+                        key=f"{idx}_att"
+    )
+                    classwork = st.number_input(
+                        f"Classwork (out of 10)", 0, 10,
+                        value=int(row.get("Classwork", 0)),
+                        key=f"{idx}_cw"
+    )
+                    test = st.number_input(
+                        f"Test (out of 10)", 0, 10,
+                        value=int(row.get("Test", 0)),
+                        key=f"{idx}_test"
+    )
+                    practical = st.number_input(
+                        f"Practical (out of 5)", 0, 5,
+                        value=int(row.get("Practical", 0)),
+                        key=f"{idx}_prac"
+    )
+                    exam = st.number_input(
+                        f"Exam (out of 70)", 0, 70,
+                        value=int(row.get("Exam", 0)),
+                        key=f"{idx}_exam"
+    )
 
-            attendance = st.number_input(f"Attendance (out of 5)", 0, 5, value=int(row.get("Attendance",0)), key=f"{idx}_att")
-            classwork = st.number_input(f"Classwork (out of 10)", 0, 10, value=int(row.get("Classwork",0)), key=f"{idx}_cw")
-            test = st.number_input(f"Test (out of 10)", 0, 10, value=int(row.get("Test",0)), key=f"{idx}_test")
-            practical = st.number_input(f"Practical (out of 5)", 0, 5, value=int(row.get("Practical",0)), key=f"{idx}_prac")
-            exam = st.number_input(f"Exam (out of 70)", 0, 70, value=int(row.get("Exam",0)), key=f"{idx}_exam")
+    # ✅ Save back to DataFrame
+                    df.at[idx, "Attendance"] = attendance
+                    df.at[idx, "Classwork"] = classwork
+                    df.at[idx, "Test"] = test
+                    df.at[idx, "Practical"] = practical
+                    df.at[idx, "Exam"] = exam
 
-    # Save back to DataFrame
-            df.at[idx, "Attendance"] = attendance
-            df.at[idx, "Classwork"] = classwork
-            df.at[idx, "Test"] = test
-            df.at[idx, "Practical"] = practical
-            df.at[idx, "Exam"] = exam
+    # ✅ Calculate total score
+                    df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
 
-    # Calculate total score
-            df.at[idx, "TotalScore"] = attendance + classwork + test + practical + exam
+# -------------------------
+# 💾 Save All Student Scores
+# -------------------------
+                if st.button("💾 Save All Student Scores"):
+                    df.to_csv(score_file, index=False)
+                    st.success("✅ All scores saved successfully!")
 
-# Save updated CSV
-        if st.button("💾 Save All Student Scores"):
-            df.to_csv(score_file, index=False)
-            st.success("✅ All scores saved successfully!")
+# -------------------------
+# 📊 Display Table
+# -------------------------
+                st.dataframe(df, use_container_width=True)
 
-# Show table
-            st.dataframe(df, use_container_width=True)
 
     # -------------------------
     # Review Student Scores (filtered)
@@ -1436,6 +1463,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
