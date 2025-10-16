@@ -245,6 +245,52 @@ def admin_view():
             st.info("No student submissions yet.")
     else:
         st.warning("Submission file not found!")
+import os
+import pandas as pd
+import streamlit as st
+
+def view_and_download_files(course_code):
+    """
+    Displays download buttons for files actually submitted by instructor/students
+    using the submission tracker CSV.
+    """
+    # Tracker CSV path
+    TRACK_FILE = os.path.join("uploads", course_code, "submission_tracker.csv")
+
+    # Check if tracker exists
+    if not os.path.exists(TRACK_FILE):
+        st.info("No files have been uploaded yet for this course.")
+        return
+
+    tracker_df = pd.read_csv(TRACK_FILE)
+
+    # Folder where files are saved
+    UPLOAD_DIR = os.path.join("uploads", course_code)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    st.subheader("📂 Available Files for Download")
+
+    any_files = False
+    for _, row in tracker_df.iterrows():
+        student_name = row.get("StudentName", "")
+        matric_no = row.get("MatricNo", "")
+        week = row.get("Week", "")
+        for sub_type in ["Assignment", "Drawing", "Seminar"]:
+            filename = row.get(sub_type, "")
+            if filename and os.path.exists(os.path.join(UPLOAD_DIR, filename)):
+                any_files = True
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                with open(file_path, "rb") as f:
+                    st.download_button(
+                        label=f"📥 {sub_type}: {student_name} ({matric_no}) - {week}",
+                        data=f.read(),
+                        file_name=filename,
+                        mime=None,
+                        key=f"{filename}_dl"
+                    )
+
+    if not any_files:
+        st.info("No files have been uploaded yet for this course.")
 
 # ===============================================================
 # 📘 LECTURE INITIALIZATION
@@ -1574,6 +1620,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
