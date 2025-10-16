@@ -680,22 +680,42 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
         updated = new_entry
     updated.to_csv(log_file, index=False)
 
-def display_module_pdf(week):
-    """Display the PDF module for a specific week."""
-    pdf_path = os.path.join(LECTURE_DIR, f"{course_code}_W{week}_module.pdf")
-    if os.path.exists(pdf_path):
-        with open(pdf_path, "rb") as f:
-            st.download_button("📥 Download Module PDF", f, file_name=os.path.basename(pdf_path))
-    else:
-        st.info("Module PDF not available.")
+import os
+import streamlit as st
 
-def display_module_pdf(week):
-    pdf_path = f"{MODULES_DIR}/{week.replace(' ','_')}.pdf"
-    if os.path.exists(pdf_path):
-        with open(pdf_path,"rb") as f:
-            st.download_button(label=f"📥 Download {week} Module PDF", data=f, file_name=f"{week}_module.pdf", mime="application/pdf")
-    else:
-        st.info("Lecture PDF module not yet uploaded.")
+def display_all_module_pdfs(course_code):
+    """
+    Lists all module PDFs for a course and provides download buttons.
+    """
+    # Ensure MODULES_DIR exists
+    os.makedirs(MODULES_DIR, exist_ok=True)
+
+    # List all PDF files in MODULES_DIR that match the course code
+    pdf_files = [
+        f for f in os.listdir(MODULES_DIR)
+        if os.path.isfile(os.path.join(MODULES_DIR, f)) and f.lower().endswith(".pdf") and f.startswith(course_code)
+    ]
+
+    if not pdf_files:
+        st.info("No module PDFs uploaded yet for this course.")
+        return
+
+    st.subheader("📂 Available Module PDFs")
+    for pdf_file in pdf_files:
+        pdf_path = os.path.join(MODULES_DIR, pdf_file)
+        week_name = pdf_file.replace(f"{course_code}_", "").replace("_module.pdf", "").replace("_", " ")
+        try:
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label=f"📥 {week_name} Module PDF",
+                    data=f.read(),
+                    file_name=pdf_file,
+                    mime="application/pdf",
+                    key=f"{pdf_file}_dl"
+                )
+        except Exception as e:
+            st.error(f"Could not load file {pdf_file}: {e}")
+
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Marks attendance for a given student safely with auto-column creation."""
@@ -1633,6 +1653,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
