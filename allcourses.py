@@ -986,9 +986,18 @@ def admin_view():
     for col in ["Week", "Topic", "Brief", "Classwork", "Assignment"]:
         if col not in lectures_df.columns:
             lectures_df[col] = ""
-
+    
     # Store in session state
     st.session_state["lectures_df"] = lectures_df
+
+    # File uploader
+    files = st.file_uploader("Upload files", accept_multiple_files=True)
+
+# Check if any files were uploaded
+    if not files:
+        st.info("No files uploaded yet.")
+    else:
+        st.success(f"{len(files)} file(s) ready to be processed!")
 
     # -------------------------
     # Add / Edit Lecture, Classwork & Assignment
@@ -1453,6 +1462,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
