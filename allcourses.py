@@ -857,7 +857,7 @@ if os.path.dirname(LECTURE_FILE):
         st.warning("Scores have not been uploaded for this course yet.")
 
 
-   import os
+import os
 import pandas as pd
 import streamlit as st
 
@@ -1507,6 +1507,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
