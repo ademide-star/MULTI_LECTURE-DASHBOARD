@@ -811,11 +811,11 @@ def student_view():
             else:
                 st.info("Lecture note not uploaded yet.")
 
-        except Exception as e:
-            st.error(f"⚠️ Error displaying lecture details: {e}")
+            except Exception as e:
+                st.error(f"⚠️ Error displaying lecture details: {e}")
 
-        if os.path.dirname(LECTURE_FILE):
-            os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+            if os.path.dirname(LECTURE_FILE):
+                os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
     # ===============================================================
 
@@ -857,6 +857,30 @@ def student_view():
             st.warning("Scores have not been uploaded for this course yet.")
 
 
+ 
+
+# Folder where instructor uploads are stored
+        UPLOAD_DIR = os.path.join("uploads", course_code)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        st.subheader("📂 Available Lecture Files")
+
+# List all files in the folder
+        uploaded_files = os.listdir(UPLOAD_DIR)
+
+        if uploaded_files:
+            for file in uploaded_files:
+                file_path = os.path.join(UPLOAD_DIR, file)
+        # Display a download button for each file
+            with open(file_path, "rb") as f:
+                st.download_button(
+                label=f"📥 {file}",
+                data=f,
+                file_name=file,
+                mime=None  # Let Streamlit detect automatically
+            )
+    else:
+        st.info("No lecture files have been uploaded yet.")
 
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (ONE-TIME SUBMISSION)
@@ -1505,6 +1529,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
