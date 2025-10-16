@@ -871,16 +871,20 @@ st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 # -----------------------------
 # Ensure lectures_df exists
 # -----------------------------
+# Ensure lectures_df exists
 if "lectures_df" not in st.session_state:
     if os.path.exists(LECTURE_FILE):
         st.session_state["lectures_df"] = pd.read_csv(LECTURE_FILE)
     else:
-        # Create default empty lectures_df
+        # Default empty lectures_df with Week column
         st.session_state["lectures_df"] = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
 lectures_df = st.session_state["lectures_df"]
 
-# Safe list of weeks
-weeks = lectures_df["Week"].tolist() if "Week" in lectures_df.columns else ["Week 1"]
+# Safe weeks list
+weeks = lectures_df["Week"].tolist() if "Week" in lectures_df.columns and not lectures_df.empty else ["Week 1"]
+
+selected_week = st.selectbox("Select Week", weeks, key=f"{course_code}_week")
+
 
 # -----------------------------
 # Upload folder & tracker
@@ -1503,6 +1507,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
