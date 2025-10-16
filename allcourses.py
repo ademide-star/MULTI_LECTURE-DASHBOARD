@@ -1179,8 +1179,7 @@ def admin_view():
                             st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
                         except Exception as e:
                             st.error(f"❌ Failed to save score file: {e}")
-        else:
-            st.info(f"No directory found for {upload_type}.")
+                            st.info(f"No directory found for {upload_type}.")
 
     # -------------------------
     # Live Score Review / Manual Entry
@@ -1437,6 +1436,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
