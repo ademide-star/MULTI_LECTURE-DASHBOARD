@@ -1302,13 +1302,22 @@ def admin_view():
     score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
     columns = ["StudentName", "MatricNo", "Attendance", "Classwork", "Test", "Practical", "Exam", "TotalScore"]
 
+    # Load or create scores DataFrame safely
+    score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+    required_columns = ["StudentName", "MatricNo", "Week",
+                    "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]
+
     if os.path.exists(score_file):
         df = pd.read_csv(score_file)
-        for col in columns:
+
+    # ✅ Add any missing columns safely
+        for col in required_columns:
             if col not in df.columns:
-                df[col] = 0
+                df[col] = 0 if "Score" in col else ""
     else:
-       df = pd.DataFrame(columns=st.columns)
+    # ✅ Create an empty DataFrame if file doesn’t exist
+        df = pd.DataFrame(columns=required_columns)
+
 
 # Loop through students
     for idx, row in df.iterrows():
@@ -1428,4 +1437,5 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
