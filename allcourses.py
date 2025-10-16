@@ -7,6 +7,13 @@ from streamlit_autorefresh import st_autorefresh
 import zipfile
 import io
 
+import os
+
+MODULES_DIR = "modules"
+UPLOAD_DIR = "student_uploads"
+
+os.makedirs(MODULES_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ATTENDANCE_FILE = "attendance.csv"
 LECTURE_FILE = "lectures.csv"
@@ -172,6 +179,41 @@ def ensure_default_lectures_file(course_code):
 # ===============================================================
 # 📁 HELPER FUNCTION
 # ===============================================================
+import streamlit as st
+
+def display_all_module_pdfs(course_code):
+    """
+    Lists all module PDFs for a course and provides download buttons.
+    """
+    # List all PDF files in MODULES_DIR that start with course_code
+    pdf_files = [
+        f for f in os.listdir(MODULES_DIR)
+        if os.path.isfile(os.path.join(MODULES_DIR, f))
+        and f.lower().endswith(".pdf")
+        and f.startswith(course_code)
+    ]
+
+    if not pdf_files:
+        st.info("No module PDFs uploaded yet for this course.")
+        return
+
+    st.subheader("📂 Available Module PDFs")
+    for pdf_file in pdf_files:
+        pdf_path = os.path.join(MODULES_DIR, pdf_file)
+        week_name = pdf_file.replace(f"{course_code}_", "").replace("_module.pdf", "").replace("_", " ")
+        try:
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label=f"📥 {week_name} Module PDF",
+                    data=f.read(),
+                    file_name=pdf_file,
+                    mime="application/pdf",
+                    key=f"{pdf_file}_dl"
+                )
+        except Exception as e:
+            st.error(f"Could not load file {pdf_file}: {e}")
+
+
 def get_file(course_code, filetype):
     """Return the file path for a given course and file type."""
     filename = f"{course_code}_{filetype}.csv"
@@ -1693,6 +1735,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
