@@ -911,6 +911,11 @@ def student_view():
         st.warning("📁 No video directory found for this course.")
 
 
+# Define base directory for file storage
+base_dir = "uploads"  # or whatever main folder you use
+
+# Ensure base directory exists
+os.makedirs(base_dir, exist_ok=True)
 
 #--- Fixed & hardened admin_view function ---
 def admin_view():
@@ -1490,6 +1495,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
