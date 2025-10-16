@@ -1265,7 +1265,7 @@ def admin_view():
                 with open(assignment_pdf_path, "wb") as f: f.write(assignment_pdf.getbuffer())
                 st.success(f"✅ Assignment PDF uploaded for {week}")
 
-            st.dataframe(lectures_df, use_container_width=True)
+                st.dataframe(lectures_df, use_container_width=True)
 
     # -------------------------
     # Student Records (Attendance / Classwork / Seminar)
@@ -1676,6 +1676,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
