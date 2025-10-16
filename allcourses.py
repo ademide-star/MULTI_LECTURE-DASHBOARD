@@ -1195,112 +1195,108 @@ def student_view():
 
 #--- Fixed & hardened admin_view function ---
 def admin_view():
-    import os
-    import pandas as pd
-    import streamlit as st
-
-    st.title("👩‍🏫 Admin Dashboard")
-    st.subheader("🔐 Teacher / Admin Panel")
+        st.title("👩‍🏫 Admin Dashboard")
+        st.subheader("🔐 Teacher / Admin Panel")
 
     # -------------------------
     # Authentication
     # -------------------------
-    ADMIN_PASS = "bimpe2025class"
-    password = st.text_input("Enter Admin Password", type="password", key="admin_password_input")
+        ADMIN_PASS = "bimpe2025class"
+        password = st.text_input("Enter Admin Password", type="password", key="admin_password_input")
 
-    if password != ADMIN_PASS:
-        st.warning("Enter the correct Admin password to continue.")
-        return
+        if password != ADMIN_PASS:
+            st.warning("Enter the correct Admin password to continue.")
+            return
 
-    st.session_state["role"] = "Admin"
-    st.success(f"✅ Logged in as Admin for {course_code}")
+        st.session_state["role"] = "Admin"
+        st.success(f"✅ Logged in as Admin for {course_code}")
 
     # -------------------------
     # Directory & File Setup
     # -------------------------
-    base_dir = "student_uploads"
-    scores_dir = "scores"
-    modules_dir = "modules"
-    os.makedirs(base_dir, exist_ok=True)
-    os.makedirs(scores_dir, exist_ok=True)
-    os.makedirs(modules_dir, exist_ok=True)
+        base_dir = "student_uploads"
+        scores_dir = "scores"
+        modules_dir = "modules"
+        os.makedirs(base_dir, exist_ok=True)
+        os.makedirs(scores_dir, exist_ok=True)
+        os.makedirs(modules_dir, exist_ok=True)
 
     # -------------------------
     # Lecture Management
     # -------------------------
-    st.header("📚 Lecture Management")
+        st.header("📚 Lecture Management")
 
-    LECTURE_FILE = get_file(course_code, "lectures")
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-    CLASSWORK_STATUS_FILE = get_file(course_code, "classwork")
-    SEMINAR_FILE = get_file(course_code, "seminar")
+        LECTURE_FILE = get_file(course_code, "lectures")
+        ATTENDANCE_FILE = get_file(course_code, "attendance")
+        CLASSWORK_STATUS_FILE = get_file(course_code, "classwork")
+        SEMINAR_FILE = get_file(course_code, "seminar")
 
     # Load lectures CSV safely
-    if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
+        if os.path.exists(LECTURE_FILE):
+            lectures_df = pd.read_csv(LECTURE_FILE)
         # Clean column names
-        lectures_df.columns = lectures_df.columns.str.strip()
-    else:
-        lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
+            lectures_df.columns = lectures_df.columns.str.strip()
+        else:
+            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
 
     # Ensure all required columns exist
-    for col in ["Week", "Topic", "Brief", "Classwork", "Assignment"]:
-        if col not in lectures_df.columns:
-            lectures_df[col] = ""
+        for col in ["Week", "Topic", "Brief", "Classwork", "Assignment"]:
+            if col not in lectures_df.columns:
+                lectures_df[col] = ""
     
     # Store in session state
-    st.session_state["lectures_df"] = lectures_df
+        st.session_state["lectures_df"] = lectures_df
 
     # File uploader
-    files = st.file_uploader("Upload files", accept_multiple_files=True)
+        files = st.file_uploader("Upload files", accept_multiple_files=True)
 
 # Check if any files were uploaded
-    if not files:
-        st.info("No files uploaded yet.")
-    else:
-        st.success(f"{len(files)} file(s) ready to be processed!")
+        if not files:
+            st.info("No files uploaded yet.")
+        else:
+            st.success(f"{len(files)} file(s) ready to be processed!")
 
     # -------------------------
     # Add / Edit Lecture, Classwork & Assignment
     # -------------------------
-    with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
-        week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
+        with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
+            week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
 
-        lectures_df = st.session_state["lectures_df"]
+            lectures_df = st.session_state["lectures_df"]
 
-        if week in lectures_df["Week"].values:
-            row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-        else:
-            new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": ""}
-            lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
-            row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-            st.session_state["lectures_df"] = lectures_df
+            if week in lectures_df["Week"].values:
+                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
+            else:
+                new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": ""}
+                lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
+                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
+                st.session_state["lectures_df"] = lectures_df
 
         # Access existing/default values safely
-        topic_default = lectures_df.at[row_idx, "Topic"]
-        brief_default = lectures_df.at[row_idx, "Brief"]
-        classwork_default = lectures_df.at[row_idx, "Classwork"]
-        assignment_default = lectures_df.at[row_idx, "Assignment"]
+            topic_default = lectures_df.at[row_idx, "Topic"]
+            brief_default = lectures_df.at[row_idx, "Brief"]
+            classwork_default = lectures_df.at[row_idx, "Classwork"]
+            assignment_default = lectures_df.at[row_idx, "Assignment"]
 
         # Input fields
-        topic = st.text_input("Lecture Topic", value=topic_default)
-        brief = st.text_area("Lecture Brief", value=brief_default)
-        classwork = st.text_area("Classwork (separate questions with ;)", value=classwork_default)
-        assignment = st.text_area("Assignment (separate questions with ;)", value=assignment_default)
+            topic = st.text_input("Lecture Topic", value=topic_default)
+            brief = st.text_area("Lecture Brief", value=brief_default)
+            classwork = st.text_area("Classwork (separate questions with ;)", value=classwork_default)
+            assignment = st.text_area("Assignment (separate questions with ;)", value=assignment_default)
 
         # PDF uploads
-        st.markdown("**Upload PDF Files (Optional)**")
-        lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"])
-        classwork_pdf = st.file_uploader("Classwork PDF", type=["pdf"])
-        assignment_pdf = st.file_uploader("Assignment PDF", type=["pdf"])
+            st.markdown("**Upload PDF Files (Optional)**")
+            lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"])
+            classwork_pdf = st.file_uploader("Classwork PDF", type=["pdf"])
+            assignment_pdf = st.file_uploader("Assignment PDF", type=["pdf"])
 
         # Save lecture & uploads
-        if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
-            lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
+            if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
+                lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
 
     # Ensure the parent directory exists
-            if os.path.dirname(LECTURE_FILE):
-                os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+                if os.path.dirname(LECTURE_FILE):
+                    os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
 
     # Save the CSV
@@ -1483,31 +1479,31 @@ def admin_view():
        # ===============================================================
 # 📄 ADMIN DASHBOARD — MANAGE & REVIEW SCORES
 # ===============================================================
-st.divider()
-with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
-    st.header("📊 Review Graded Scores")
+        st.divider()
+        with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
+            st.header("📊 Review Graded Scores")
 
-    review_paths = [
-        os.path.join("student_uploads", f"{course_code}_scores.csv"),
-        os.path.join("scores", f"{course_code.lower()}_scores.csv")
+            review_paths = [
+            os.path.join("student_uploads", f"{course_code}_scores.csv"),
+            os.path.join("scores", f"{course_code.lower()}_scores.csv")
     ]
 
-    scores_df = None
-    for p in review_paths:
-        if os.path.exists(p):
-            try:
-                scores_df = pd.read_csv(p)
-                break
-            except Exception:
-                continue
+            scores_df = None
+            for p in review_paths:
+                if os.path.exists(p):
+                    try:
+                        scores_df = pd.read_csv(p)
+                        break
+                    except Exception:
+                    continue
 
-    if scores_df is None or scores_df.empty:
-        st.info("No graded scores yet. Once you grade a file, it will appear here.")
-    else:
-        col1, col2 = st.columns(2)
+                if scores_df is None or scores_df.empty:
+                    st.info("No graded scores yet. Once you grade a file, it will appear here.")
+                else:
+                    col1, col2 = st.columns(2)
 
-        with col1:
-            type_values = ["All"] + (
+                    with col1:
+                    type_values = ["All"] + (
                 sorted(scores_df["Type"].dropna().unique().tolist())
                 if "Type" in scores_df.columns else []
             )
@@ -1782,6 +1778,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
