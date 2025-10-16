@@ -857,96 +857,93 @@ if os.path.dirname(LECTURE_FILE):
         st.warning("Scores have not been uploaded for this course yet.")
 
 
-import os
-import pandas as pd
-import streamlit as st
 
 # ===============================================================
 # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS (ONE-TIME SUBMISSION)
 # ===============================================================
 
-st.divider()
-st.subheader("📄 Assignment, Drawing & Seminar Uploads")
+    st.divider()
+    st.subheader("📄 Assignment, Drawing & Seminar Uploads")
 
 # -----------------------------
 # Ensure lectures_df exists
 # -----------------------------
-if "lectures_df" not in st.session_state:
-    if os.path.exists(LECTURE_FILE):
-        st.session_state["lectures_df"] = pd.read_csv(LECTURE_FILE)
-    else:
-        st.session_state["lectures_df"] = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
-lectures_df = st.session_state["lectures_df"]
+    if "lectures_df" not in st.session_state:
+        if os.path.exists(LECTURE_FILE):
+            st.session_state["lectures_df"] = pd.read_csv(LECTURE_FILE)
+        else:
+            st.session_state["lectures_df"] = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
+            lectures_df = st.session_state["lectures_df"]
 
 # Safe weeks list
-weeks = lectures_df["Week"].tolist() if "Week" in lectures_df.columns and not lectures_df.empty else ["Week 1"]
+            weeks = lectures_df["Week"].tolist() if "Week" in lectures_df.columns and not lectures_df.empty else ["Week 1"]
 
 # -----------------------------
 # Upload folder & tracker CSV
 # -----------------------------
-UPLOAD_DIR = os.path.join("uploads", course_code)
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+            UPLOAD_DIR = os.path.join("uploads", course_code)
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-TRACK_FILE = os.path.join(UPLOAD_DIR, "submission_tracker.csv")
-if os.path.exists(TRACK_FILE):
-    tracker_df = pd.read_csv(TRACK_FILE)
-else:
-    tracker_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Drawing", "Seminar"])
+            TRACK_FILE = os.path.join(UPLOAD_DIR, "submission_tracker.csv")
+            if os.path.exists(TRACK_FILE):
+                tracker_df = pd.read_csv(TRACK_FILE)
+            else:
+                tracker_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Drawing", "Seminar"])
 
 # -----------------------------
 # Student Info
 # -----------------------------
-student_name = st.text_input("Full Name", key=f"{course_code}_name_input")
-matric_no = st.text_input("Matric Number", key=f"{course_code}_matric_input")
-selected_week = st.selectbox("Select Week", weeks, key=f"{course_code}_week_select")
+            student_name = st.text_input("Full Name", key=f"{course_code}_name_input")
+            matric_no = st.text_input("Matric Number", key=f"{course_code}_matric_input")
+            selected_week = st.selectbox("Select Week", weeks, key=f"{course_code}_week_select")
 
-if student_name and matric_no:
+            if student_name and matric_no:
     # Check if student-week exists
-    existing = tracker_df[
-        (tracker_df["StudentName"] == student_name) &
-        (tracker_df["MatricNo"] == matric_no) &
-        (tracker_df["Week"] == selected_week)
+                existing = tracker_df[
+                (tracker_df["StudentName"] == student_name) &
+                (tracker_df["MatricNo"] == matric_no) &
+                (tracker_df["Week"] == selected_week)
     ]
-    if existing.empty:
-        student_row = len(tracker_df)
-        tracker_df.loc[student_row] = [student_name, matric_no, selected_week, "", "", ""]
-    else:
-        student_row = existing.index[0]
+                if existing.empty:
+                    student_row = len(tracker_df)
+                    tracker_df.loc[student_row] = [student_name, matric_no, selected_week, "", "", ""]
+                else:
+                    student_row = existing.index[0]
 
     # -----------------------------
     # Submission types
     # -----------------------------
-    submission_info = {
-        "Assignment": ["pdf", "docx", "jpg", "png"],
-        "Drawing": ["pdf", "jpg", "png"],
-        "Seminar": ["pdf", "pptx", "docx"]
+                submission_info = {
+                    "Assignment": ["pdf", "docx", "jpg", "png"],
+                    "Drawing": ["pdf", "jpg", "png"],
+                    "Seminar": ["pdf", "pptx", "docx"]
     }
 
-    for sub_type, allowed_types in submission_info.items():
-        submitted_file = tracker_df.at[student_row, sub_type]
-        key_suffix = f"{sub_type}_{matric_no}_{selected_week}"
+                for sub_type, allowed_types in submission_info.items():
+                    submitted_file = tracker_df.at[student_row, sub_type]
+                    key_suffix = f"{sub_type}_{matric_no}_{selected_week}"
 
-        if submitted_file:
-            st.warning(f"You have already submitted your **{sub_type}** for {selected_week}.")
-        else:
-            uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
-            if uploaded_file:
+                    if submitted_file:
+                        st.warning(f"You have already submitted your **{sub_type}** for {selected_week}.")
+                    else:
+                        uploaded_file = st.file_uploader(f"Upload {sub_type}", type=allowed_types, key=key_suffix)
+                        if uploaded_file:
                 # Save file
-                extension = uploaded_file.name.split('.')[-1]
-                filename = f"{student_name}_{matric_no}_{selected_week}_{sub_type}.{extension}"
-                file_path = os.path.join(UPLOAD_DIR, filename)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+                            extension = uploaded_file.name.split('.')[-1]
+                            filename = f"{student_name}_{matric_no}_{selected_week}_{sub_type}.{extension}"
+                            file_path = os.path.join(UPLOAD_DIR, filename)
+                            with open(file_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
 
                 # Update tracker CSV
-                tracker_df.at[student_row, sub_type] = filename
-                tracker_df.to_csv(TRACK_FILE, index=False)
+                            tracker_df.at[student_row, sub_type] = filename
+                            tracker_df.to_csv(TRACK_FILE, index=False)
 
                 # Optional: call existing logging function if available
-                if "log_submission" in globals():
-                    log_submission(course_code, matric_no, student_name, selected_week, uploaded_file.name, sub_type)
+                            if "log_submission" in globals():
+                                log_submission(course_code, matric_no, student_name, selected_week, uploaded_file.name, sub_type)
 
-                st.success(f"✅ {sub_type} uploaded successfully!")
+                            st.success(f"✅ {sub_type} uploaded successfully!")
 
 
     # 🎬 Lecture Videos
@@ -1508,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
