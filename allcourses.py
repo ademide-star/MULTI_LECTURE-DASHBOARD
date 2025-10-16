@@ -940,26 +940,26 @@ def student_view():
                         tracker_df.to_csv(TRACK_FILE, index=False)
 
                 # Optional: call existing logging function if available
-                         if "log_submission" in globals():
+                        if "log_submission" in globals():
                             log_submission(course_code, matric_no, student_name, selected_week, uploaded_file.name, sub_type)
 
                         st.success(f"✅ {sub_type} uploaded successfully!")
 
 
     # 🎬 Lecture Videos
-    st.divider()
-    st.subheader("🎬 Watch Lecture Videos")
+        st.divider()
+        st.subheader("🎬 Watch Lecture Videos")
 
-    video_dir = os.path.join("video_lectures", course_code)
-    if os.path.exists(video_dir):
-        video_files = sorted(os.listdir(video_dir))
-        if video_files:
-            selected_video = st.selectbox("Select a lecture to watch:", video_files, key=f"{course_code}_video_select")
-            st.video(os.path.join(video_dir, selected_video))
+        video_dir = os.path.join("video_lectures", course_code)
+        if os.path.exists(video_dir):
+            video_files = sorted(os.listdir(video_dir))
+            if video_files:
+                selected_video = st.selectbox("Select a lecture to watch:", video_files, key=f"{course_code}_video_select")
+                st.video(os.path.join(video_dir, selected_video))
+            else:
+                st.info("No lecture videos uploaded yet.")
         else:
-            st.info("No lecture videos uploaded yet.")
-    else:
-        st.warning("📁 No video directory found for this course.")
+            st.warning("📁 No video directory found for this course.")
 
 
 
@@ -1505,6 +1505,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
