@@ -478,7 +478,26 @@ def ensure_data_files():
 
 # call once
 ensure_data_files()
+# -----------------------------
+# PDF and seminar helpers
+# -----------------------------
+def display_module_pdf(week):
+    pdf_path = f"{MODULES_DIR}/{week.replace(' ','_')}.pdf"
+    if os.path.exists(pdf_path):
+        with open(pdf_path,"rb") as f:
+            st.download_button(label=f"📥 Download {week} Module PDF", data=f, file_name=f"{week}_module.pdf", mime="application/pdf")
+    else:
+        st.info("Lecture PDF module not yet uploaded.")
 
+def display_seminar_upload(name, matric):
+    today = date.today()
+    if today >= date(today.year,10,20):
+        seminar_file = st.file_uploader("Upload Seminar PPT", type=["ppt","pptx"])
+        if seminar_file:
+            save_seminar(name, matric, seminar_file)
+        st.info("Seminar presentations will hold in the **3rd week of November**.")
+    else:
+        st.warning("Seminar submissions will open mid-semester.")
 # -----------------------------
 # ATTENDANCE + SUBMISSION HELPERS
 # -----------------------------
@@ -1676,6 +1695,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
