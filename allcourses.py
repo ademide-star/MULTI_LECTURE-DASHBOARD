@@ -1325,153 +1325,153 @@ def admin_view():
     # -------------------------
     # Student Records (Attendance / Classwork / Seminar)
     # -------------------------
-    st.header("📋 Student Records")
-    for file, label in [
-        (ATTENDANCE_FILE, "Attendance Records"),
-        (CLASSWORK_FILE, "Classwork Submissions"),
-        (SEMINAR_FILE, "Seminar Submissions")
+                st.header("📋 Student Records")
+                for file, label in [
+                (ATTENDANCE_FILE, "Attendance Records"),
+                (CLASSWORK_FILE, "Classwork Submissions"),
+                (SEMINAR_FILE, "Seminar Submissions")
     ]:
-        st.divider()
-        st.markdown(f"### {label}")
-        if os.path.exists(file):
-            df = pd.read_csv(file)
-            st.dataframe(df, use_container_width=True)
-            st.download_button(
-                label=f"⬇️ Download {label} CSV",
-                data=df.to_csv(index=False).encode(),
-                file_name=os.path.basename(file),
-                mime="text/csv",
-                key=f"{label}_download"
+                st.divider()
+                st.markdown(f"### {label}")
+                if os.path.exists(file):
+                    df = pd.read_csv(file)
+                    st.dataframe(df, use_container_width=True)
+                    st.download_button(
+                    label=f"⬇️ Download {label} CSV",
+                    data=df.to_csv(index=False).encode(),
+                    file_name=os.path.basename(file),
+                    mime="text/csv",
+                    key=f"{label}_download"
             )
-        else:
-            st.info(f"No {label.lower()} yet.")
+                else:
+                    st.info(f"No {label.lower()} yet.")
 
     # -------------------------
     # View & Grade Uploaded Files (assignment/drawing/seminar)
     # -------------------------
-    st.divider()
-    st.subheader("📂 View Student Submissions & Grade Them")
-    with st.expander("Expand to view and grade student submissions", expanded=True):
-        upload_types = ["assignment", "drawing", "seminar"]
-        for upload_type in upload_types:
-            st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
-            upload_dir = os.path.join(base_dir, course_code, upload_type)
-            if os.path.exists(upload_dir):
-                files = sorted([
-                f for f in os.listdir(upload_dir)
-                if os.path.isfile(os.path.join(upload_dir, f))
+                st.divider()
+                st.subheader("📂 View Student Submissions & Grade Them")
+                with st.expander("Expand to view and grade student submissions", expanded=True):
+                    upload_types = ["assignment", "drawing", "seminar"]
+                    for upload_type in upload_types:
+                    st.markdown(f"### 📄 {upload_type.capitalize()} Uploads")
+                    upload_dir = os.path.join(base_dir, course_code, upload_type)
+                    if os.path.exists(upload_dir):
+                        files = sorted([
+                        f for f in os.listdir(upload_dir)
+                        if os.path.isfile(os.path.join(upload_dir, f))
             ])
-            if not files:
-                st.info(f"No {upload_type} uploaded yet.")
-            else:
-                for file in files:
-                    file_path = os.path.join(upload_dir, file)
-                    unique_key = f"{course_code}_{upload_type}_{file}"
+                        if not files:
+                            st.info(f"No {upload_type} uploaded yet.")
+                    else:
+                        for file in files:
+                            file_path = os.path.join(upload_dir, file)
+                            unique_key = f"{course_code}_{upload_type}_{file}"
 
-                    st.write(f"📎 **{file}**")
+                            st.write(f"📎 **{file}**")
 
-                    try:
-                        with open(file_path, "rb") as fh:
-                            st.download_button(
-                                label=f"⬇️ Download {file}",
-                                data=fh,
-                                file_name=file,
-                                mime="application/octet-stream",
-                                key=f"{unique_key}_download"
+                            try:
+                                with open(file_path, "rb") as fh:
+                                    st.download_button(
+                                    label=f"⬇️ Download {file}",
+                                    data=fh,
+                                    file_name=file,
+                                    mime="application/octet-stream",
+                                    key=f"{unique_key}_download"
                             )
-                    except Exception:
-                        st.warning("⚠️ Cannot open file for download.")
+                            except Exception:
+                                st.warning("⚠️ Cannot open file for download.")
 
-                    score = st.number_input(
-                        f"Enter score for {file}",
-                        min_value=0,
-                        max_value=100,
-                        key=f"{unique_key}_score"
+                                score = st.number_input(
+                                    f"Enter score for {file}",
+                                    min_value=0,
+                                    max_value=100,
+                                    key=f"{unique_key}_score"
                     )
 
-                    if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
+                            if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
                         # Parse filename format: Name_Matric_Week.ext
-                        parts = file.rsplit(".", 1)[0].split("_")
-                        student_name = parts[0].strip().title() if len(parts) > 0 else "Unknown"
-                        matric = parts[1].strip().upper() if len(parts) > 1 else "Unknown"
-                        week = parts[2].strip().title() if len(parts) > 2 else "Unknown"
+                                parts = file.rsplit(".", 1)[0].split("_")
+                                student_name = parts[0].strip().title() if len(parts) > 0 else "Unknown"
+                                matric = parts[1].strip().upper() if len(parts) > 1 else "Unknown"
+                                week = parts[2].strip().title() if len(parts) > 2 else "Unknown"
 
                         # Score file path
-                        score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
+                                score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
                         # Load or create scores DataFrame safely
-                        score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
-                        required_columns = ["StudentName", "MatricNo", "Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]
+                                score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+                                required_columns = ["StudentName", "MatricNo", "Week", "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"]
 
-                        if os.path.exists(score_file):
-                            df = pd.read_csv(score_file)
+                                if os.path.exists(score_file):
+                                    df = pd.read_csv(score_file)
                             # Add missing columns if any
-                            for col in required_columns:
-                                if col not in df.columns:
-                                    df[col] = 0 if "Score" in col else ""
+                                    for col in required_columns:
+                                        if col not in df.columns:
+                                            df[col] = 0 if "Score" in col else ""
                                 else:
     # Create empty DataFrame with required columns
                                     df = pd.DataFrame(columns=required_columns)
 
                         # parse filename expected: Name_Matric_Week.ext
-                        parts = file.rsplit(".", 1)[0].split("_")
+                                    parts = file.rsplit(".", 1)[0].split("_")
 
 # Validate filename format
-                        if len(parts) < 3:
-                            st.warning(f"Invalid filename format: {file}. Use Name_Matric_Week.ext")
-                            continue  # Skip this file if format is wrong
+                                if len(parts) < 3:
+                                    st.warning(f"Invalid filename format: {file}. Use Name_Matric_Week.ext")
+                                continue  # Skip this file if format is wrong
 
 # Extract student info
-                        student_name = parts[0].strip().title()
-                        matric = parts[1].strip().upper()
-                        week = parts[2].strip().title()
+                                student_name = parts[0].strip().title()
+                                matric = parts[1].strip().upper()
+                                week = parts[2].strip().title()
 
 # Map upload type to column
-                        column_map = {"assignment": "AssignmentScore", "drawing": "ClassworkScore", "seminar": "SeminarScore"}
-                        col = column_map.get(upload_type, "AssignmentScore")
+                                column_map = {"assignment": "AssignmentScore", "drawing": "ClassworkScore", "seminar": "SeminarScore"}
+                                col = column_map.get(upload_type, "AssignmentScore")
 
                         # Locate existing record
-                        existing_idx = df[
-                            (df["StudentName"].astype(str).str.lower() == student_name.lower()) &
-                            (df["MatricNo"].astype(str).str.lower() == matric.lower()) &
-                            (df["Week"].astype(str).str.lower() == week.lower())
-                        ].index
+                                existing_idx = df[
+                                    (df["StudentName"].astype(str).str.lower() == student_name.lower()) &
+                                    (df["MatricNo"].astype(str).str.lower() == matric.lower()) &
+                                    (df["Week"].astype(str).str.lower() == week.lower())
+                                    ].index
 
-                        column_map = {
-                            "assignment": "AssignmentScore",
-                            "drawing": "ClassworkScore",
-                            "seminar": "SeminarScore"
+                                column_map = {
+                                    "assignment": "AssignmentScore",
+                                    "drawing": "ClassworkScore",
+                                    "seminar": "SeminarScore"
                         }
-                        col = column_map.get(upload_type, "AssignmentScore")
+                                col = column_map.get(upload_type, "AssignmentScore")
 
-                        if len(existing_idx) > 0:
-                            df.loc[existing_idx, col] = score
-                        else:
-                            new_row = {
-                                "StudentName": student_name,
-                                "MatricNo": matric,
-                                "Week": week,
-                                "ClassworkScore": 0,
-                                "SeminarScore": 0,
-                                "AssignmentScore": 0,
-                                "TotalScore": 0
+                                if len(existing_idx) > 0:
+                                    df.loc[existing_idx, col] = score
+                                else:
+                                    new_row = {
+                                        "StudentName": student_name,
+                                        "MatricNo": matric,
+                                        "Week": week,
+                                        "ClassworkScore": 0,
+                                        "SeminarScore": 0,
+                                        "AssignmentScore": 0,
+                                        "TotalScore": 0
                             }
-                            new_row[col] = score
-                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                                    new_row[col] = score
+                                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
                         # Compute total weighted score
-                        df["TotalScore"] = (
-                            df.get("ClassworkScore", 0).fillna(0).astype(float) * 0.3 +
-                            df.get("SeminarScore", 0).fillna(0).astype(float) * 0.2 +
-                            df.get("AssignmentScore", 0).fillna(0).astype(float) * 0.5
-                        ).round(1)
+                                    df["TotalScore"] = (
+                                        df.get("ClassworkScore", 0).fillna(0).astype(float) * 0.3 +
+                                        df.get("SeminarScore", 0).fillna(0).astype(float) * 0.2 +
+                                        df.get("AssignmentScore", 0).fillna(0).astype(float) * 0.5
+                                    ).round(1)
 
-                        try:
-                            df.to_csv(score_file, index=False)
-                            st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
-                        except Exception as e:
-                            st.error(f"❌ Failed to save score file: {e}")
-        else:
-            st.info(f"No directory found for {upload_type}.")
+                            try:
+                                df.to_csv(score_file, index=False)
+                                st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
+                            except Exception as e:
+                                st.error(f"❌ Failed to save score file: {e}")
+            else:
+                st.info(f"No directory found for {upload_type}.")
 
     # -------------------------
     # Live Score Review / Manual Entry
