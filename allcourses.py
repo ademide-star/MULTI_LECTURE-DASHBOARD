@@ -811,8 +811,8 @@ def student_view():
             else:
                 st.info("Lecture note not uploaded yet.")
 
-            except Exception as e:
-                st.error(f"⚠️ Error displaying lecture details: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Error displaying lecture details: {e}")
 
             if os.path.dirname(LECTURE_FILE):
                 os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
@@ -1529,6 +1529,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
