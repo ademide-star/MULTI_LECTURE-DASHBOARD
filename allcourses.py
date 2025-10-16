@@ -680,8 +680,31 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
         updated = new_entry
     updated.to_csv(log_file, index=False)
 
-import os
-import streamlit as st
+
+MODULES_DIR = "modules"
+os.makedirs(MODULES_DIR, exist_ok=True)
+
+# ------------------------------
+# Define the function first
+# ------------------------------
+def display_module_pdf(course_code, week):
+    """
+    Display the module PDF for a specific course and week.
+    """
+    pdf_filename = f"{course_code}_{week.replace(' ','_')}_module.pdf"
+    pdf_path = os.path.join(MODULES_DIR, pdf_filename)
+
+    if os.path.exists(pdf_path):
+        with open(pdf_path, "rb") as f:
+            st.download_button(
+                label=f"📥 Download {week} Module PDF",
+                data=f.read(),
+                file_name=pdf_filename,
+                mime="application/pdf",
+                key=f"{course_code}_{week}_pdf"
+            )
+    else:
+        st.info("Module PDF not yet uploaded.")
 
 def display_all_module_pdfs(course_code):
     """
@@ -1653,6 +1676,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
