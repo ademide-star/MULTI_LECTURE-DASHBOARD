@@ -628,6 +628,7 @@ def student_view():
         # -------------------------------
         # 🕒 Attendance Form
         # -------------------------------
+        course_code = st.selectbox("Select Course",  ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"])
         with st.form(f"{course_code}_attendance_form"):
             name = st.text_input("Full Name", key=f"{course_code}_student_name")
             matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
@@ -1405,6 +1406,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
