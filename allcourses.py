@@ -676,6 +676,7 @@ def student_view():
                     start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
                     end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
                     valid_code = COURSE_TIMINGS[course_code]["valid_code"]
+                    
                     now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria timezone (UTC+1)
 
                     if not (start_time <= now_t <= end_time):
@@ -1389,6 +1390,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
