@@ -939,21 +939,25 @@ def admin_view():
     # Lecture Management
     # -------------------------
     st.header("📚 Lecture Management")
+    LECTURE_FILE = get_file(course_code, "lectures")
+    ATTENDANCE_FILE = get_file(course_code, "attendance")
+    CLASSWORK_STATUS_FILE = get_file(course_code, "classwork")
+    SEMINAR_FILE = get_file(course_code, "seminar")
 
     # Load lectures CSV safely
     if os.path.exists(LECTURE_FILE):
-        try:
-            lectures_df = pd.read_csv(LECTURE_FILE)
-            lectures_df.columns = lectures_df.columns.str.strip()
-        except Exception:
-            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
+        lectures_df = pd.read_csv(LECTURE_FILE)
+        # Clean column names
+        lectures_df.columns = lectures_df.columns.str.strip()
     else:
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
 
+    # Ensure all required columns exist
     for col in ["Week", "Topic", "Brief", "Classwork", "Assignment"]:
         if col not in lectures_df.columns:
             lectures_df[col] = ""
 
+    # Store in session state
     st.session_state["lectures_df"] = lectures_df
 
     # Add / Edit Lecture, Classwork & Assignment
@@ -1010,23 +1014,6 @@ def admin_view():
                     st.success(f"✅ Assignment PDF uploaded for {week}")
                 except Exception as e:
                     st.warning(f"Failed to save assignment PDF: {e}")
-                    try:
-    # Ensure the folder exists
-                        folder = "lectures"
-                        os.makedirs(folder, exist_ok=True)
-
-    # Build file path safely
-                        if "course_code" not in locals() or not course_code:
-                            st.error("⚠️ Course code not defined. Please select or enter a valid course code.")
-                        else:
-                            lecture_file = os.path.join(folder, f"{course_code}_lectures.csv")
-
-        # Save the DataFrame safely
-                            lectures_df.to_csv(lecture_file, index=False)
-                            st.success(f"✅ Lecture data saved successfully to {lecture_file}.")
-                    except Exception as e:
-                        st.error(f"⚠️ Failed to save lecture CSV: {e}")
-
 
             st.dataframe(lectures_df, use_container_width=True)
 
@@ -1423,6 +1410,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
