@@ -889,11 +889,11 @@ def student_view():
     os.makedirs(base_dir, exist_ok=True)
 
 
-#--- Fixed & hardened admin_view function ---
-def admin_view():
+def admin_view(course_code):
     import os
     import pandas as pd
     import streamlit as st
+    from datetime import datetime
 
     st.title("👩‍🏫 Admin Dashboard")
     st.subheader("🔐 Teacher / Admin Panel")
@@ -921,20 +921,36 @@ def admin_view():
     os.makedirs(scores_dir, exist_ok=True)
     os.makedirs(modules_dir, exist_ok=True)
 
+    # helper: safe get_file fallback
+    try:
+        LECTURE_FILE = get_file(course_code, "lectures")
+    except Exception:
+        LECTURE_FILE = os.path.join("data", f"{course_code}_lectures.csv")
+    try:
+        ATTENDANCE_FILE = get_file(course_code, "attendance")
+    except Exception:
+        ATTENDANCE_FILE = os.path.join("data", f"{course_code}_attendance.csv")
+    try:
+        CLASSWORK_FILE = get_file(course_code, "classwork")
+    except Exception:
+        CLASSWORK_FILE = os.path.join("data", f"{course_code}_classwork.csv")
+    try:
+        SEMINAR_FILE = get_file(course_code, "seminar")
+    except Exception:
+        SEMINAR_FILE = os.path.join("data", f"{course_code}_seminar.csv")
+
     # -------------------------
     # Lecture Management
     # -------------------------
     st.header("📚 Lecture Management")
 
-    LECTURE_FILE = get_file(course_code, "lectures")
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-    CLASSWORK_FILE = get_file(course_code, "classwork")
-    SEMINAR_FILE = get_file(course_code, "seminar")
-
     # Load lectures CSV safely
     if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
-        lectures_df.columns = lectures_df.columns.str.strip()
+        try:
+            lectures_df = pd.read_csv(LECTURE_FILE)
+            lectures_df.columns = lectures_df.columns.str.strip()
+        except Exception:
+            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
     else:
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
 
@@ -944,9 +960,7 @@ def admin_view():
 
     st.session_state["lectures_df"] = lectures_df
 
-    # -------------------------
     # Add / Edit Lecture, Classwork & Assignment
-    # -------------------------
     with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
         week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
         lectures_df = st.session_state["lectures_df"]
@@ -971,27 +985,40 @@ def admin_view():
 
         if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
             lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
-            lectures_df.to_csv(LECTURE_FILE, index=False)
-            st.session_state["lectures_df"] = lectures_df
-            st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
+            try:
+                os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+                st.session_state["lectures_df"] = lectures_df
+                st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
+            except Exception as e:
+                st.error(f"Failed to save lecture CSV: {e}")
 
             if lecture_pdf:
-                with open(os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf"), "wb") as f:
-                    f.write(lecture_pdf.getbuffer())
-                st.success(f"✅ Lecture PDF uploaded for {week}")
+                try:
+                    with open(os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf"), "wb") as f:
+                        f.write(lecture_pdf.getbuffer())
+                    st.success(f"✅ Lecture PDF uploaded for {week}")
+                except Exception as e:
+                    st.warning(f"Failed to save lecture PDF: {e}")
             if classwork_pdf:
-                with open(os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf"), "wb") as f:
-                    f.write(classwork_pdf.getbuffer())
-                st.success(f"✅ Classwork PDF uploaded for {week}")
+                try:
+                    with open(os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf"), "wb") as f:
+                        f.write(classwork_pdf.getbuffer())
+                    st.success(f"✅ Classwork PDF uploaded for {week}")
+                except Exception as e:
+                    st.warning(f"Failed to save classwork PDF: {e}")
             if assignment_pdf:
-                with open(os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf"), "wb") as f:
-                    f.write(assignment_pdf.getbuffer())
-                st.success(f"✅ Assignment PDF uploaded for {week}")
+                try:
+                    with open(os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf"), "wb") as f:
+                        f.write(assignment_pdf.getbuffer())
+                    st.success(f"✅ Assignment PDF uploaded for {week}")
+                except Exception as e:
+                    st.warning(f"Failed to save assignment PDF: {e}")
 
             st.dataframe(lectures_df, use_container_width=True)
 
     # -------------------------
-    # Student Records (Attendance / Classwork / Seminar)
+    # Student Records
     # -------------------------
     st.header("📋 Student Records")
     for file, label in [
@@ -1031,7 +1058,11 @@ def admin_view():
                 st.info(f"No {upload_type} uploaded yet.")
                 continue
 
-            files = sorted(os.listdir(upload_dir))
+            files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
+            if not files:
+                st.info(f"No {upload_type} uploaded yet.")
+                continue
+
             for file in files:
                 file_path = os.path.join(upload_dir, file)
                 unique_key = f"{course_code}_{upload_type}_{file}"
@@ -1049,93 +1080,257 @@ def admin_view():
                 except Exception:
                     st.warning("⚠️ Cannot open file for download.")
 
-                score = st.number_input(f"Enter score for {file}", 0, 100, 0, key=f"{unique_key}_score")
+                score = st.number_input(f"Enter score for {file}", min_value=0, max_value=100, value=0, key=f"{unique_key}_score")
                 if st.button(f"💾 Save Score ({file})", key=f"{unique_key}_save"):
                     try:
                         parts = file.rsplit(".", 1)[0].split("_")
                         if len(parts) < 3:
-                            st.warning(f"Invalid filename format: {file}")
+                            st.warning(f"Invalid filename format: {file}. Expected Name_Matric_Week.ext")
                             continue
 
-                        student_name, matric, week = parts[0].title(), parts[1].upper(), parts[2].title()
-                        os.makedirs("scores", exist_ok=True)
-                        score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+                        student_name = parts[0].strip().title()
+                        matric = parts[1].strip().upper()
+                        week = parts[2].strip().title()
 
-                        required_columns = [
-                            "StudentName", "MatricNo", "Week",
-                            "ClassworkScore", "SeminarScore", "AssignmentScore", "TotalScore"
-                        ]
-                        df = pd.read_csv(score_file) if os.path.exists(score_file) else pd.DataFrame(columns=required_columns)
-                        for col in required_columns:
-                            if col not in df.columns:
-                                df[col] = 0 if "Score" in col else ""
+                        os.makedirs(scores_dir, exist_ok=True)
+                        score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
+                        required_columns = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Total", "Grade"]
 
-                        column_map = {"assignment": "AssignmentScore", "drawing": "ClassworkScore", "seminar": "SeminarScore"}
-                        col = column_map.get(upload_type, "AssignmentScore")
-
-                        existing = df[
-                            (df["StudentName"].str.lower() == student_name.lower()) &
-                            (df["MatricNo"].str.lower() == matric.lower()) &
-                            (df["Week"].str.lower() == week.lower())
-                        ].index
-
-                        if len(existing) > 0:
-                            df.loc[existing, col] = score
+                        if os.path.exists(score_file):
+                            df_scores = pd.read_csv(score_file)
                         else:
+                            df_scores = pd.DataFrame(columns=required_columns)
+
+                        for col in required_columns:
+                            if col not in df_scores.columns:
+                                df_scores[col] = 0 if col in ["Assignment", "Test", "Practical", "Exam", "Total"] else ""
+
+                        # Save the single score to Assignment field by default (legacy behavior)
+                        # If you prefer another default mapping for upload scoring, change here.
+                        df_scores.loc[
+                            (df_scores["StudentName"].astype(str).str.lower() == student_name.lower()) &
+                            (df_scores["MatricNo"].astype(str).str.lower() == matric.lower()) &
+                            (df_scores["Week"].astype(str).str.lower() == week.lower()),
+                            "Assignment"
+                        ] = score
+
+                        # If no existing row, add one
+                        if not ((df_scores["StudentName"].astype(str).str.lower() == student_name.lower()) &
+                                (df_scores["MatricNo"].astype(str).str.lower() == matric.lower()) &
+                                (df_scores["Week"].astype(str).str.lower() == week.lower())).any():
                             new_row = {
                                 "StudentName": student_name,
                                 "MatricNo": matric,
                                 "Week": week,
-                                "ClassworkScore": 0,
-                                "SeminarScore": 0,
-                                "AssignmentScore": 0,
-                                "TotalScore": 0
+                                "Assignment": score,
+                                "Test": 0,
+                                "Practical": 0,
+                                "Exam": 0,
+                                "Total": 0,
+                                "Grade": ""
                             }
-                            new_row[col] = score
-                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                            df_scores = pd.concat([df_scores, pd.DataFrame([new_row])], ignore_index=True)
 
-                        df["TotalScore"] = (
-                            df.get("ClassworkScore", 0).fillna(0).astype(float) * 0.3 +
-                            df.get("SeminarScore", 0).fillna(0).astype(float) * 0.2 +
-                            df.get("AssignmentScore", 0).fillna(0).astype(float) * 0.5
-                        ).round(1)
+                        # Compute Total & Grade using weights:
+                        # Assignment: 20%, Test: 20%, Practical: 10%, Exam: 50%
+                        try:
+                            df_scores["Total"] = (
+                                df_scores.get("Assignment", 0).fillna(0).astype(float) * 0.20 +
+                                df_scores.get("Test", 0).fillna(0).astype(float) * 0.20 +
+                                df_scores.get("Practical", 0).fillna(0).astype(float) * 0.10 +
+                                df_scores.get("Exam", 0).fillna(0).astype(float) * 0.50
+                            ).round(1)
+                        except Exception:
+                            df_scores["Total"] = 0
 
-                        df.to_csv(score_file, index=False)
+                        # Grade scheme
+                        def compute_grade(total):
+                            try:
+                                t = float(total)
+                            except Exception:
+                                return ""
+                            if t >= 70: return "A"
+                            if t >= 60: return "B"
+                            if t >= 50: return "C"
+                            if t >= 45: return "D"
+                            if t >= 40: return "E"
+                            return "F"
+
+                        df_scores["Grade"] = df_scores["Total"].apply(compute_grade)
+
+                        df_scores.to_csv(score_file, index=False)
                         st.success(f"✅ Score saved for {student_name} ({matric}) - {week}")
                     except Exception as e:
                         st.error(f"❌ Failed to save score file: {e}")
 
     # -------------------------
-    # Live Score Review
+    # Grading — Manual Entry & CSV Upload
     # -------------------------
     st.divider()
-    with st.expander("🧭 ADMIN DASHBOARD — Manage and Review Scores", expanded=True):
-        st.header("📊 Review Graded Scores")
+    st.subheader("🧮 Grading — Manual Entry & CSV Upload")
 
-        score_paths = [
-            os.path.join("student_uploads", f"{course_code}_scores.csv"),
-            os.path.join("scores", f"{course_code.lower()}_scores.csv")
-        ]
+    score_file = os.path.join(scores_dir, f"{course_code.lower()}_scores.csv")
+    os.makedirs(scores_dir, exist_ok=True)
 
-        scores_df = None
-        for path in score_paths:
-            if os.path.exists(path):
+    # Option: Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam
+    st.markdown("**Option A — Upload scores CSV** (columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam)")
+    uploaded_scores_csv = st.file_uploader("Upload scores CSV (optional)", type=["csv"], key=f"{course_code}_scores_csv")
+
+    if uploaded_scores_csv is not None:
+        try:
+            uploaded_df = pd.read_csv(uploaded_scores_csv)
+            # Ensure columns exist
+            for col in ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam"]:
+                if col not in uploaded_df.columns:
+                    uploaded_df[col] = 0
+            # Compute totals and grades for uploaded rows
+            uploaded_df["Total"] = (
+                uploaded_df["Assignment"].fillna(0).astype(float) * 0.20 +
+                uploaded_df["Test"].fillna(0).astype(float) * 0.20 +
+                uploaded_df["Practical"].fillna(0).astype(float) * 0.10 +
+                uploaded_df["Exam"].fillna(0).astype(float) * 0.50
+            ).round(1)
+            def compute_grade_scalar(t):
                 try:
-                    scores_df = pd.read_csv(path)
-                    break
+                    t = float(t)
                 except Exception:
-                    continue
+                    return ""
+                if t >= 70: return "A"
+                if t >= 60: return "B"
+                if t >= 50: return "C"
+                if t >= 45: return "D"
+                if t >= 40: return "E"
+                return "F"
+            uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade_scalar)
 
-        if scores_df is None or scores_df.empty:
-            st.info("No graded scores yet.")
+            # Merge with existing score file if present
+            if os.path.exists(score_file):
+                existing_df = pd.read_csv(score_file)
+            else:
+                existing_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Total", "Grade"])
+
+            # For each uploaded row, update or append
+            for _, r in uploaded_df.iterrows():
+                mask = (
+                    (existing_df["StudentName"].astype(str).str.lower() == str(r["StudentName"]).lower()) &
+                    (existing_df["MatricNo"].astype(str).str.lower() == str(r["MatricNo"]).lower()) &
+                    (existing_df["Week"].astype(str).str.lower() == str(r["Week"]).lower())
+                )
+                if mask.any():
+                    existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Total", "Grade"]] = [
+                        r["Assignment"], r["Test"], r["Practical"], r["Exam"], r["Total"], r["Grade"]
+                    ]
+                else:
+                    new_row = {
+                        "StudentName": r["StudentName"],
+                        "MatricNo": r["MatricNo"],
+                        "Week": r["Week"],
+                        "Assignment": r["Assignment"],
+                        "Test": r["Test"],
+                        "Practical": r["Practical"],
+                        "Exam": r["Exam"],
+                        "Total": r["Total"],
+                        "Grade": r["Grade"]
+                    }
+                    existing_df = pd.concat([existing_df, pd.DataFrame([new_row])], ignore_index=True)
+
+            existing_df.to_csv(score_file, index=False)
+            st.success("✅ Uploaded scores processed and saved.")
+            st.dataframe(existing_df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Failed to process uploaded CSV: {e}")
+
+    st.markdown("---")
+    # Option: Manual entry
+    st.markdown("**Option B — Manual entry (per student & week)**")
+    # Load existing scores or create template
+    if os.path.exists(score_file):
+        try:
+            scores_df = pd.read_csv(score_file)
+        except Exception:
+            scores_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Total", "Grade"])
+    else:
+        scores_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Total", "Grade"])
+
+    # Inputs for manual entry
+    m_name = st.text_input("Student Name (manual)", key=f"{course_code}_manual_name")
+    m_matric = st.text_input("Matric Number (manual)", key=f"{course_code}_manual_matric")
+    m_week = st.selectbox("Week (manual)", lectures_df["Week"].tolist() if not lectures_df.empty else [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_manual_week")
+    m_assignment = st.number_input("Assignment score (0-100)", min_value=0, max_value=100, value=0, key=f"{course_code}_manual_assignment")
+    m_test = st.number_input("Test score (0-100)", min_value=0, max_value=100, value=0, key=f"{course_code}_manual_test")
+    m_practical = st.number_input("Practical score (0-100)", min_value=0, max_value=100, value=0, key=f"{course_code}_manual_practical")
+    m_exam = st.number_input("Exam score (0-100)", min_value=0, max_value=100, value=0, key=f"{course_code}_manual_exam")
+
+    if st.button("💾 Save Manual Score"):
+        if not m_name or not m_matric:
+            st.warning("Please provide student name and matric number.")
         else:
-            st.dataframe(scores_df, use_container_width=True)
-            st.download_button(
-                label="⬇️ Download All Scores (CSV)",
-                data=scores_df.to_csv(index=False).encode(),
-                file_name=f"{course_code}_graded_scores.csv",
-                mime="text/csv"
-            )
+            try:
+                # compute total and grade
+                total = round(m_assignment * 0.20 + m_test * 0.20 + m_practical * 0.10 + m_exam * 0.50, 1)
+                def compute_grade_value(t):
+                    if t >= 70: return "A"
+                    if t >= 60: return "B"
+                    if t >= 50: return "C"
+                    if t >= 45: return "D"
+                    if t >= 40: return "E"
+                    return "F"
+                grade = compute_grade_value(total)
+
+                mask = (
+                    (scores_df["StudentName"].astype(str).str.lower() == m_name.lower()) &
+                    (scores_df["MatricNo"].astype(str).str.lower() == m_matric.lower()) &
+                    (scores_df["Week"].astype(str).str.lower() == m_week.lower())
+                )
+
+                if mask.any():
+                    scores_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Total", "Grade"]] = [
+                        m_assignment, m_test, m_practical, m_exam, total, grade
+                    ]
+                else:
+                    new_row = {
+                        "StudentName": m_name.title(),
+                        "MatricNo": m_matric.upper(),
+                        "Week": m_week,
+                        "Assignment": m_assignment,
+                        "Test": m_test,
+                        "Practical": m_practical,
+                        "Exam": m_exam,
+                        "Total": total,
+                        "Grade": grade
+                    }
+                    scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
+
+                scores_df.to_csv(score_file, index=False)
+                st.success(f"✅ Manual score saved for {m_name} ({m_matric}) - {m_week}")
+            except Exception as e:
+                st.error(f"Failed to save manual score: {e}")
+
+    # Show scores preview
+    if not scores_df.empty:
+        st.markdown("### Current Scores Preview")
+        st.dataframe(scores_df.sort_values(["StudentName", "Week"]), use_container_width=True)
+        st.download_button("⬇️ Download Scores CSV", data=scores_df.to_csv(index=False).encode(), file_name=os.path.basename(score_file), mime="text/csv")
+
+    # -------------------------
+    # Reset All Scores (danger)
+    # -------------------------
+    st.markdown("---")
+    st.warning("Reset all scores will permanently delete the scores CSV for this course.")
+    if st.button("🧹 Reset All Scores for this Course (Irreversible)"):
+        try:
+            if os.path.exists(score_file):
+                os.remove(score_file)
+                st.success("✅ Scores file removed.")
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+            else:
+                st.info("No scores file to remove.")
+        except Exception as e:
+            st.error(f"Failed to reset scores: {e}")
 
     # -------------------------
     # Video upload & management
@@ -1184,9 +1379,8 @@ def admin_view():
     # Classwork Control
     # -------------------------
     st.header("🧩 Classwork Control")
-
     week_options = lectures_df["Week"].unique().tolist() if not lectures_df.empty else ["Week 1"]
-    week_to_control = st.selectbox("Select Week to Open/Close Classwork", week_options)
+    week_to_control = st.selectbox("Select Week to Open/Close Classwork", week_options, key=f"{course_code}_admin_week_control")
 
     if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)"):
         try:
@@ -1204,6 +1398,10 @@ def admin_view():
     except Exception:
         pass
 
+    # Footer
+    st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
+
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
 if st.session_state["role"] == "Admin":
@@ -1212,6 +1410,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
