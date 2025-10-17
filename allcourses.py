@@ -670,7 +670,7 @@ def student_view():
                     "BIO306": {"valid_code": "BIO306-ZT2", "start": "24:00", "end": "22:00"},
                 }
 
-                if course_code not in COURSE_TIMINGS:
+                if not course_code or course_code not in COURSE_TIMINGS:
                     st.error(f"⚠️ No timing configured for {course_code}.")
                 else:
                     start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
@@ -1390,6 +1390,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
