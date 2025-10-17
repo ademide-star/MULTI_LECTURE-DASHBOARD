@@ -917,24 +917,7 @@ def admin_view():
     os.makedirs(scores_dir, exist_ok=True)
     os.makedirs(modules_dir, exist_ok=True)
 
-    # helper: safe get_file fallback
-    try:
-        LECTURE_FILE = get_file(course_code, "lectures")
-    except Exception:
-        LECTURE_FILE = os.path.join("data", f"{course_code}_lectures")
-    try:
-        ATTENDANCE_FILE = get_file(course_code, "attendance")
-    except Exception:
-        ATTENDANCE_FILE = os.path.join("data", f"{course_code}_attendance")
-    try:
-        CLASSWORK_FILE = get_file(course_code, "classwork")
-    except Exception:
-        CLASSWORK_FILE = os.path.join("data", f"{course_code}_classwork")
-    try:
-        SEMINAR_FILE = get_file(course_code, "seminar")
-    except Exception:
-        SEMINAR_FILE = os.path.join("data", f"{course_code}_seminar")
-
+   
     # -------------------------
     # Lecture Management
     # -------------------------
@@ -991,13 +974,11 @@ def admin_view():
 
         if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
             lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
-            try:
-                os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
-                lectures_df.to_csv(LECTURE_FILE, index=False)
-                st.session_state["lectures_df"] = lectures_df
-                st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
-            except Exception as e:
-                st.error(f"Failed to save lecture CSV: {e}")
+            
+            lectures_df.to_csv(LECTURE_FILE, index=False)
+            st.session_state["lectures_df"] = lectures_df
+            st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
+            
 
             if lecture_pdf:
                 try:
@@ -1416,6 +1397,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
