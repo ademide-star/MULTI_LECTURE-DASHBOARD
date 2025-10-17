@@ -889,11 +889,7 @@ def student_view():
     os.makedirs(base_dir, exist_ok=True)
 
 
-def admin_view(course_code):
-    import os
-    import pandas as pd
-    import streamlit as st
-    from datetime import datetime
+def admin_view():
 
     st.title("👩‍🏫 Admin Dashboard")
     st.subheader("🔐 Teacher / Admin Panel")
@@ -1410,6 +1406,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
