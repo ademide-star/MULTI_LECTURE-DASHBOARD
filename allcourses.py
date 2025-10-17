@@ -576,7 +576,7 @@ def display_module_pdf(week):
 def mark_attendance_entry(course_code, name, matric, week):
     """Marks attendance for a given student safely with auto-column creation."""
     try:
-        file_path = get_file(course_code, "attendance")
+        file_path = get_file(course_code, "attendance_form")
 
         # ✅ Load or initialize attendance DataFrame
         if os.path.exists(file_path):
@@ -1405,6 +1405,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
