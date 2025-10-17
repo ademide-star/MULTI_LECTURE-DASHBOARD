@@ -921,19 +921,19 @@ def admin_view():
     try:
         LECTURE_FILE = get_file(course_code, "lectures")
     except Exception:
-        LECTURE_FILE = os.path.join("data", f"{course_code}_lectures.csv")
+        LECTURE_FILE = os.path.join("data", f"{course_code}_lectures")
     try:
         ATTENDANCE_FILE = get_file(course_code, "attendance")
     except Exception:
-        ATTENDANCE_FILE = os.path.join("data", f"{course_code}_attendance.csv")
+        ATTENDANCE_FILE = os.path.join("data", f"{course_code}_attendance")
     try:
         CLASSWORK_FILE = get_file(course_code, "classwork")
     except Exception:
-        CLASSWORK_FILE = os.path.join("data", f"{course_code}_classwork.csv")
+        CLASSWORK_FILE = os.path.join("data", f"{course_code}_classwork")
     try:
         SEMINAR_FILE = get_file(course_code, "seminar")
     except Exception:
-        SEMINAR_FILE = os.path.join("data", f"{course_code}_seminar.csv")
+        SEMINAR_FILE = os.path.join("data", f"{course_code}_seminar")
 
     # -------------------------
     # Lecture Management
@@ -1416,6 +1416,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
