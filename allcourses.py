@@ -980,27 +980,19 @@ def admin_view():
             st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
             
 
+            # Save PDFs
             if lecture_pdf:
-                try:
-                    with open(os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf"), "wb") as f:
-                        f.write(lecture_pdf.getbuffer())
-                    st.success(f"✅ Lecture PDF uploaded for {week}")
-                except Exception as e:
-                    st.warning(f"Failed to save lecture PDF: {e}")
+                lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
+                with open(lecture_pdf_path, "wb") as f: f.write(lecture_pdf.getbuffer())
+                st.success(f"✅ Lecture PDF uploaded for {week}")
             if classwork_pdf:
-                try:
-                    with open(os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf"), "wb") as f:
-                        f.write(classwork_pdf.getbuffer())
-                    st.success(f"✅ Classwork PDF uploaded for {week}")
-                except Exception as e:
-                    st.warning(f"Failed to save classwork PDF: {e}")
+                classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
+                with open(classwork_pdf_path, "wb") as f: f.write(classwork_pdf.getbuffer())
+                st.success(f"✅ Classwork PDF uploaded for {week}")
             if assignment_pdf:
-                try:
-                    with open(os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf"), "wb") as f:
-                        f.write(assignment_pdf.getbuffer())
-                    st.success(f"✅ Assignment PDF uploaded for {week}")
-                except Exception as e:
-                    st.warning(f"Failed to save assignment PDF: {e}")
+                assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
+                with open(assignment_pdf_path, "wb") as f: f.write(assignment_pdf.getbuffer())
+                st.success(f"✅ Assignment PDF uploaded for {week}")
 
             st.dataframe(lectures_df, use_container_width=True)
 
@@ -1397,6 +1389,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
