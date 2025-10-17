@@ -604,7 +604,7 @@ def mark_attendance_entry(course_code, name, matric, week):
             "Week": week,
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        df = pd.contact([df, pd.DataFrame([new_entry])], ignore_index=True)
 
         # ✅ Save back to CSV
         df.to_csv(file_path, index=False)
@@ -1405,6 +1405,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
