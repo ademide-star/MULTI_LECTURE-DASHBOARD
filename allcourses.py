@@ -973,6 +973,12 @@ def admin_view():
             row_idx = lectures_df[lectures_df["Week"] == week].index[0]
             st.session_state["lectures_df"] = lectures_df
 
+         # Access existing/default values safely
+        topic_default = lectures_df.at[row_idx, "Topic"]
+        brief_default = lectures_df.at[row_idx, "Brief"]
+        classwork_default = lectures_df.at[row_idx, "Classwork"]
+        assignment_default = lectures_df.at[row_idx, "Assignment"]  
+        
         topic = st.text_input("Lecture Topic", value=lectures_df.at[row_idx, "Topic"])
         brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"])
         classwork = st.text_area("Classwork (separate questions with ;)", value=lectures_df.at[row_idx, "Classwork"])
@@ -1410,6 +1416,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
