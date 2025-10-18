@@ -582,6 +582,46 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
+def mark_attendance_entry(course_code, name, matric, week):
+    """Marks attendance for a given student safely with auto-column creation."""
+    try:
+        file_path = get_file(course_code, "attendance_form")
+
+        # ✅ Load or initialize attendance DataFrame
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+        else:
+            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+
+        # ✅ Ensure required columns exist
+        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
+            if col not in df.columns:
+                df[col] = None
+
+        # ✅ Standardize column names (in case older files used different headers)
+        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+
+        # ✅ Check if student has already marked attendance for this week
+        if ((df["Studentname"].str.lower() == name.strip().lower()) & 
+            (df["Week"].astype(str) == str(week))).any():
+            return False  # already marked
+
+        # ✅ Record new attendance
+        new_entry = {
+            "StudentName": name.strip(),
+            "Matric": matric.strip(),
+            "Week": week,
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+        # ✅ Save back to CSV
+        df.to_csv(file_path, index=False)
+        return True
+
+    except Exception as e:
+        st.error(f"⚠️ Error marking attendance: {e}")
+        return False
 
 
 def student_view():
@@ -748,6 +788,41 @@ def student_view():
                 st.info("Lecture note not uploaded yet.")
         except Exception as e:
             st.error(f"⚠️ Error displaying lecture details: {e}")
+
+
+        # ============================================================
+# 📘 Lecture Materials Viewer
+# ============================================================
+        st.divider()
+        st.subheader("📚 Lecture Materials")
+
+        modules_dir = "modules"
+        lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
+        classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
+        assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
+
+        def show_pdf(file_path, label):
+            if os.path.exists(file_path):
+                st.markdown(f"**{label}**")
+                with open(file_path, "rb") as pdf_file:
+                    st.download_button(
+                        label=f"📥 Download {label}",
+                        data=pdf_file.read(),
+                        file_name=os.path.basename(file_path),
+                        mime="application/pdf"
+            )
+                st.markdown(
+                    f'<iframe src="data:application/pdf;base64,{base64.b64encode(open(file_path,"rb").read()).decode()}" '
+                    f'width="100%" height="600px"></iframe>',
+                    unsafe_allow_html=True
+        )
+            else:
+                st.info(f"{label} not uploaded yet.")
+
+# Display available PDFs
+        show_pdf(lecture_pdf_path, f"Lecture Note ({week})")
+        show_pdf(classwork_pdf_path, f"Classwork ({week})")
+        show_pdf(assignment_pdf_path, f"Assignment ({week})")
 
         # ===============================================================
         # 🎓 Student Dashboard — View Scores
@@ -949,7 +1024,8 @@ def admin_view():
             st.session_state["lectures_df"] = lectures_df
             st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
             
-
+            modules_dir = "modules"
+            os.makedirs(modules_dir, exist_ok=True)
             # Save PDFs
             if lecture_pdf:
                 lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
@@ -1359,6 +1435,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
