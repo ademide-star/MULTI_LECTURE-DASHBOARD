@@ -784,7 +784,7 @@ def student_view():
                 "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
                 "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
             }
-
+            
             if course_code not in COURSE_TIMINGS:
                 st.error(f"⚠️ No timing configured for {course_code}.")
             else:
@@ -793,6 +793,8 @@ def student_view():
                 valid_code = COURSE_TIMINGS[course_code]["valid_code"]
 
                 now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria timezone (UTC+1)
+                
+                st.session_state["attended_week"] = str(week)  # Always store as string, not Pandas Series
 
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
@@ -1543,6 +1545,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
