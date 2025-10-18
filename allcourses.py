@@ -842,7 +842,6 @@ def student_view():
         st.info("Assignment not yet released.")
 
     
-    # 🧩 Classwork Section #
 # ==============================
 # 🧩 Student Classwork Display
 # ==============================
@@ -921,10 +920,7 @@ def student_view():
     show_pdf(assignment_pdf_path, f"Assignment ({week})")
 
 
-   
-
-
-        # ===============================================================
+      # ===============================================================
         # 🎓 Student Dashboard — View Scores
         # ===============================================================
     st.title("🎓 Student Dashboard — View Scores")
@@ -1568,9 +1564,14 @@ def admin_view(course_code):
 
         # Safely call function (ignore duration_min if not defined)
             try:
-                open_classwork(course_code, week_to_control, duration_min=20)
+    # Ensure classwork folder exists before calling function
+                os.makedirs("classwork_status", exist_ok=True)
+                open_classwork(course_code, week_to_control)
             except TypeError:
                 open_classwork(course_code, week_to_control)
+            except Exception as e:
+                st.error(f"⚠️ Error while opening classwork: {e}")
+
 
             st.success(f"✅ Classwork for {week_to_control} is now OPEN for 20 minutes!")
 
@@ -1607,6 +1608,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
