@@ -582,66 +582,81 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
+import os
+import pandas as pd
+from datetime import datetime
+import streamlit as st
+
 def mark_attendance_entry(course_code, name, matric, week):
-    """Marks attendance for a given student safely, even if CSV is corrupted or has duplicate headers."""
+    """Marks attendance robustly — cleans file, enforces unique columns, fixes index issues."""
     try:
         file_path = get_file(course_code, "attendance_form")
 
-        # ✅ Load DataFrame safely or initialize a new one
+        # ✅ Step 1: Ensure parent folder exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # ✅ Step 2: Try reading the file safely
         if os.path.exists(file_path):
             try:
                 df = pd.read_csv(file_path)
 
-                # 🚨 Fix duplicate columns automatically
-                if not df.columns.is_unique:
-                    df.columns = pd.io.parsers.ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+                # 🔧 Fix duplicate or unnamed columns
+                df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
+                df.columns = pd.io.parsers.ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
 
-                # ✅ Drop any unnamed or empty columns
-                df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-            except Exception:
-                # If file is corrupted, reinitialize it
+                # 🔧 Ensure unique column names
+                if not df.columns.is_unique:
+                    df.columns = [f"{col}_{i}" if df.columns.tolist().count(col) > 1 else col
+                                  for i, col in enumerate(df.columns)]
+
+                # 🔧 Reset index to avoid reindex errors
+                df.reset_index(drop=True, inplace=True)
+
+            except Exception as e:
+                st.warning(f"⚠️ Attendance file corrupted, reinitializing: {e}")
                 df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
 
-        # ✅ Normalize column names
+        # ✅ Step 3: Normalize column names
         df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
 
-        # ✅ Ensure required columns exist
+        # ✅ Step 4: Ensure required columns exist
         for col in ["StudentName", "Matric", "Week", "Timestamp"]:
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Convert to proper dtypes
-        df["StudentName"] = df["StudentName"].astype(str)
-        df["Matric"] = df["Matric"].astype(str)
-        df["Week"] = df["Week"].astype(str)
+        # ✅ Step 5: Convert all to strings (prevents dtype issues)
+        for col in ["StudentName", "Matric", "Week"]:
+            df[col] = df[col].astype(str)
 
-        # ✅ Check if already marked
-        if ((df["StudentName"].str.lower() == name.strip().lower()) &
-            (df["Week"] == str(week))).any():
+        # ✅ Step 6: Check if already marked
+        already = df[
+            (df["StudentName"].str.lower() == name.strip().lower()) &
+            (df["Week"] == str(week))
+        ]
+        if not already.empty:
             return False
 
-        # ✅ Add new record
+        # ✅ Step 7: Add new entry
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
             "Week": str(week),
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
 
-        # ✅ Reset index cleanly
-        df = df.loc[:, ~df.columns.duplicated()]
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.reset_index(drop=True, inplace=True)
 
-        # ✅ Save safely
+        # ✅ Step 8: Save cleanly (always overwrite with fresh, unique headers)
         df.to_csv(file_path, index=False)
         return True
 
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+
 
 
 
@@ -1448,6 +1463,14 @@ def admin_view():
 
     # Footer
     st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+    
+    if st.button("Check Attendance Columns"):
+    file_path = get_file(course_code, "attendance_form")
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        st.write(df.columns)
+    else:
+        st.warning("Attendance file not found!")
 
 
 # 🚪 SHOW VIEW BASED ON ROLE
@@ -1458,6 +1481,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
