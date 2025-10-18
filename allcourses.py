@@ -869,7 +869,7 @@ def student_view():
                 progress_placeholder.progress(progress)
 
             # Classwork form
-               classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
+                classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
                 if classwork_text:
                     st.markdown("### 🧩 Classwork Questions")
                     questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
@@ -1596,6 +1596,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
