@@ -756,13 +756,13 @@ def student_view():
                             st.session_state["attended_week"] = week
 
         # ---------------------------------------------
-        # 📘 Lecture Briefs and Classwork
-        # ---------------------------------------------
+# 📘 Lecture Briefs and Classwork
+# ---------------------------------------------
         st.divider()
         st.subheader("📘 Lecture Briefs and Classwork")
         st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
-        # Safely get lecture info
+# Safely get lecture info
         if "attended_week" not in st.session_state:
             st.warning("Please attend a lecture before accessing materials.")
             return
@@ -770,7 +770,7 @@ def student_view():
             week = st.session_state["attended_week"]
             st.success(f"Access granted for {week}")
 
-        # ✅ Ensure lectures_df is available
+# ✅ Ensure lectures_df is available
         try:
             if "lectures_df" not in st.session_state:
                 file_path = get_file(course_code, "lectures")
@@ -779,7 +779,7 @@ def student_view():
             else:
                 lectures_df = st.session_state["lectures_df"]
 
-            # ✅ Safety checks
+    # ✅ Safety checks
             if "Week" not in lectures_df.columns:
                 st.warning(f"⚠️ No 'Week' column found in lecture data for {course_code}.")
                 st.stop()
@@ -788,12 +788,12 @@ def student_view():
                 st.warning(f"⚠️ No lecture found for {week}.")
                 st.stop()
 
-            lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict()
+                lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict()
         except Exception as e:
             st.error(f"⚠️ Could not load lecture data for {course_code}: {e}")
             st.stop()
 
-        # ✅ Display Topic, Brief, Assignment, Classwork
+# ✅ Display Topic, Brief, Assignment, Classwork
         try:
             st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
             brief = str(lecture_info.get("Brief", "") or "").strip()
@@ -818,29 +818,17 @@ def student_view():
                     submit_cw = st.form_submit_button(
                         "Submit Answers",
                         disabled=not is_classwork_open(course_code, week)
-                    )
+            )
                     close_classwork_after_20min(course_code)
                     if submit_cw:
                         save_classwork(name, matric, week, answers)
             else:
                 st.info("Classwork not yet released.")
-                pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
-            if os.path.exists(pdf_path):
-                with open(pdf_path, "rb") as pdf_file:
-                    st.download_button(
-                        label=f"📥 Download {lecture_info.get('Week', 'Lecture')} Module PDF",
-                        data=pdf_file.read(),
-                        file_name=f"{course_code}_{lecture_info.get('Week', 'Lecture')}.pdf",
-                        mime="application/pdf",
-                        key=f"{course_code}_pdf_dl"
-                    )
-            else:
-                st.info("Lecture note not uploaded yet.")
         except Exception as e:
             st.error(f"⚠️ Error displaying lecture details: {e}")
 
 # ============================================================
-#         📘 Lecture Materials Viewer
+# 📚 Lecture Materials Viewer (PDFs)
 # ============================================================
         st.divider()
         st.subheader("📚 Lecture Materials")
@@ -850,21 +838,22 @@ def student_view():
         classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
         assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
 
+# Helper to show and preview PDFs
         def show_pdf(file_path, label):
             if os.path.exists(file_path):
                 st.markdown(f"**{label}**")
                 with open(file_path, "rb") as pdf_file:
                     st.download_button(
-                        label=f"📥 Download {label}",
-                        data=pdf_file.read(),
-                        file_name=os.path.basename(file_path),
-                        mime="application/pdf"
+                    label=f"📥 Download {label}",
+                    data=pdf_file.read(),
+                    file_name=os.path.basename(file_path),
+                    mime="application/pdf"
             )
-                st.markdown(
-                    f'<iframe src="data:application/pdf;base64,{base64.b64encode(open(file_path,"rb").read()).decode()}" '
-                    f'width="100%" height="600px"></iframe>',
-                    unsafe_allow_html=True
-        )
+        # Embed the PDF for inline viewing
+                with open(file_path, "rb") as pdf_file:
+                    base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
+                    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px"></iframe>'
+                    st.markdown(pdf_display, unsafe_allow_html=True)
             else:
                 st.info(f"{label} not uploaded yet.")
 
@@ -1495,6 +1484,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
