@@ -832,16 +832,23 @@ def student_view():
             return
 
         # Check duplicate attendance
-        if has_marked_attendance(course_code, week, name):
-            st.info("✅ Attendance already marked. You can’t mark it again.")
+       if has_marked_attendance(course_code, week, name):
+            st.info("✅ Attendance already marked for this week.")
             st.session_state["attended_week"] = str(week)
         else:
+    # Check if attendance is open (controlled by admin)
+        if not st.session_state.get(f"{course_code}_attendance_open", False):
+            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+        elif attendance_code != COURSE_TIMINGS[course_code]["valid_code"]:
+            st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
+        else:
             ok = mark_attendance_entry(course_code, name, matric, week)
-            if ok:
-                st.session_state["attended_week"] = str(week)
-                st.success(f"✅ Attendance recorded successfully for Week {week}.")
-            else:
-                st.error("⚠️ Failed to record attendance.")
+        if ok:
+            st.session_state["attended_week"] = str(week)
+            st.success(f"✅ Attendance recorded successfully for Week {week}.")
+        else:
+            st.error("⚠️ Failed to record attendance. Try again later.")
+
 
     # -------------------------------
 
@@ -880,8 +887,7 @@ def student_view():
 # ===============================================================
 
 # Retrieve classwork text from lecture_info
-    if "attended_week" in st.session_state:
-            st.warning("Please attend a lecture before accessing classwork.")
+   
     classwork_text = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
 
 # Debugging helper (optional)
@@ -1642,6 +1648,19 @@ def admin_view(course_code):
             st.dataframe(df_status)
 
         st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+# -------------------------------
+# 🕒 Attendance Control (Admin)
+# -------------------------------
+    st.subheader("🎛 Attendance Control")
+
+    selected_course = st.selectbox("Select Course to Manage", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
+    open_attendance = st.toggle(f"🔓 Allow students to mark attendance for {selected_course}", 
+                            key=f"{selected_course}_attendance_open")
+
+    if open_attendance:
+        st.success(f"✅ Attendance is OPEN for {selected_course}")
+    else:
+        st.warning(f"🚫 Attendance is CLOSED for {selected_course}")
 
 
 # 🚪 SHOW VIEW BASED ON ROLE
@@ -1652,6 +1671,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
