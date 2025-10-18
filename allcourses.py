@@ -746,7 +746,6 @@ def student_view():
     st.subheader("🎓 Student Login and Attendance")
 
     submit_attendance = False
-    ok = False
 
     # -------------------------------
     # 🕒 Attendance Form
@@ -756,20 +755,22 @@ def student_view():
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
 
-        lectures_df = st.session_state.get("lectures_df")
-        if lectures_df is None:
-            lectures_df = load_lectures(course_code)
+        lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
 
         if "Week" not in lectures_df.columns:
-            st.error("⚠️ The lectures file is missing the 'Week' column. Please upload a valid lectures CSV.")
+            st.error("⚠️ The lectures file is missing the 'Week' column.")
             st.stop()
 
-        week = st.selectbox("Select Lecture Week", [str(w) for w in lectures_df["Week"].tolist()], key=f"{course_code}_att_week")
+        week = st.selectbox(
+            "Select Lecture Week", 
+            [str(w) for w in lectures_df["Week"].tolist()], 
+            key=f"{course_code}_att_week"
+        )
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
     # -------------------------------
-    # 🧾 Attendance Validation Logic
+    # 🧾 Attendance Validation
     # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
@@ -784,7 +785,7 @@ def student_view():
                 "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
                 "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
             }
-            
+
             if course_code not in COURSE_TIMINGS:
                 st.error(f"⚠️ No timing configured for {course_code}.")
             else:
@@ -792,9 +793,9 @@ def student_view():
                 end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
                 valid_code = COURSE_TIMINGS[course_code]["valid_code"]
 
-                now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria timezone (UTC+1)
-                
-                st.session_state["attended_week"] = str(week)  # Always store as string, not Pandas Series
+                now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # UTC+1
+
+                st.session_state["attended_week"] = str(week)  # store as string
 
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
@@ -802,36 +803,26 @@ def student_view():
                 elif attendance_code != valid_code:
                     st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
                 elif has_marked_attendance(course_code, week, name):
-                    st.info("✅ Attendance already marked. You can’t mark it again.")
-                    st.session_state["attended_week"] = week  # Grant access if already marked
+                    st.info("✅ Attendance already marked.")
                 else:
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
-                        st.session_state["attended_week"] = week
-
-        # Then below, show lecture if attended
-                    if "attended_week" in st.session_state:
-                        show_lecture(st.session_state["attended_week"])
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
     st.divider()
     st.subheader("📘 Lecture Briefs and Classwork")
-    st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
     if "attended_week" not in st.session_state:
         st.warning("Please attend a lecture before accessing materials.")
         return
-    else:
-        week = str(st.session_state["attended_week"])
-        st.success(f"Access granted for {week}")
 
-    lectures_df = st.session_state.get("lectures_df")
-    if lectures_df is None:
-        lectures_df = load_lectures(course_code)
+    week = str(st.session_state["attended_week"])
+    st.success(f"Access granted for {week}")
 
+    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
     lecture_info = lectures_df.loc[lectures_df["Week"] == week].iloc[0].to_dict()
 
     # Topic & Brief
@@ -856,20 +847,17 @@ def student_view():
         st.markdown("### 🧩 Classwork Questions")
         questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
 
-        # Admin-controlled timer
         remaining_sec = get_remaining_time(course_code, week)
         timer_placeholder = st.empty()
-        progress_placeholder = st.empty()  # progress bar
+        progress_placeholder = st.empty()
 
         if remaining_sec > 0:
-            # Live countdown with auto-refresh
             st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
 
-            # Timer display
             minutes, seconds = divmod(remaining_sec, 60)
             timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
 
-            # Progress bar: 0% at start → 100% when expired
+            # Progress bar
             total_duration = 20 * 60
             progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
             progress_placeholder.progress(progress)
@@ -892,62 +880,55 @@ def student_view():
                 if submit_cw:
                     save_classwork(name, matric, week, answers)
                     st.success("✅ Classwork submitted successfully!")
-
         else:
             timer_placeholder.info("⏳ Classwork not yet opened by Admin or time expired.")
             progress_placeholder.progress(1.0)
 
+    # ---------------------- Lecture Materials (PDFs) ---------------------- #
+    st.divider()
+    st.subheader("📚 Lecture Materials")
+    modules_dir = "modules"
+    lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
+    classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
+    assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
 
-# ============================================================
-# 📚 Lecture Materials Viewer (PDFs)
-# ============================================================
-        st.divider()
-        st.subheader("📚 Lecture Materials")
-
-        modules_dir = "modules"
-        lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
-        classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
-        assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
-
-# Helper to show and preview PDFs
-        def show_pdf(file_path, label):
-            if os.path.exists(file_path):
-                st.markdown(f"**{label}**")
-                with open(file_path, "rb") as pdf_file:
-                    st.download_button(
+    def show_pdf(file_path, label):
+        if os.path.exists(file_path):
+            st.markdown(f"**{label}**")
+            with open(file_path, "rb") as pdf_file:
+                st.download_button(
                     label=f"📥 Download {label}",
                     data=pdf_file.read(),
                     file_name=os.path.basename(file_path),
                     mime="application/pdf"
-            )
-        # Embed the PDF for inline viewing
-                with open(file_path, "rb") as pdf_file:
-                    base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
-                    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px"></iframe>'
-                    st.markdown(pdf_display, unsafe_allow_html=True)
-            else:
-                st.info(f"{label} not uploaded yet.")
+                )
+            with open(file_path, "rb") as pdf_file:
+                base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px"></iframe>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
+        else:
+            st.info(f"{label} not uploaded yet.")
 
-# Display available PDFs
-        show_pdf(lecture_pdf_path, f"Lecture Note ({week})")
-        show_pdf(classwork_pdf_path, f"Classwork ({week})")
-        show_pdf(assignment_pdf_path, f"Assignment ({week})")
+    show_pdf(lecture_pdf_path, f"Lecture Note ({week})")
+    show_pdf(classwork_pdf_path, f"Classwork ({week})")
+    show_pdf(assignment_pdf_path, f"Assignment ({week})")
+
 
         # ===============================================================
         # 🎓 Student Dashboard — View Scores
         # ===============================================================
-        st.title("🎓 Student Dashboard — View Scores")
+    st.title("🎓 Student Dashboard — View Scores")
 
-        courses = ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"]
-        course_code = st.selectbox("Select Your Course", courses)
-        matric_no = st.text_input("Enter Your Matric Number").strip().upper()
-        score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
+    courses = ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"]
+    course_code = st.selectbox("Select Your Course", courses)
+    matric_no = st.text_input("Enter Your Matric Number").strip().upper()
+    score_file = os.path.join("scores", f"{course_code.lower()}_scores.csv")
 
-        if os.path.exists(score_file):
-            df = pd.read_csv(score_file)
+    if os.path.exists(score_file):
+        df = pd.read_csv(score_file)
 
-            if matric_no:
-                student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
+        if matric_no:
+            student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
                 if not student_scores.empty:
                     st.success(f"✅ Scores for Matric Number: {matric_no}")
                     st.dataframe(student_scores, use_container_width=True)
@@ -1545,6 +1526,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
