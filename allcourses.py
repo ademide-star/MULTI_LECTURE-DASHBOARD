@@ -1524,7 +1524,7 @@ def admin_view(course_code):
 # -----------------------------
 # 🧩 Admin Classwork Control
 # -----------------------------
-    def admin_classwork_control(course_code):
+    
         st.header("🧩 Classwork Control")
 
     # Load lectures for the selected course
@@ -1602,6 +1602,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
