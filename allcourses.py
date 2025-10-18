@@ -902,16 +902,10 @@ def student_view():
                     file_name=os.path.basename(file_path),
                     mime="application/pdf"
                 )
-            with open(file_path, "rb") as pdf_file:
-                base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
-                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px"></iframe>'
-                st.markdown(pdf_display, unsafe_allow_html=True)
         else:
             st.info(f"{label} not uploaded yet.")
 
-    show_pdf(lecture_pdf_path, f"Lecture Note ({week})")
-    show_pdf(classwork_pdf_path, f"Classwork ({week})")
-    show_pdf(assignment_pdf_path, f"Assignment ({week})")
+   
 
 
         # ===============================================================
@@ -1525,6 +1519,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
