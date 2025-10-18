@@ -787,42 +787,6 @@ def get_remaining_time(course_code, week):
         return max(int(remaining.total_seconds()), 0)
     return 0
 
-import os
-import pandas as pd
-from datetime import datetime
-
-def has_marked_attendance(file_path, student_name):
-    """Check if the student already marked attendance in this week's file"""
-    if not os.path.exists(file_path):
-        return False
-    df = pd.read_csv(file_path)
-    return student_name in df['Name'].values
-
-def mark_attendance_entry_weekly(file_path, name, matric, week, course):
-    """Save weekly attendance record"""
-    try:
-        record = {
-            "Name": [name],
-            "Matric": [matric],
-            "Course": [course],
-            "Week": [week],
-            "Date": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-        }
-
-        new_df = pd.DataFrame(record)
-
-        # If file exists, append
-        if os.path.exists(file_path):
-            old_df = pd.read_csv(file_path)
-            updated_df = pd.concat([old_df, new_df], ignore_index=True)
-        else:
-            updated_df = new_df
-
-        updated_df.to_csv(file_path, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving attendance: {e}")
-        return False
 
 
 # ---------------------- Student View ---------------------- #
@@ -1832,6 +1796,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
