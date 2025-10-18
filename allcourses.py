@@ -656,10 +656,24 @@ def mark_attendance_entry(course_code, name, matric, week):
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+        
+    file_path = get_file(course_code, "attendance_form")
+    if not file_path or file_path.strip() == "":
+        file_path = os.path.join("data", f"{course_code}_attendance.csv")
+        os.makedirs("data", exist_ok=True)
 
 
+BASE_DIR = "data"  # or "database" or whatever you prefer
+os.makedirs(BASE_DIR, exist_ok=True)
 
-
+def get_file(course_code, file_type):
+    """Generate a valid file path for different file types."""
+    file_map = {
+        "attendance_form": os.path.join(BASE_DIR, f"{course_code}_attendance.csv"),
+        "lectures": os.path.join(BASE_DIR, f"{course_code}_lectures.csv"),
+        "scores": os.path.join(BASE_DIR, f"{course_code}_scores.csv"),
+    }
+    return file_map.get(file_type, "")
 
 
 def student_view():
@@ -1484,6 +1498,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
