@@ -1438,6 +1438,15 @@ def admin_view():
     else:
         st.info("No videos uploaded yet.")
 
+
+
+    if st.button("Check Attendance Columns"):
+        file_path = get_file(course_code, "attendance_form")
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+            st.write(df.columns)
+        else:
+            st.warning("Attendance file not found!")
     # -------------------------
     # Classwork Control
     # -------------------------
@@ -1464,13 +1473,7 @@ def admin_view():
     # Footer
     st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-    if st.button("Check Attendance Columns"):
-    file_path = get_file(course_code, "attendance_form")
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-        st.write(df.columns)
-    else:
-        st.warning("Attendance file not found!")
+   
 
 
 # 🚪 SHOW VIEW BASED ON ROLE
@@ -1481,6 +1484,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
