@@ -938,12 +938,11 @@ def student_view():
                     file_name=f"{matric_no}_scores.csv",
                     mime="text/csv"
                     )
-             else:
+            else:
                 st.info("No scores found for this matric number yet.")
         else:
             st.warning("Please enter your matric number to view scores.")
-    else:
-        st.warning("Scores have not been uploaded for this course yet.")
+            st.warning("Scores have not been uploaded for this course yet.")
 
         # ===============================================================
         # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS
@@ -1526,6 +1525,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
