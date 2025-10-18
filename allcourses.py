@@ -799,19 +799,13 @@ def student_view():
 
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
-                             f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
-                else: attendance_code != valid_code:
-                    st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-                
-                if has_marked_attendance(course_code, week, name):
-                    st.info("✅ Attendance already marked. You can’t mark it again.")
-                else:
-                    ok = mark_attendance_entry(course_code, name, matric, week)
-                if ok:
-                    st.success(f"✅ Attendance recorded for {name} ({week}).")
-
-                else:
-                    ok = mark_attendance_entry(course_code, name, matric, week)
+                        f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
+            elif attendance_code != valid_code:
+                st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
+            elif has_marked_attendance(course_code, week, name):
+                st.info("✅ Attendance already marked. You can’t mark it again.")
+            else:
+                ok = mark_attendance_entry(course_code, name, matric, week)
                 if ok:
                     st.success(f"✅ Attendance recorded for {name} ({week}).")
 
@@ -1526,6 +1520,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
