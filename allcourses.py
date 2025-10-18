@@ -1527,7 +1527,7 @@ def admin_view(course_code):
 
         close_classwork_after_20min(course_code)
 # Footer timestamp
-            st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
 
 
@@ -1539,6 +1539,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
