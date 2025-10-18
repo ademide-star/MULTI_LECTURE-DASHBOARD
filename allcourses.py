@@ -378,21 +378,6 @@ def has_marked_attendance(course_code, week, name):
         return False
 
 
-def mark_attendance_entry(course_code, name, matric, week):
-    """Mark attendance (returns True on success, False if already marked)."""
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-    if not os.path.exists(ATTENDANCE_FILE):
-        pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"]).to_csv(ATTENDANCE_FILE, index=False)
-
-    df = pd.read_csv(ATTENDANCE_FILE)
-    if ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any():
-        return False
-    new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Status": "Present", "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(ATTENDANCE_FILE, index=False)
-    return True
-
-
 def save_file(course_code, name, week, uploaded_file, file_type):
     """Save an uploaded file to submissions/<course>/<file_type>/ and log it."""
     folder_path = os.path.join("submissions", course_code, file_type)
@@ -462,6 +447,7 @@ def record_score(course_code, score_type, name, matric, week, score, remarks="")
     st.success(f"✅ {score_type.capitalize()} score updated for {name} ({week})")
 
 @st.cache_data(ttl=30)
+    
 def get_student_scores_cached(course_code, matric):
     score_types = ["classwork", "seminar", "assignment"]
     results = {}
@@ -657,39 +643,59 @@ def get_file(course_code, file_type):
 
 
 def mark_attendance_entry(course_code, name, matric, week):
-    """Marks attendance for a given student safely with auto-column creation."""
+    """Safely mark attendance — cleans duplicates, fixes indexes, and auto-creates files."""
     try:
         file_path = get_file(course_code, "attendance")
+        if not file_path:
+            raise ValueError("⚠️ Attendance file path not found — check get_file() mapping.")
 
-        if not file_path or file_path.strip() == "":
-            os.makedirs("data", exist_ok=True)
-            file_path = os.path.join("data", f"{course_code}_attendance.csv")
-
+        # ✅ Ensure folder exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
+        # ✅ Load or create new DataFrame
         if os.path.exists(file_path):
             df = pd.read_csv(file_path)
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
 
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+        # ✅ Drop any duplicate or unnamed columns
+        df = df.loc[:, ~df.columns.duplicated()]
+        df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
 
-        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
+        # ✅ Reset index cleanly
+        df.reset_index(drop=True, inplace=True)
+
+        # ✅ Ensure all required columns exist
+        required_cols = ["StudentName", "Matric", "Week", "Timestamp"]
+        for col in required_cols:
             if col not in df.columns:
                 df[col] = None
 
-        if ((df["StudentName"].str.lower() == name.strip().lower()) &
-            (df["Week"].astype(str) == str(week))).any():
-            return False
+        # ✅ Standardize header names
+        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
 
+        # ✅ Convert to strings
+        for col in ["StudentName", "Matric", "Week"]:
+            df[col] = df[col].astype(str).fillna("")
+
+        # ✅ Check if already marked
+        duplicate_mask = (
+            (df["StudentName"].str.lower() == name.strip().lower()) &
+            (df["Week"].astype(str) == str(week))
+        )
+        if duplicate_mask.any():
+            return False  # already marked
+
+        # ✅ Add new record
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
             "Week": str(week),
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+        # ✅ Save cleaned file
         df.to_csv(file_path, index=False)
         return True
 
@@ -1523,6 +1529,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
