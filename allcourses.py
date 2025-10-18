@@ -1558,6 +1558,8 @@ def admin_view(course_code):
                 }])], ignore_index=True)
 
         # Save status
+            # Ensure folder exists before saving
+            os.makedirs(os.path.dirname(CLASSWORK_STATUS_FILE), exist_ok=True)
             df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
 
         # Set 20-minute timer
@@ -1605,6 +1607,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
