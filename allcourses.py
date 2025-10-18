@@ -600,12 +600,16 @@ def mark_attendance_entry(course_code, name, matric, week):
                 # 🔧 Fix duplicate or unnamed columns (modern Pandas compatible)
                 df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
 
-                # Deduplicate column names safely for Pandas >= 2.2
+                # ✅ Deduplicate column names — works on all Pandas versions
                 try:
                     from pandas.io.common import dedup_names
-                    df.columns = dedup_names(df.columns.tolist())
+                    # Handle both Pandas ≥2.2 and <2.2 versions
+                    try:
+                        df.columns = dedup_names(df.columns.tolist(), is_potential_multiindex=False)
+                    except TypeError:
+                        df.columns = dedup_names(df.columns.tolist())
                 except ImportError:
-                    # Manual fallback for older Pandas
+                    # Manual fallback if dedup_names unavailable
                     seen = {}
                     new_cols = []
                     for col in df.columns:
@@ -1494,6 +1498,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
