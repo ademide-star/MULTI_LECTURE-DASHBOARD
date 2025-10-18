@@ -582,60 +582,7 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
-def mark_attendance_entry(course_code, name, matric, week):
-    """Marks attendance for a given student safely with auto-column creation."""
-    try:
-        file_path = get_file(course_code, "attendance_form")
 
-        # ✅ Load or initialize attendance DataFrame
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-        else:
-            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
-
-        # ✅ Remove duplicate columns if they exist
-        df = df.loc[:, ~df.columns.duplicated()]
-
-        # ✅ Standardize and sanitize column names
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
-
-        # ✅ Ensure all required columns exist
-        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
-            if col not in df.columns:
-                df[col] = None
-
-        # ✅ Convert data types safely
-        df["StudentName"] = df["StudentName"].astype(str)
-        df["Week"] = df["Week"].astype(str)
-
-        # ✅ Check if this student has already marked attendance for this week
-        already_marked = df[
-            (df["StudentName"].str.lower() == name.strip().lower()) &
-            (df["Week"] == str(week))
-        ]
-
-        if not already_marked.empty:
-            return False  # already marked
-
-        # ✅ Record new attendance
-        new_entry = {
-            "StudentName": name.strip(),
-            "Matric": matric.strip(),
-            "Week": str(week),
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-        # ✅ Append safely without index issues
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-        df.reset_index(drop=True, inplace=True)
-
-        # ✅ Save back to CSV
-        df.to_csv(file_path, index=False)
-        return True
-
-    except Exception as e:
-        st.error(f"⚠️ Error marking attendance: {e}")
-        return False
 
 
 
@@ -1451,6 +1398,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
