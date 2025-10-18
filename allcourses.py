@@ -1705,13 +1705,6 @@ def admin_view(course_code):
             st.session_state[f"{course_code}_{week_to_control}_cw_end"] = datetime.now()
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
-    # ------------------------
-    # 📋 STATUS SUMMARY
-    # ------------------------
-        if not df_status.empty:
-            st.dataframe(df_status)
-
-        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 # -------------------------------
 # -------------------------------
 # 🕒 Attendance Control (Admin)
@@ -1732,7 +1725,7 @@ def admin_view(course_code):
 )
 
 # Create a unique key for that course-week combination
-    attendance_key = f"{selected_course}_{selected_week}_attendance_open"
+    attendance_key = f"{course_code}_{selected_week}_attendance_open"
 
 # Attendance toggle
     open_attendance = st.toggle(
@@ -1784,6 +1777,14 @@ def admin_view(course_code):
         else:
             st.info("No attendance files found.")
 
+ # ------------------------
+    # 📋 STATUS SUMMARY
+    # ------------------------
+        if not df_status.empty:
+            st.dataframe(df_status)
+
+        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
 if st.session_state["role"] == "Admin":
@@ -1792,6 +1793,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
