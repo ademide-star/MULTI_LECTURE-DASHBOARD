@@ -849,14 +849,7 @@ def student_view():
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
 
-    # -------------------------------
-    # 📚 LECTURE PREVIEW (Optional)
-    # -------------------------------
-    st.divider()
-    st.subheader("📖 Available Lectures")
-    st.dataframe(lectures_df[["Week", "Topic", "Date"]], use_container_width=True)
-
-
+   
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
@@ -1806,6 +1799,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
