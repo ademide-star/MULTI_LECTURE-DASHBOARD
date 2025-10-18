@@ -663,26 +663,25 @@ def get_file(course_code, file_type):
 
 
 def mark_attendance_entry(course_code, name, matric, week):
-    """Robust attendance marker — auto-fixes missing columns, duplicates, and broken files."""
+    """Robust attendance marker — creates separate weekly files and auto-fixes errors."""
     try:
-        file_path = get_file(course_code, "attendance")
-        if not file_path:
-            raise ValueError("⚠️ Invalid attendance file path for this course.")
+        # ✅ Create folder for attendance (if not exists)
+        base_folder = os.path.join("attendance_records", course_code)
+        os.makedirs(base_folder, exist_ok=True)
 
-        # ✅ Ensure folder exists
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # ✅ Each week has its own file
+        file_path = os.path.join(base_folder, f"Week_{week}.csv")
 
-        # ✅ Load file or create new one
+        # ✅ Load or create DataFrame
         if os.path.exists(file_path):
             try:
                 df = pd.read_csv(file_path)
             except Exception:
-                # File exists but unreadable — recreate it cleanly
                 df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
 
-        # ✅ Normalize all column names (fixes case sensitivity)
+        # ✅ Normalize columns
         df.columns = [str(c).strip().title().replace(" ", "") for c in df.columns]
 
         # ✅ Ensure required columns exist
@@ -691,24 +690,24 @@ def mark_attendance_entry(course_code, name, matric, week):
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Remove duplicate/unnamed columns and fix index
+        # ✅ Remove duplicates and reset index
         df = df.loc[:, ~df.columns.duplicated()]
         df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
         df.reset_index(drop=True, inplace=True)
 
-        # ✅ Convert to string (avoid dtype errors)
+        # ✅ Ensure string columns
         for col in ["StudentName", "Matric", "Week"]:
             df[col] = df[col].astype(str).fillna("")
 
-        # ✅ Check for duplicates
+        # ✅ Prevent duplicate entries
         already = df[
             (df["StudentName"].str.lower() == name.strip().lower()) &
-            (df["Week"].astype(str) == str(week))
+            (df["Matric"].str.lower() == matric.strip().lower())
         ]
         if not already.empty:
-            return False  # Already marked
+            return False  # Already marked this week
 
-        # ✅ Append new record
+        # ✅ Append new entry
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
@@ -1658,6 +1657,26 @@ def admin_view(course_code):
     else:
         st.warning(f"🚫 Attendance is CLOSED for {selected_course}")
 
+ 
+
+    ATTENDANCE_FOLDER = "attendance_records"
+
+# Ensure folder exists
+    os.makedirs(ATTENDANCE_FOLDER, exist_ok=True)
+
+# List existing attendance files
+    attendance_files = [f for f in os.listdir(ATTENDANCE_FOLDER) if f.endswith(".csv")]
+
+    st.subheader("🗑️ Delete Attendance Record")
+
+    if attendance_files:
+        file_to_delete = st.selectbox("Select file to delete:", attendance_files)
+        if st.button("Delete Selected File"):
+            os.remove(os.path.join(ATTENDANCE_FOLDER, file_to_delete))
+            st.success(f"✅ '{file_to_delete}' deleted successfully!")
+    else:
+        st.info("No attendance files found.")
+
 
 
 # 🚪 SHOW VIEW BASED ON ROLE
@@ -1668,6 +1687,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
