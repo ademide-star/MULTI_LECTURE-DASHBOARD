@@ -1024,7 +1024,7 @@ def student_view():
         if video_files:
             selected_video = st.selectbox("Select a lecture to watch:", video_files, key=f"{course_code}_video_select")
             st.video(os.path.join(video_dir, selected_video))
-         else:
+        else:
             st.info("No lecture videos uploaded yet.")
     else:
         st.warning("📁 No video directory found for this course.")
@@ -1593,6 +1593,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
