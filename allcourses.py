@@ -604,6 +604,69 @@ def get_file(course_code, file_type):
     }
     return file_map.get(file_type, "")
 
+def mark_attendance_entry(course_code, name, matric, week):
+    """Marks attendance robustly — handles missing folders/files, duplicate headers, and index issues."""
+    try:
+        # ✅ Ensure file path exists
+        file_path = get_file(course_code, "attendance_form")
+        if not file_path or file_path.strip() == "":
+            os.makedirs("data", exist_ok=True)
+            file_path = os.path.join("data", f"{course_code}_attendance.csv")
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        # ✅ Try to load file safely
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_csv(file_path)
+
+                # 🔧 Fix unnamed/duplicate columns (safe approach)
+                df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False)]
+                if not df.columns.is_unique:
+                    df.columns = [f"{c}_{i}" if df.columns.tolist().count(c) > 1 else c for i, c in enumerate(df.columns)]
+
+                df.reset_index(drop=True, inplace=True)
+
+            except Exception as e:
+                st.warning(f"⚠️ Attendance file corrupted, reinitializing: {e}")
+                df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+        else:
+            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+
+        # ✅ Normalize and enforce correct columns
+        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
+            if col not in df.columns:
+                df[col] = None
+
+        # ✅ Ensure all important fields are string
+        for col in ["StudentName", "Matric", "Week"]:
+            df[col] = df[col].astype(str)
+
+        # ✅ Prevent duplicate entries
+        already = df[
+            (df["StudentName"].str.lower() == name.strip().lower()) &
+            (df["Week"] == str(week))
+        ]
+        if not already.empty:
+            return False
+
+        # ✅ Add new attendance record
+        new_entry = {
+            "StudentName": name.strip(),
+            "Matric": matric.strip(),
+            "Week": str(week),
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+        # ✅ Save cleanly
+        df.to_csv(file_path, index=False)
+        return True
+
+    except Exception as e:
+        st.error(f"⚠️ Error marking attendance: {e}")
+        return False
 
 def student_view():
     if st.session_state.get("role") == "Student":
@@ -1419,6 +1482,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
