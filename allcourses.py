@@ -1056,7 +1056,7 @@ def admin_view():
         return
 
     st.session_state["role"] = "Admin"
-    st.success(f"✅ Logged in as Admin for {course_code}")
+    st.success(f"✅ Logged in as Admin")
 
     # -------------------------
     # Directory & File Setup
@@ -1561,6 +1561,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
