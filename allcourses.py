@@ -841,8 +841,8 @@ def student_view():
     else:
         st.info("Assignment not yet released.")
 
-    # ---------------------- Classwork Section ---------------------- #
-    # ---------------------- 🧩 Classwork Section ---------------------- #
+    
+    # 🧩 Classwork Section #
     classwork_text = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
 
     if classwork_text:
@@ -1587,6 +1587,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
