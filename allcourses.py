@@ -1040,7 +1040,7 @@ def student_view():
     os.makedirs(base_dir, exist_ok=True)
 
 
-def admin_view():
+def admin_view(course_code):
 
     st.title("👩‍🏫 Admin Dashboard")
     st.subheader("🔐 Teacher / Admin Panel")
@@ -1056,7 +1056,7 @@ def admin_view():
         return
 
     st.session_state["role"] = "Admin"
-    st.success(f"✅ Logged in as Admin")
+    st.success(f"✅ Logged in as Admin {course_code}")
 
     # -------------------------
     # Directory & File Setup
@@ -1561,6 +1561,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
