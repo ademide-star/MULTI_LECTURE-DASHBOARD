@@ -583,6 +583,64 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
+def ensure_default_lectures_file(file_path):
+    """Ensure lecture file exists; create a default one if missing."""
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if not os.path.exists(file_path):
+        df = pd.DataFrame({
+            "Week": ["Week 1", "Week 2", "Week 3"],
+            "Topic": ["Introduction", "Cell Structure", "Microbial Physiology"],
+            "Brief": ["Overview of microbiology", "Structure and function of cells", "Basic metabolism in microbes"],
+            "Assignment": ["Read Chapter 1", "Draw bacterial cell", "Submit enzyme report"],
+            "Classwork": ["Define microbiology;", "Label cell parts;", "Explain glycolysis;"]
+        })
+        df.to_csv(file_path, index=False)
+    return pd.read_csv(file_path)
+
+# ===========================================
+# 🔧 UNIVERSAL LECTURE LOADER (NO FILE NEEDED)
+# ===========================================
+def get_lecture_brief(course_code):
+    """Return the lecture brief for any course directly."""
+    lectures = {
+        "MCB221": [
+            {
+                "Week": "Week 1",
+                "Topic": "Introduction to Microbiology",
+                "Brief": "Definition, history, branches, and importance of microbiology.",
+                "Classwork": "List three branches of microbiology;",
+                "Assignment": "Write a short note on the history of microbiology;"
+            },
+            {
+                "Week": "Week 2",
+                "Topic": "Microscopy",
+                "Brief": "Types, principles, and care of microscopes.",
+                "Classwork": "Draw and label a compound microscope;",
+                "Assignment": "Explain the principle of light microscopy;"
+            },
+        ],
+        "BIO113": [
+            {
+                "Week": "Week 1",
+                "Topic": "Viruses: Structure and Reproduction",
+                "Brief": "Structure of viruses, modes of replication, and classification.",
+                "Classwork": "List five viral diseases;",
+                "Assignment": "Explain the lytic and lysogenic cycles;"
+            },
+            {
+                "Week": "Week 2",
+                "Topic": "Bacteria and Lower Plants",
+                "Brief": "Morphology, cell wall structure, and reproduction of bacteria and algae.",
+                "Classwork": "Label parts of a bacterial cell;",
+                "Assignment": "Discuss the economic importance of algae;"
+            },
+        ],
+        # Add more courses below in the same pattern 👇
+        # "CHM101": [ ... ],
+        # "PHY111": [ ... ],
+    }
+
+    return lectures.get(course_code, [])
 
 BASE_DIR = "database"
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -741,12 +799,18 @@ def student_view():
         st.session_state["lectures_df"] = lectures_df
 
         try:
-            if "lectures_df" not in st.session_state:
-                file_path = get_file(course_code, "lectures")
-                lectures_df = ensure_default_lectures_file(file_path)
-                st.session_state["lectures_df"] = lectures_df
-            else:
-                lectures_df = st.session_state["lectures_df"]
+            file_path = get_file(course_code, "lectures")
+            if not os.path.exists(file_path):
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"]).to_csv(file_path, index=False)
+                st.info(f"📘 Created new lecture file for {course_code}. You can add content in Admin panel.")
+
+            lectures_df = pd.read_csv(file_path)
+            st.session_state["lectures_df"] = lectures_df
+        except Exception as e:
+            st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
+            st.stop()
+
 
     # ✅ Safety checks
             if "Week" not in lectures_df.columns:
@@ -1454,6 +1518,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
