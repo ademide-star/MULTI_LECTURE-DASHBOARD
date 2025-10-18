@@ -882,17 +882,14 @@ def student_view():
                         close_classwork_after_20min(course_code)
                         if submit_cw:
                             save_classwork(name, matric, week, answers)
-                else:
-                    st.info("Classwork not yet released.")
-            except Exception as e:
-                st.error(f"⚠️ Error displaying lecture details: {e}")
+                    else:
+                         st.error(f"⚠️ Error displaying lecture details: {e}")
 
                 else:
                     timer_placeholder.info("⏳ Time's up! Classwork is closed.")
-                    progress_placeholder.progress(1.0)
-
-        else:
-            st.info("Classwork not yet released.")
+                    progress_placeholder.progress(1.0
+            else:
+                st.info("Classwork not yet released.")
 
 # ---------------------- Lecture Materials (PDFs) ---------------------- #
     st.divider()
@@ -1596,6 +1593,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
