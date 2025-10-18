@@ -1550,8 +1550,8 @@ def admin_view():
         st.session_state[key] = datetime.now() + timedelta(minutes=20)
         st.success(f"✅ Classwork for {course_code} ({week}) is now OPEN for 20 minutes!")
 
-   if st.button(f"⏹ Close Classwork for {course_code} - {week}"):
-      key = f"{course_code}_{week}_cw_end"
+    if st.button(f"⏹ Close Classwork for {course_code} - {week}"):
+        key = f"{course_code}_{week}_cw_end"
         if key in st.session_state:
             st.session_state[key] = datetime.now()  # Timer expires immediately
             st.warning(f"⚠️ Classwork for {course_code} ({week}) is now CLOSED!")
@@ -1566,6 +1566,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
