@@ -663,51 +663,50 @@ def get_file(course_code, file_type):
 
 
 def mark_attendance_entry(course_code, name, matric, week):
-    """Robust attendance marker — creates separate weekly files and auto-fixes errors."""
+    """Save attendance in week-by-week files, with safety checks and no duplicates."""
     try:
-        # ✅ Create folder for attendance (if not exists)
-        base_folder = os.path.join("attendance_records", course_code)
-        os.makedirs(base_folder, exist_ok=True)
+        # 📁 Folder for attendance files
+        attendance_folder = os.path.join("data", "attendance")
+        os.makedirs(attendance_folder, exist_ok=True)
 
-        # ✅ Each week has its own file
-        file_path = os.path.join(base_folder, f"Week_{week}.csv")
+        # 📄 File for the current week
+        file_path = os.path.join(attendance_folder, f"{course_code}_Week_{week}.csv")
 
-        # ✅ Load or create DataFrame
+        # ✅ Load or create the file
         if os.path.exists(file_path):
             try:
                 df = pd.read_csv(file_path)
             except Exception:
+                # File exists but broken, recreate cleanly
                 df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
 
         # ✅ Normalize columns
         df.columns = [str(c).strip().title().replace(" ", "") for c in df.columns]
-
-        # ✅ Ensure required columns exist
         required = ["StudentName", "Matric", "Week", "Status", "Timestamp"]
         for col in required:
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Remove duplicates and reset index
+        # ✅ Clean dataframe
         df = df.loc[:, ~df.columns.duplicated()]
         df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
         df.reset_index(drop=True, inplace=True)
 
-        # ✅ Ensure string columns
+        # ✅ Convert columns to strings
         for col in ["StudentName", "Matric", "Week"]:
             df[col] = df[col].astype(str).fillna("")
 
-        # ✅ Prevent duplicate entries
+        # ✅ Prevent duplicate attendance for same student + week
         already = df[
             (df["StudentName"].str.lower() == name.strip().lower()) &
             (df["Matric"].str.lower() == matric.strip().lower())
         ]
         if not already.empty:
-            return False  # Already marked this week
+            return False  # Already marked
 
-        # ✅ Append new entry
+        # ✅ Append new attendance record
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
@@ -718,11 +717,13 @@ def mark_attendance_entry(course_code, name, matric, week):
 
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.to_csv(file_path, index=False)
+
         return True
 
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+
 
 
 # ---------------------- Helper ---------------------- #
@@ -1757,6 +1758,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
