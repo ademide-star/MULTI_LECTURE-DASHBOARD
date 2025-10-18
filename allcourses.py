@@ -742,72 +742,108 @@ def student_view():
         return
 
     st.title("🎓 Student Dashboard")
-    st.info("Welcome, Student! Access your lectures, upload assignments, and mark attendance here.")
-    st.subheader("🎓 Student Login and Attendance")
-
-    submit_attendance = False
+    st.info("Welcome! Access your lectures, upload assignments, and mark attendance here.")
 
     # -------------------------------
-    # 🕒 Attendance Form
+    # 🎓 COURSE SELECTION
     # -------------------------------
     course_code = st.selectbox("Select Course", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
+
+    # Load lecture data
+    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
+    if lectures_df.empty or "Week" not in lectures_df.columns:
+        st.error("⚠️ Lecture file missing or invalid format.")
+        return
+
+    # -------------------------------
+    # 🕒 ATTENDANCE FORM
+    # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
-
-        lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
-
-        if "Week" not in lectures_df.columns:
-            st.error("⚠️ The lectures file is missing the 'Week' column.")
-            st.stop()
-
-        week = st.selectbox(
-            "Select Lecture Week", 
-            [str(w) for w in lectures_df["Week"].tolist()], 
-            key=f"{course_code}_att_week"
-        )
+        week = st.selectbox("Select Lecture Week", [str(w) for w in lectures_df["Week"].tolist()], key=f"{course_code}_att_week")
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
     # -------------------------------
-    # 🧾 Attendance Validation
+    # ⚙️ ATTENDANCE CONFIG
+    # -------------------------------
+    COURSE_TIMINGS = {
+        "BIO203": {"valid_code": "BIO203-ZT7", "start": "01:00", "end": "22:00"},
+        "BCH201": {"valid_code": "BCH201-ZT8", "start": "01:00", "end": "22:00"},
+        "MCB221": {"valid_code": "MCB221-ZT9", "start": "01:00", "end": "22:20"},
+        "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
+        "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
+    }
+
+    # -------------------------------
+    # 🧾 ATTENDANCE VALIDATION
     # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
+            return
         elif not attendance_code.strip():
             st.warning("Please enter the attendance code for today.")
+            return
+
+        if course_code not in COURSE_TIMINGS:
+            st.error(f"⚠️ No timing configured for {course_code}.")
+            return
+
+        valid_code = COURSE_TIMINGS[course_code]["valid_code"]
+        start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
+        end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
+        now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria UTC+1
+
+        # Check time validity
+        if not (start_time <= now_t <= end_time):
+            st.error(f"⏰ Attendance for {course_code} is only open between "
+                     f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
+            return
+
+        # Check code
+        if attendance_code != valid_code:
+            st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
+            return
+
+        # Check duplicate attendance
+        if has_marked_attendance(course_code, week, name):
+            st.info("✅ Attendance already marked. You can’t mark it again.")
+            st.session_state["attended_week"] = str(week)
         else:
-            COURSE_TIMINGS = {
-                "BIO203": {"valid_code": "BIO203-ZT7", "start": "01:00", "end": "22:00"},
-                "BCH201": {"valid_code": "BCH201-ZT8", "start": "01:00", "end": "22:00"},
-                "MCB221": {"valid_code": "MCB221-ZT9", "start": "01:00", "end": "22:20"},
-                "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
-                "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
-            }
-
-            if course_code not in COURSE_TIMINGS:
-                st.error(f"⚠️ No timing configured for {course_code}.")
+            ok = mark_attendance_entry(course_code, name, matric, week)
+            if ok:
+                st.session_state["attended_week"] = str(week)
+                st.success(f"✅ Attendance recorded successfully for Week {week}.")
             else:
-                start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
-                end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
-                valid_code = COURSE_TIMINGS[course_code]["valid_code"]
+                st.error("⚠️ Failed to record attendance.")
 
-                now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # UTC+1
+    # -------------------------------
+    # 📋 SHOW LECTURES + RESTRICT SUBMISSION
+    # -------------------------------
+    st.divider()
+    st.subheader("📘 Course Lectures, Classwork, and Assignments")
 
-                st.session_state["attended_week"] = str(week)  # store as string
+    attended_week = st.session_state.get("attended_week")
 
-            if not (start_time <= now_t <= end_time):
-                    st.error(f"⏰ Attendance for {course_code} is only open between "
-                        f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
-            elif attendance_code != valid_code:
-                st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-            elif has_marked_attendance(course_code, week, name):
-                st.info("✅ Attendance already marked. You can’t mark it again.")
-            else:
-                ok = mark_attendance_entry(course_code, name, matric, week)
-                if ok:
-                    st.success(f"✅ Attendance recorded for {name} ({week}).")
+    for _, row in lectures_df.iterrows():
+        week_label = str(row["Week"])
+        st.markdown(f"#### Week {week_label}: {row.get('Topic', 'Untitled Lecture')}")
+        st.markdown(f"**Brief:** {row.get('Brief', 'No summary available.')}")
+
+        # Always show classwork/assignment text (view only)
+        if row.get("Classwork"):
+            st.write("🧩 Classwork:", row["Classwork"])
+        if row.get("Assignment"):
+            st.write("📘 Assignment:", row["Assignment"])
+
+        # ✅ Only allow upload if attendance marked for this week
+        if attended_week == week_label:
+            st.success("✅ Attendance verified. You can now submit assignment/classwork.")
+            st.file_uploader(f"Upload Assignment for Week {week_label}", type=["pdf", "docx"], key=f"upload_{week_label}")
+        else:
+            st.warning("🚫 Attendance required to enable submission for this week.")
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -1618,6 +1654,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
