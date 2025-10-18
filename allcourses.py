@@ -1554,6 +1554,14 @@ def admin_classwork_control(course_code):
     # ------------------------
     # Open Classwork Button
     # ------------------------
+    st.header("🧩 Classwork Control")
+
+    week_to_control = st.selectbox(
+        "Select Week to Open/Close Classwork", 
+        lectures_df["Week"].unique(), 
+        key="admin_cw_control"
+)
+
     if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key=f"open_cw_{course_code}"):
         # Update or insert row
         if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
@@ -1602,6 +1610,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
