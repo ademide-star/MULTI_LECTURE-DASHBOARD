@@ -754,7 +754,6 @@ def student_view():
         lectures_df = st.session_state["lectures_df"]
     else:
         lectures_df = load_lectures(course_code)
-        lectures_df = load_lectures(course_code) or pd.DataFrame(columns=["Week"])
 
     if lectures_df.empty or "Week" not in lectures_df.columns:
         st.error("⚠️ Lecture file missing or invalid format.")
@@ -825,37 +824,13 @@ def student_view():
                 st.error("⚠️ Failed to record attendance.")
 
     # -------------------------------
-    # 📋 SHOW LECTURES + RESTRICT SUBMISSION
-    # -------------------------------
-    st.divider()
-    st.subheader("📘 Course Lectures, Classwork, and Assignments")
-
-    attended_week = st.session_state.get("attended_week")
-
-    for _, row in lectures_df.iterrows():
-        week_label = str(row["Week"])
-        st.markdown(f"#### Week {week_label}: {row.get('Topic', 'Untitled Lecture')}")
-        st.markdown(f"**Brief:** {row.get('Brief', 'No summary available.')}")
-
-        # Always show classwork/assignment text (view only)
-        if row.get("Classwork"):
-            st.write("🧩 Classwork:", row["Classwork"])
-        if row.get("Assignment"):
-            st.write("📘 Assignment:", row["Assignment"])
-
-        # ✅ Only allow upload if attendance marked for this week
-        if attended_week == week_label:
-            st.success("✅ Attendance verified. You can now submit assignment/classwork.")
-            st.file_uploader(f"Upload Assignment for Week {week_label}", type=["pdf", "docx"], key=f"upload_{week_label}")
-        else:
-            st.warning("🚫 Attendance required to enable submission for this week.")
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
     st.divider()
     st.subheader("📘 Lecture Briefs and Classwork")
-
+    attended_week = st.session_state.get("attended_week")
     if "attended_week" not in st.session_state:
         st.warning("Please attend a lecture before accessing materials.")
         return
@@ -1659,6 +1634,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
