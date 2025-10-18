@@ -1556,11 +1556,12 @@ def admin_view(course_code):
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
 if st.session_state["role"] == "Admin":
-    admin_view()
+    admin_view(course_code)
 elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
