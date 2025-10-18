@@ -593,15 +593,18 @@ def mark_attendance_entry(course_code, name, matric, week):
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
 
-        # ✅ Standardize column names
+        # ✅ Remove duplicate columns if they exist
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # ✅ Standardize and sanitize column names
         df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
 
-        # ✅ Ensure required columns exist
+        # ✅ Ensure all required columns exist
         for col in ["StudentName", "Matric", "Week", "Timestamp"]:
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Convert 'StudentName' and 'Week' columns to string (avoid .str error)
+        # ✅ Convert data types safely
         df["StudentName"] = df["StudentName"].astype(str)
         df["Week"] = df["Week"].astype(str)
 
@@ -622,7 +625,9 @@ def mark_attendance_entry(course_code, name, matric, week):
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
+        # ✅ Append safely without index issues
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        df.reset_index(drop=True, inplace=True)
 
         # ✅ Save back to CSV
         df.to_csv(file_path, index=False)
@@ -631,6 +636,7 @@ def mark_attendance_entry(course_code, name, matric, week):
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+
 
 
 
@@ -1445,6 +1451,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
