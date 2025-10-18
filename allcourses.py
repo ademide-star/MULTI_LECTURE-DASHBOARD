@@ -799,97 +799,110 @@ def student_view():
             week = st.session_state["attended_week"]
             st.success(f"Access granted for {week}")
        
-# ✅ Ensure lectures_df is available
-        # ✅ Retrieve selected lecture safely
-        lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0]
-        try:
-            file_path = get_file(course_code, "lectures")
+# ---------------------- Helper ---------------------- #
+def clean_text(val):
+    return str(val or "").strip()
 
-    # ✅ Ensure the folder exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+def load_lectures(course_code):
+    """Load lecture CSV or create new if missing"""
+    try:
+        file_path = get_file(course_code, "lectures")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-    # ✅ Auto-create if the file doesn't exist yet
-            if not os.path.exists(file_path):
-                df_template = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
-                df_template.to_csv(file_path, index=False)
-                st.info(f"📘 Created a new lecture file for {course_code}. Please add lecture details in Admin view.")
+        if not os.path.exists(file_path):
+            pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"]).to_csv(file_path, index=False)
+            st.info(f"📘 Created new lecture file for {course_code}. Lecture content will appear once added by Admin.")
 
-    # ✅ Now safely load the CSV
-            lectures_df = pd.read_csv(file_path)
-            st.session_state["lectures_df"] = lectures_df
+        lectures_df = pd.read_csv(file_path)
+        st.session_state["lectures_df"] = lectures_df
+        return lectures_df
 
-        except Exception as e:
-            st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
-            st.stop()
-            st.session_state["lectures_df"] = lectures_df
+    except Exception as e:
+        st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
+        st.stop()
 
-        try:
-            file_path = get_file(course_code, "lectures")
-            if not os.path.exists(file_path):
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"]).to_csv(file_path, index=False)
-                st.info(f"📘 Created new lecture file for {course_code}. You can add content in Admin panel.")
+# ---------------------- Timer Logic ---------------------- #
+def get_remaining_time(course_code, week):
+    """Check how much time is left based on admin start"""
+    key = f"{course_code}_{week}_cw_end"
+    if key in st.session_state:
+        remaining = st.session_state[key] - datetime.now()
+        return max(int(remaining.total_seconds()), 0)
+    return 0
 
-            lecture_data = get_lecture_brief(course_code)
-            if not lecture_data:
-                st.warning(f"No lecture briefs available for {course_code}.")
-                return
-            lectures_df = pd.DataFrame(lecture_data)
+# ---------------------- Display Lecture ---------------------- #
+def display_student_lecture(course_code, week, name, matric):
+    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
 
-            st.session_state["lectures_df"] = lectures_df
-        except Exception as e:
-            st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
-            st.stop()
+    # Safety checks
+    if "Week" not in lectures_df.columns:
+        st.warning(f"⚠️ Lecture data not properly formatted for {course_code}.")
+        st.stop()
+    if week not in lectures_df["Week"].values:
+        st.warning(f"⚠️ No lecture available for {week}.")
+        st.stop()
 
+    lecture_info = lectures_df.loc[lectures_df["Week"] == week].iloc[0].to_dict()
 
-    # ✅ Safety checks
-            if "Week" not in lectures_df.columns:
-                st.warning(f"⚠️ No 'Week' column found in lecture data for {course_code}.")
-                st.stop()
+    # Topic & Brief
+    st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
+    brief = clean_text(lecture_info.get("Brief"))
+    if brief:
+        st.write(f"**Lecture Brief:** {brief}")
+    else:
+        st.info("Lecture brief not yet available.")
 
-            if week not in lectures_df["Week"].values:
-                st.warning(f"⚠️ No lecture found for {week}.")
-                st.stop()
-            else:
-        # Convert to dict to safely use .get()
-                lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict() 
-        except Exception as e:
-            st.error(f"⚠️ Could not load lecture data for {course_code}: {e}")
-            st.stop()
+    # Assignment
+    assignment = clean_text(lecture_info.get("Assignment"))
+    if assignment:
+        st.subheader("📚 Assignment")
+        st.markdown(f"**Assignment:** {assignment}")
+    else:
+        st.info("Assignment not yet released.")
 
-# ✅ Display Topic, Brief, Assignment, Classwork
-        try:
-            st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
-            brief = str(lecture_info.get("Brief", "") or "").strip()
-            if brief:
-                st.write(f"**Lecture Brief:** {brief}")
-            else:
-                st.info("Lecture brief not yet available.")
+    # Classwork
+    classwork_text = clean_text(lecture_info.get("Classwork"))
+    if classwork_text:
+        st.markdown("### 🧩 Classwork Questions")
+        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
 
-            assignment = str(lecture_info.get("Assignment", "") or "").strip()
-            if assignment:
-                st.subheader("📚 Assignment")
-                st.markdown(f"**Assignment:** {assignment}")
-            else:
-                st.info("Assignment not released yet.")
+        remaining_sec = get_remaining_time(course_code, week)
 
-            classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
-            if classwork_text:
-                st.markdown("### 🧩 Classwork Questions")
-                questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-                with st.form("cw_form"):
-                    answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                    submit_cw = st.form_submit_button(
-                        "Submit Answers",
-                        disabled=not is_classwork_open(course_code, week)
-            )
-                    close_classwork_after_20min(course_code)
-                    if submit_cw:
-                        save_classwork(name, matric, week, answers)
-            else:
-                st.info("Classwork not yet released.")
-        except Exception as e:
-            st.error(f"⚠️ Error displaying lecture details: {e}")
+        if remaining_sec > 0:
+            # Create a placeholder for live timer
+            timer_placeholder = st.empty()
+
+            with st.form("cw_form"):
+                answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
+                submit_cw = st.form_submit_button(
+                    "Submit Answers",
+                    disabled=remaining_sec == 0 or not is_classwork_open(course_code, week)
+                )
+                if submit_cw:
+                    save_classwork(name, matric, week, answers)
+                    st.success("✅ Classwork submitted successfully!")
+
+            # Live countdown loop
+            while remaining_sec > 0:
+                minutes, seconds = divmod(remaining_sec, 60)
+                timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
+                time.sleep(1)
+                remaining_sec = get_remaining_time(course_code, week)
+
+            # When time expires
+            timer_placeholder.info("⏳ Time's up! Classwork is closed.")
+        else:
+            st.info("⏳ Classwork not yet opened by Admin or time expired.")
+    else:
+        st.info("Classwork not yet released.")
+
+# ---------------------- USAGE ---------------------- #
+course_code = "BIO101"
+week = "Week 3"
+name = "John Doe"
+matric = "MAT12345"
+
+display_student_lecture(course_code, week, name, matric)
 
 # ============================================================
 # 📚 Lecture Materials Viewer (PDFs)
@@ -1548,6 +1561,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
