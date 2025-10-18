@@ -836,6 +836,7 @@ def student_view():
             st.info("✅ Attendance already marked for this week.")
             st.session_state["attended_week"] = str(week)
         else:
+            ok = mark_attendance_entry(course_code, name, matric, week)
     # Check if attendance is open (controlled by admin)
         if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
@@ -1670,6 +1671,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
