@@ -593,26 +593,35 @@ def mark_attendance_entry(course_code, name, matric, week):
         else:
             df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
 
+        # ✅ Standardize column names
+        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+
         # ✅ Ensure required columns exist
         for col in ["StudentName", "Matric", "Week", "Timestamp"]:
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Standardize column names (in case older files used different headers)
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+        # ✅ Convert 'StudentName' and 'Week' columns to string (avoid .str error)
+        df["StudentName"] = df["StudentName"].astype(str)
+        df["Week"] = df["Week"].astype(str)
 
-        # ✅ Check if student has already marked attendance for this week
-        if ((df["Studentname"].str.lower() == name.strip().lower()) & 
-            (df["Week"].astype(str) == str(week))).any():
+        # ✅ Check if this student has already marked attendance for this week
+        already_marked = df[
+            (df["StudentName"].str.lower() == name.strip().lower()) &
+            (df["Week"] == str(week))
+        ]
+
+        if not already_marked.empty:
             return False  # already marked
 
         # ✅ Record new attendance
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
-            "Week": week,
+            "Week": str(week),
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
 
         # ✅ Save back to CSV
@@ -622,6 +631,7 @@ def mark_attendance_entry(course_code, name, matric, week):
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+
 
 
 def student_view():
@@ -790,7 +800,7 @@ def student_view():
             st.error(f"⚠️ Error displaying lecture details: {e}")
 
 
-        # ============================================================
+# ============================================================
 # 📘 Lecture Materials Viewer
 # ============================================================
         st.divider()
@@ -1435,6 +1445,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
