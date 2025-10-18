@@ -822,7 +822,7 @@ def student_view():
     week = str(st.session_state["attended_week"])
     st.success(f"Access granted for {week}")
 
-    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
+    lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
     lecture_info = lectures_df.loc[lectures_df["Week"] == week].iloc[0].to_dict()
 
     # Topic & Brief
@@ -1525,6 +1525,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
