@@ -842,12 +842,14 @@ def student_view():
         st.info("Assignment not yet released.")
 
     # ---------------------- Classwork Section ---------------------- #
-        classwork_text = clean_text(lecture_info.get("Classwork"))
-        if classwork_text:
-            st.markdown("### 🧩 Classwork Questions")
-            questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+    # ---------------------- 🧩 Classwork Section ---------------------- #
+    classwork_text = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
 
-    # Check if admin has opened classwork
+    if classwork_text:
+        st.markdown("### 🧩 Classwork Questions")
+        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+
+    # Check if classwork is open
         if not is_classwork_open(course_code, week):
             st.info("⏳ Classwork not yet opened by Admin.")
         else:
@@ -856,40 +858,32 @@ def student_view():
             progress_placeholder = st.empty()
 
             if remaining_sec > 0:
-            # Auto-refresh to update timer
+            # Auto-refresh every second
                 st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
 
-            # Timer display
                 minutes, seconds = divmod(remaining_sec, 60)
                 timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
 
-            # Progress bar
-                total_duration = 20 * 60  # 20 minutes
+                total_duration = 20 * 60
                 progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
                 progress_placeholder.progress(progress)
 
-            # Classwork form
-                classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
-                if classwork_text:
-                    st.markdown("### 🧩 Classwork Questions")
-                    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-                    with st.form("cw_form"):
-                        answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                        submit_cw = st.form_submit_button(
-                            "Submit Answers",
-                            disabled=not is_classwork_open(course_code, week)
-            )
-                        close_classwork_after_20min(course_code)
-                        if submit_cw:
-                            save_classwork(name, matric, week, answers)
-                        else:
-                             st.error(f"⚠️ Error displaying lecture details: {e}")
+            # Classwork input form
+                with st.form(f"cw_form_{course_code}_{week}"):
+                    answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
+                    submit_cw = st.form_submit_button(
+                        "Submit Answers",
+                        disabled=remaining_sec == 0 or not is_classwork_open(course_code, week)
+                )
+                    if submit_cw:
+                        save_classwork(name, matric, week, answers)
+                        st.success("✅ Classwork submitted successfully!")
 
-                else:
-                    timer_placeholder.info("⏳ Time's up! Classwork is closed.")
-                    progress_placeholder.progress(1.0)
             else:
-                st.info("Classwork not yet released.")
+                timer_placeholder.info("⏳ Time's up! Classwork is closed.")
+                progress_placeholder.progress(1.0)
+    else:
+        st.info("No classwork uploaded for this lecture.")
 
 # ---------------------- Lecture Materials (PDFs) ---------------------- #
     st.divider()
@@ -1593,6 +1587,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
