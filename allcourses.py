@@ -787,6 +787,44 @@ def get_remaining_time(course_code, week):
         return max(int(remaining.total_seconds()), 0)
     return 0
 
+import os
+import pandas as pd
+from datetime import datetime
+
+def has_marked_attendance(file_path, student_name):
+    """Check if the student already marked attendance in this week's file"""
+    if not os.path.exists(file_path):
+        return False
+    df = pd.read_csv(file_path)
+    return student_name in df['Name'].values
+
+def mark_attendance_entry_weekly(file_path, name, matric, week, course):
+    """Save weekly attendance record"""
+    try:
+        record = {
+            "Name": [name],
+            "Matric": [matric],
+            "Course": [course],
+            "Week": [week],
+            "Date": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+        }
+
+        new_df = pd.DataFrame(record)
+
+        # If file exists, append
+        if os.path.exists(file_path):
+            old_df = pd.read_csv(file_path)
+            updated_df = pd.concat([old_df, new_df], ignore_index=True)
+        else:
+            updated_df = new_df
+
+        updated_df.to_csv(file_path, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving attendance: {e}")
+        return False
+
+
 # ---------------------- Student View ---------------------- #
 def student_view():
     if st.session_state.get("role") != "Student":
@@ -810,36 +848,38 @@ def student_view():
         st.error("⚠️ Lecture file missing or invalid format.")
         return
 
-    # -------------------------------
-    # 🧾 ATTENDANCE VALIDATION (NO CODE)
-    # -------------------------------
-    if submit_attendance:
-        if not name.strip() or not matric.strip():
-            st.warning("Please enter your full name and matric number.")
-            return
-
-        # ✅ Check if attendance is open
-        if not st.session_state.get(f"{course_code}_attendance_open", False):
-            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-        
-         # -------------------------------
-    # 🕒 ATTENDANCE FORM
-    # -------------------------------
+ # -------------------------------
+# 🕒 ATTENDANCE FORM
+# -------------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
         week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist(), key=f"{course_code}_att_week")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-        # Process attendance submission
-        st.success("✅ Attendance marked successfully!")
 
-        # ✅ Prevent duplicate marking
-        if has_marked_attendance(course_code, week, name):
+# -------------------------------
+# 🧾 ATTENDANCE VALIDATION (Saves by Week)
+# -------------------------------
+    if submit_attendance:
+        if not name.strip() or not matric.strip():
+            st.warning("Please enter your full name and matric number.")
+            return
+
+    # ✅ Check if attendance is open (controlled by admin)
+        if not st.session_state.get(f"{course_code}_attendance_open", False):
+            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+            return
+
+    # ✅ Define file for this week
+        week_file = f"attendance_{course_code}_week{week}.csv"
+
+    # ✅ Prevent duplicate marking
+        if has_marked_attendance(week_file, name):
             st.info("✅ Attendance already marked for this week.")
             return
 
-        # ✅ Mark attendance
-        ok = mark_attendance_entry(course_code, name, matric, week)
+    # ✅ Mark attendance
+        ok = mark_attendance_entry_weekly(week_file, name, matric, week, course_code)
         if ok:
             st.session_state["attended_week"] = str(week)
             st.success(f"🎉 Attendance recorded successfully for {course_code} - Week {week}.")
@@ -1792,6 +1832,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
