@@ -818,7 +818,7 @@ def student_view():
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
-        week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist(), key=f"{course_code}_att_week")
+        week = st.selectbox("Select Lecture Week", [str(i) for i in range(1, 15)], key=f"{course_code}_att_week")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
 # -------------------------------
@@ -1706,12 +1706,11 @@ def admin_view(course_code):
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
 # -------------------------------
-# -------------------------------
 # 🕒 Attendance Control (Admin)
 # -------------------------------
     st.subheader("🎛 Attendance Control")
 
-    selected_course = st.selectbox(
+    course_code = st.selectbox(
         "Select Course to Manage", 
         ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
 )
@@ -1719,20 +1718,46 @@ def admin_view(course_code):
     selected_week = st.selectbox(
         "Select Week", 
         [f"Week {i}" for i in range(1, 15)], 
-        key=f"{selected_course}_week_select"
+        key=f"{course_code}_week_select"
 )
 
-    attendance_key = f"{selected_course}_{selected_week}_attendance_open"
+    attendance_key = f"{course_code}_{selected_week}_attendance_open"
+    timer_key = f"{course_code}_{selected_week}_open_time"
 
+# Toggle to open attendance
     open_attendance = st.toggle(
-        f"🔓 Allow students to mark attendance for {selected_course} ({selected_week})", 
+        f"🔓 Allow students to mark attendance for {course_code} ({selected_week})", 
         key=attendance_key
 )
 
+# Record start time when opened
     if open_attendance:
-        st.success(f"✅ Attendance is OPEN for {selected_course} - {selected_week}")
+        if timer_key not in st.session_state:
+            st.session_state[timer_key] = datetime.now()
+        st.session_state[f"{course_code}_attendance_open"] = True
+        st.session_state[f"{course_code}_open_week"] = selected_week
+        st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
     else:
-        st.warning(f"🚫 Attendance is CLOSED for {selected_course} - {selected_week}")
+    # Close manually
+        st.session_state[f"{course_code}_attendance_open"] = False
+        st.session_state[f"{course_code}_open_week"] = None
+        if timer_key in st.session_state:
+            del st.session_state[timer_key]
+        st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
+
+# Automatically close after 10 minutes
+    if st.session_state.get(timer_key):
+        elapsed = (datetime.now() - st.session_state[timer_key]).total_seconds()
+        remaining = max(0, 600 - elapsed)  # 600 seconds = 10 minutes
+
+        if remaining <= 0:
+            st.session_state[f"{course_code}_attendance_open"] = False
+            st.warning(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed.")
+        else:
+            mins = int(remaining // 60)
+            secs = int(remaining % 60)
+            st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+
 
 
 # 📁 Delete attendance record option
@@ -1790,6 +1815,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
