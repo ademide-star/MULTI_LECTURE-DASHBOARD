@@ -822,35 +822,31 @@ def student_view():
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
 # -------------------------------
-# 🧾 ATTENDANCE VALIDATION (Saves by Week)
+# 🧾 ATTENDANCE VALIDATION
 # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
-            return
+            st.stop()
 
-    # ✅ Check if attendance is open (controlled by admin)
+    # ✅ Check if attendance is open
         if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-            return
-
-    # ✅ Define file for this week
-        week_file = f"attendance_{course_code}_week{week}.csv"
+            st.stop()
 
     # ✅ Prevent duplicate marking
-        if has_marked_attendance(week_file, name):
+        if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
-            return
+            st.stop()
 
     # ✅ Mark attendance
-        ok = mark_attendance_entry_weekly(week_file, name, matric, week, course_code)
+        ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
             st.success(f"🎉 Attendance recorded successfully for {course_code} - Week {week}.")
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
 
-   
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
@@ -1796,6 +1792,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
