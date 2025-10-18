@@ -750,7 +750,12 @@ def student_view():
     course_code = st.selectbox("Select Course", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
 
     # Load lecture data
-    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
+    if "lectures_df" in st.session_state and st.session_state["lectures_df"] is not None:
+        lectures_df = st.session_state["lectures_df"]
+    else:
+        lectures_df = load_lectures(course_code)
+        lectures_df = load_lectures(course_code) or pd.DataFrame(columns=["Week"])
+
     if lectures_df.empty or "Week" not in lectures_df.columns:
         st.error("⚠️ Lecture file missing or invalid format.")
         return
@@ -1654,6 +1659,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
