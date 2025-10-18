@@ -801,12 +801,16 @@ def student_view():
                     st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
                 elif has_marked_attendance(course_code, week, name):
                     st.info("✅ Attendance already marked. You can’t mark it again.")
-                    st.session_state["attended_week"] = str(week)
+                    st.session_state["attended_week"] = week  # Grant access if already marked
                 else:
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
-                        st.session_state["attended_week"] = str(week)
+                        st.session_state["attended_week"] = week
+
+        # Then below, show lecture if attended
+                    if "attended_week" in st.session_state:
+                        show_lecture(st.session_state["attended_week"])
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -1539,6 +1543,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
