@@ -929,21 +929,21 @@ def student_view():
 
         if matric_no:
             student_scores = df[df["MatricNo"].astype(str).str.upper() == matric_no]
-                if not student_scores.empty:
-                    st.success(f"✅ Scores for Matric Number: {matric_no}")
-                    st.dataframe(student_scores, use_container_width=True)
-                    st.download_button(
-                        "⬇️ Download Your Scores as CSV",
-                        student_scores.to_csv(index=False).encode(),
-                        file_name=f"{matric_no}_scores.csv",
-                        mime="text/csv"
+            if not student_scores.empty:
+                st.success(f"✅ Scores for Matric Number: {matric_no}")
+                st.dataframe(student_scores, use_container_width=True)
+                st.download_button(
+                    "⬇️ Download Your Scores as CSV",
+                    student_scores.to_csv(index=False).encode(),
+                    file_name=f"{matric_no}_scores.csv",
+                    mime="text/csv"
                     )
-                else:
-                    st.info("No scores found for this matric number yet.")
-            else:
-                st.warning("Please enter your matric number to view scores.")
+             else:
+                st.info("No scores found for this matric number yet.")
         else:
-            st.warning("Scores have not been uploaded for this course yet.")
+            st.warning("Please enter your matric number to view scores.")
+    else:
+        st.warning("Scores have not been uploaded for this course yet.")
 
         # ===============================================================
         # 📄 ASSIGNMENT, DRAWING & SEMINAR UPLOADS
@@ -1526,6 +1526,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
