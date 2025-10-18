@@ -863,6 +863,15 @@ def student_view():
     lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
 
     # Topic & Brief
+    if not lectures_df.empty:
+        lecture_row = lectures_df.loc[lectures_df["Week"] == week]
+    if not lecture_row.empty:
+        lecture_info = lecture_row.squeeze().to_dict()
+    else:
+        lecture_info = {}
+    else:
+        lecture_info = {}
+
     st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
     brief = clean_text(lecture_info.get("Brief"))
     if brief:
@@ -1670,6 +1679,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
