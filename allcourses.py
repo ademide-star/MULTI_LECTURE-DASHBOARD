@@ -755,7 +755,7 @@ def student_view():
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
 
-        lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
+        lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
 
         if "Week" not in lectures_df.columns:
             st.error("⚠️ The lectures file is missing the 'Week' column.")
@@ -1525,6 +1525,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
