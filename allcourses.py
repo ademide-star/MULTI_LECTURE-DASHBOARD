@@ -1711,79 +1711,76 @@ def admin_view(course_code):
 # -------------------------------
     st.subheader("🎛 Attendance Control")
 
-# Select course
     selected_course = st.selectbox(
         "Select Course to Manage", 
         ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
 )
 
-# Select week
     selected_week = st.selectbox(
         "Select Week", 
         [f"Week {i}" for i in range(1, 15)], 
         key=f"{selected_course}_week_select"
 )
 
-# Create a unique key for that course-week combination
-    attendance_key = f"{course_code}_{selected_week}_attendance_open"
+    attendance_key = f"{selected_course}_{selected_week}_attendance_open"
 
-# Attendance toggle
     open_attendance = st.toggle(
-        f"🔓 Allow students to mark attendance for {course_code} ({selected_week})", 
+        f"🔓 Allow students to mark attendance for {selected_course} ({selected_week})", 
         key=attendance_key
 )
 
     if open_attendance:
-        st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
+        st.success(f"✅ Attendance is OPEN for {selected_course} - {selected_week}")
     else:
-        st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
+        st.warning(f"🚫 Attendance is CLOSED for {selected_course} - {selected_week}")
+
 
 # 📁 Delete attendance record option
-    attendance_folder = os.path.join("data", "attendance")
-    os.makedirs(attendance_folder, exist_ok=True)
-    attendance_file = os.path.join(attendance_folder, f"{course_code}_{selected_week}.csv")
+        attendance_folder = os.path.join("data", "attendance")
+        os.makedirs(attendance_folder, exist_ok=True)
+        attendance_file = os.path.join(attendance_folder, f"{course_code}_{selected_week}.csv")
 
-    if os.path.exists(attendance_file):
-        st.info(f"📂 Found record: {attendance_file}")
-        if st.button(f"🗑 Delete Attendance Record for {course_code} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
-            os.remove(attendance_file)
-            st.success(f"✅ Deleted attendance record for {course_code} - {selected_week}")
-    else:
-        st.info(f"No attendance record yet for {course_code} - {selected_week}")
+        if os.path.exists(attendance_file):
+            st.info(f"📂 Found record: {attendance_file}")
+            if st.button(f"🗑 Delete Attendance Record for {course_code} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
+                os.remove(attendance_file)
+                st.success(f"✅ Deleted attendance record for {course_code} - {selected_week}")
+        else:
+            st.info(f"No attendance record yet for {course_code} - {selected_week}")
 
 
-    ATTENDANCE_FOLDER = "attendance_records"
+        ATTENDANCE_FOLDER = "attendance_records"
 
 # Ensure folder exists
-    os.makedirs(ATTENDANCE_FOLDER, exist_ok=True)
+        os.makedirs(ATTENDANCE_FOLDER, exist_ok=True)
 
 # List existing attendance files
-    attendance_files = [f for f in os.listdir(ATTENDANCE_FOLDER) if f.endswith(".csv")]
+        attendance_files = [f for f in os.listdir(ATTENDANCE_FOLDER) if f.endswith(".csv")]
 
-    st.subheader("🗑️ Delete Weekly Attendance Record")
-    base_folder = "attendance_records"
-    if os.path.exists(base_folder):
-        all_files = []
-        for root, _, files in os.walk(base_folder):
-            for f in files:
-                if f.endswith(".csv"):
-                    all_files.append(os.path.join(root, f))
+        st.subheader("🗑️ Delete Weekly Attendance Record")
+        base_folder = "attendance_records"
+        if os.path.exists(base_folder):
+            all_files = []
+            for root, _, files in os.walk(base_folder):
+                for f in files:
+                    if f.endswith(".csv"):
+                        all_files.append(os.path.join(root, f))
 
-        if all_files:
-            selected = st.selectbox("Select attendance file to delete:", all_files)
-            if st.button("Delete Selected File"):
-                os.remove(selected)
-                st.success(f"✅ Deleted: {selected}")
-        else:
-            st.info("No attendance files found.")
+            if all_files:
+                selected = st.selectbox("Select attendance file to delete:", all_files)
+                if st.button("Delete Selected File"):
+                    os.remove(selected)
+                    st.success(f"✅ Deleted: {selected}")
+            else:
+                st.info("No attendance files found.")
 
  # ------------------------
     # 📋 STATUS SUMMARY
     # ------------------------
-        if not df_status.empty:
-            st.dataframe(df_status)
+            if not df_status.empty:
+                st.dataframe(df_status)
 
-        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+            st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
@@ -1793,6 +1790,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
