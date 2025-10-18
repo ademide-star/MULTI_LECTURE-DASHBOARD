@@ -849,9 +849,6 @@ def student_view():
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
 
-
-    # -------------------------------
-
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
@@ -1649,18 +1646,6 @@ def admin_view(course_code):
 
         st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 # -------------------------------
-# 🕒 Attendance Control (Admin)
-# -------------------------------
-    st.subheader("🎛 Attendance Control")
-
-    selected_course = st.selectbox("Select Course to Manage", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
-    open_attendance = st.toggle(f"🔓 Allow students to mark attendance for {selected_course}", 
-                            key=f"{selected_course}_attendance_open")
-
-    if open_attendance:
-        st.success(f"✅ Attendance is OPEN for {selected_course}")
-    else:
-        st.warning(f"🚫 Attendance is CLOSED for {selected_course}")
 
 
 # 🚪 SHOW VIEW BASED ON ROLE
@@ -1671,6 +1656,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
