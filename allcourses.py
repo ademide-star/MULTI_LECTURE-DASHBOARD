@@ -359,14 +359,23 @@ ensure_data_files()
 # ATTENDANCE + SUBMISSION HELPERS
 # -----------------------------
 def has_marked_attendance(course_code, week, name):
-    """Return True if student already has attendance for the week."""
-    ATTENDANCE_FILE = get_file(course_code, "attendance")
-    if not os.path.exists(ATTENDANCE_FILE):
+    try:
+        df = pd.read_csv(os.path.join("attendance", f"{course_code}_attendance.csv"))
+        # Ensure columns exist
+        if "Name" not in df.columns or "Week" not in df.columns:
+            return False
+
+        # Check case-insensitive match
+        return any(
+            (df["Name"].astype(str).str.upper() == str(name).upper()) &
+            (df["Week"].astype(str).str.upper() == str(week).upper())
+        )
+    except FileNotFoundError:
         return False
-    df = pd.read_csv(ATTENDANCE_FILE)
-    if "StudentName" not in df.columns or "Week" not in df.columns:
+    except Exception as e:
+        st.error(f"⚠️ Error checking attendance: {e}")
         return False
-    return ((df["StudentName"].str.lower() == name.strip().lower()) & (df["Week"] == week)).any()
+
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Mark attendance (returns True on success, False if already marked)."""
@@ -573,46 +582,6 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
-def mark_attendance_entry(course_code, name, matric, week):
-    """Marks attendance for a given student safely with auto-column creation."""
-    try:
-        file_path = get_file(course_code, "attendance_form")
-
-        # ✅ Load or initialize attendance DataFrame
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-        else:
-            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
-
-        # ✅ Ensure required columns exist
-        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
-            if col not in df.columns:
-                df[col] = None
-
-        # ✅ Standardize column names (in case older files used different headers)
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
-
-        # ✅ Check if student has already marked attendance for this week
-        if ((df["Studentname"].str.lower() == name.strip().lower()) & 
-            (df["Week"].astype(str) == str(week))).any():
-            return False  # already marked
-
-        # ✅ Record new attendance
-        new_entry = {
-            "StudentName": name.strip(),
-            "Matric": matric.strip(),
-            "Week": week,
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-
-        # ✅ Save back to CSV
-        df.to_csv(file_path, index=False)
-        return True
-
-    except Exception as e:
-        st.error(f"⚠️ Error marking attendance: {e}")
-        return False
 
 
 def student_view():
@@ -1390,6 +1359,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
