@@ -583,10 +583,6 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
-import os
-import pandas as pd
-from datetime import datetime
-import streamlit as st
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Marks attendance robustly — cleans file, enforces unique columns, fixes index issues."""
@@ -601,14 +597,25 @@ def mark_attendance_entry(course_code, name, matric, week):
             try:
                 df = pd.read_csv(file_path)
 
-                # 🔧 Fix duplicate or unnamed columns
-                df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
-                df.columns = pd.io.parsers.ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+                # 🔧 Fix duplicate or unnamed columns (modern Pandas compatible)
+                df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
 
-                # 🔧 Ensure unique column names
-                if not df.columns.is_unique:
-                    df.columns = [f"{col}_{i}" if df.columns.tolist().count(col) > 1 else col
-                                  for i, col in enumerate(df.columns)]
+                # Deduplicate column names safely for Pandas >= 2.2
+                try:
+                    from pandas.io.common import dedup_names
+                    df.columns = dedup_names(df.columns.tolist())
+                except ImportError:
+                    # Manual fallback for older Pandas
+                    seen = {}
+                    new_cols = []
+                    for col in df.columns:
+                        if col in seen:
+                            seen[col] += 1
+                            new_cols.append(f"{col}_{seen[col]}")
+                        else:
+                            seen[col] = 0
+                            new_cols.append(col)
+                    df.columns = new_cols
 
                 # 🔧 Reset index to avoid reindex errors
                 df.reset_index(drop=True, inplace=True)
@@ -637,7 +644,7 @@ def mark_attendance_entry(course_code, name, matric, week):
             (df["Week"] == str(week))
         ]
         if not already.empty:
-            return False
+            return False  # already marked
 
         # ✅ Step 7: Add new entry
         new_entry = {
@@ -657,7 +664,8 @@ def mark_attendance_entry(course_code, name, matric, week):
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
-        
+
+    # ✅ Fallback: Ensure file path exists if get_file failed
     file_path = get_file(course_code, "attendance_form")
     if not file_path or file_path.strip() == "":
         file_path = os.path.join("data", f"{course_code}_attendance.csv")
@@ -690,7 +698,7 @@ def student_view():
         # -------------------------------
         # 🕒 Attendance Form
         # -------------------------------
-        course_code = st.selectbox("Select Course",  ["BIO113", "BIO306", "BIO203", "BCH201", "MCB221"])
+        course_code = st.selectbox("Select Course",  ["MCB221", "BCH201","BIO203","BIO113", "BIO306"])
         with st.form(f"{course_code}_attendance_form"):
             name = st.text_input("Full Name", key=f"{course_code}_student_name")
             matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
@@ -769,8 +777,10 @@ def student_view():
         else:
             week = st.session_state["attended_week"]
             st.success(f"Access granted for {week}")
-
+       
 # ✅ Ensure lectures_df is available
+        lecture_info = {}
+
         try:
             if "lectures_df" not in st.session_state:
                 file_path = get_file(course_code, "lectures")
@@ -1484,6 +1494,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
