@@ -1564,40 +1564,40 @@ def admin_view(course_code):
 
             if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key=f"open_cw_{course_code}"):
         # Update or insert row
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = True
-            else:
-                df_status = pd.concat([df_status, pd.DataFrame([{
-                    "Course": course_code,
-                    "Week": week_to_control,
-                    "Open": True
-                }])], ignore_index=True)
+                if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
+                    df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = True
+                else:
+                    df_status = pd.concat([df_status, pd.DataFrame([{
+                        "Course": course_code,
+                        "Week": week_to_control,
+                        "Open": True
+                    }])], ignore_index=True)
 
         # Save CSV
-            df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
+                df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
 
         # Set 20-minute timer for all students
-            key = f"{course_code}_{week_to_control}_cw_end"
-            st.session_state[key] = datetime.now() + timedelta(minutes=20)
+                key = f"{course_code}_{week_to_control}_cw_end"
+                    st.session_state[key] = datetime.now() + timedelta(minutes=20)
 
-            st.success(f"✅ Classwork for {week_to_control} is now OPEN for 20 minutes!")
+                    st.success(f"✅ Classwork for {week_to_control} is now OPEN for 20 minutes!")
 
     # ------------------------
     # Close Classwork Button
     # ------------------------
-            if st.button(f"⏹ Close Classwork for {week_to_control}", key=f"close_cw_{course_code}"):
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = False
-                df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
+                if st.button(f"⏹ Close Classwork for {week_to_control}", key=f"close_cw_{course_code}"):
+                if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
+                    df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = False
+                    df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
 
         # Expire timer immediately
-                key = f"{course_code}_{week_to_control}_cw_end"
-                    st.session_state[key] = datetime.now()
+                    key = f"{course_code}_{week_to_control}_cw_end"
+                        st.session_state[key] = datetime.now()
 
-            st.warning(f"⚠️ Classwork for {week_to_control} is now CLOSED!")
+                st.warning(f"⚠️ Classwork for {week_to_control} is now CLOSED!")
 
     # Footer timestamp
-    st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+            st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
 
 
@@ -1610,6 +1610,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
