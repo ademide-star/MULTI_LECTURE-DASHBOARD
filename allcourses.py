@@ -1054,7 +1054,7 @@ def admin_view(course_code):
     ATTENDANCE_FILE = get_file(course_code, "attendance")
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork")
     SEMINAR_FILE = get_file(course_code, "seminar")
-    CLASSWORK_FILE = "classwork_submissions.csv"
+    CLASSWORK_FILE = get_file(course_code, "classwork_submissions")
 
     # Load lectures CSV safely
     if os.path.exists(LECTURE_FILE):
@@ -1520,6 +1520,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
