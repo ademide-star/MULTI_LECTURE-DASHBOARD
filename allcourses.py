@@ -800,14 +800,20 @@ def student_view():
                 if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
                              f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
-                elif attendance_code != valid_code:
+                else: attendance_code != valid_code:
                     st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-                elif has_marked_attendance(course_code, week, name):
-                    st.info("✅ Attendance already marked.")
+                
+                if has_marked_attendance(course_code, week, name):
+                    st.info("✅ Attendance already marked. You can’t mark it again.")
                 else:
                     ok = mark_attendance_entry(course_code, name, matric, week)
-                    if ok:
-                        st.success(f"✅ Attendance recorded for {name} ({week}).")
+                if ok:
+                    st.success(f"✅ Attendance recorded for {name} ({week}).")
+
+                else:
+                    ok = mark_attendance_entry(course_code, name, matric, week)
+                if ok:
+                    st.success(f"✅ Attendance recorded for {name} ({week}).")
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -1054,6 +1060,7 @@ def admin_view(course_code):
     ATTENDANCE_FILE = get_file(course_code, "attendance")
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork")
     SEMINAR_FILE = get_file(course_code, "seminar")
+    CLASSWORK_FILE = "classwork_submissions.csv"
 
     # Load lectures CSV safely
     if os.path.exists(LECTURE_FILE):
@@ -1493,21 +1500,21 @@ def admin_view(course_code):
     # -------------------------------------
 # 🧩 CLASSWORK CONTROL
 # -------------------------------------
-        st.header("🧩 Classwork Control")
+    st.header("🧩 Classwork Control")
 
-        week_to_control = st.selectbox(
-            "Select Week to Open/Close Classwork", 
-            lectures_df["Week"].unique(), 
-            key="admin_cw_control"
+    week_to_control = st.selectbox(
+        "Select Week to Open/Close Classwork", 
+        lectures_df["Week"].unique(), 
+        key="admin_cw_control"
 )
 
-        if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
-            open_classwork(course_code, week_to_control)
-            st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
+    if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
+        open_classwork(course_code, week_to_control)
+        st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
 
-        close_classwork_after_20min(course_code)
+    close_classwork_after_20min(course_code)
 # Footer timestamp
-        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+    st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
 
 
@@ -1519,6 +1526,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
