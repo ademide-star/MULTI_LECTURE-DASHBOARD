@@ -706,12 +706,6 @@ def mark_attendance_entry(course_code, name, matric, week):
         return False
 
 
-import os
-import pandas as pd
-import streamlit as st
-from datetime import datetime, timedelta
-from streamlit_autorefresh import st_autorefresh  # pip install streamlit-autorefresh
-
 # ---------------------- Helper ---------------------- #
 def clean_text(val):
     return str(val or "").strip()
@@ -751,7 +745,6 @@ def student_view():
     st.info("Welcome, Student! Access your lectures, upload assignments, and mark attendance here.")
     st.subheader("🎓 Student Login and Attendance")
 
-    # Initialize safe variables
     submit_attendance = False
     ok = False
 
@@ -763,17 +756,15 @@ def student_view():
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
 
-        # ✅ Ensure lectures_df is loaded
         lectures_df = st.session_state.get("lectures_df")
         if lectures_df is None:
             lectures_df = load_lectures(course_code)
 
-        # ✅ Safety check: 'Week' column
         if "Week" not in lectures_df.columns:
             st.error("⚠️ The lectures file is missing the 'Week' column. Please upload a valid lectures CSV.")
             st.stop()
 
-        week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist(), key=f"{course_code}_att_week")
+        week = st.selectbox("Select Lecture Week", [str(w) for w in lectures_df["Week"].tolist()], key=f"{course_code}_att_week")
         attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
@@ -810,12 +801,12 @@ def student_view():
                     st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
                 elif has_marked_attendance(course_code, week, name):
                     st.info("✅ Attendance already marked. You can’t mark it again.")
-                    st.session_state["attended_week"] = week
+                    st.session_state["attended_week"] = str(week)
                 else:
                     ok = mark_attendance_entry(course_code, name, matric, week)
                     if ok:
                         st.success(f"✅ Attendance recorded for {name} ({week}).")
-                        st.session_state["attended_week"] = week
+                        st.session_state["attended_week"] = str(week)
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -824,12 +815,11 @@ def student_view():
     st.subheader("📘 Lecture Briefs and Classwork")
     st.markdown("Here you can view lecture summaries, slides, and classwork materials.")
 
-    # Safely get lecture info
     if "attended_week" not in st.session_state:
         st.warning("Please attend a lecture before accessing materials.")
         return
     else:
-        week = st.session_state["attended_week"]
+        week = str(st.session_state["attended_week"])
         st.success(f"Access granted for {week}")
 
     lectures_df = st.session_state.get("lectures_df")
@@ -863,24 +853,22 @@ def student_view():
         # Admin-controlled timer
         remaining_sec = get_remaining_time(course_code, week)
         timer_placeholder = st.empty()
-        # Display timer and progress bar
-        total_duration = 20 * 60  # 20 minutes in seconds
-        minutes, seconds = divmod(remaining_sec, 60)
-        timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
+        progress_placeholder = st.empty()  # progress bar
 
-        # Progress bar: 0% at start, 100% when time expires
-        progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
-        progress_placeholder.progress(progress)
-        
         if remaining_sec > 0:
-            minutes, seconds = divmod(remaining_sec, 60)
-            timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
-
             # Live countdown with auto-refresh
             st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
 
+            # Timer display
+            minutes, seconds = divmod(remaining_sec, 60)
+            timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
+
+            # Progress bar: 0% at start → 100% when expired
+            total_duration = 20 * 60
+            progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
+            progress_placeholder.progress(progress)
+
             with st.form("cw_form"):
-                # Preserve answers in session_state
                 answers_state_key = f"{course_code}_{week}_answers"
                 if answers_state_key not in st.session_state:
                     st.session_state[answers_state_key] = [""] * len(questions)
@@ -889,7 +877,7 @@ def student_view():
                 for i, q in enumerate(questions):
                     ans = st.text_input(f"Q{i+1}: {q}", value=st.session_state[answers_state_key][i], key=f"{answers_state_key}_{i}")
                     answers.append(ans)
-                    st.session_state[answers_state_key][i] = ans  # update session
+                    st.session_state[answers_state_key][i] = ans
 
                 submit_cw = st.form_submit_button(
                     "Submit Answers",
@@ -901,6 +889,7 @@ def student_view():
 
         else:
             timer_placeholder.info("⏳ Classwork not yet opened by Admin or time expired.")
+            progress_placeholder.progress(1.0)
 
     else:
         st.info("Classwork not yet released.")
@@ -1577,6 +1566,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
