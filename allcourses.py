@@ -359,7 +359,7 @@ ensure_data_files()
 # -----------------------------
 # ATTENDANCE + SUBMISSION HELPERS
 # -----------------------------
-def has_marked_attendance(course_code, week, name):
+def has_marked_attendance(course_code, week, matric, name):
     try:
         df = pd.read_csv(os.path.join("attendance", f"{course_code}_attendance.csv"))
         # Ensure columns exist
@@ -378,7 +378,7 @@ def has_marked_attendance(course_code, week, name):
         return False
 
 
-def save_file(course_code, name, week, uploaded_file, file_type):
+def save_file(course_code, name, week, matric, uploaded_file, file_type):
     """Save an uploaded file to submissions/<course>/<file_type>/ and log it."""
     folder_path = os.path.join("submissions", course_code, file_type)
     os.makedirs(folder_path, exist_ok=True)
@@ -505,18 +505,38 @@ def close_classwork_after_20min(course_code):
     if changed:
         df.to_csv(CLASSWORK_STATUS_FILE, index=False)
         
-def save_classwork(name, matric, week, answers):
-    """Save classwork answers to a CSV file."""
+def save_classwork(course_code, name, matric, week, answers):
+    """Save classwork answers to a CSV file after validation."""
     CLASSWORK_STATUS_FILE = get_file(course_code, "classwork_answers")
+
+    # Ensure attendance and activation
+    if "attended_week" not in st.session_state:
+        st.warning("⚠️ You must mark attendance before submitting classwork.")
+        return
+    if not st.session_state.get("classwork_open", False):
+        st.warning("🚫 Classwork is not open yet. Please wait for your lecturer.")
+        return
+
+    # Create CSV if missing
     if not os.path.exists(CLASSWORK_STATUS_FILE):
         pd.DataFrame(columns=["StudentName", "Matric", "Week", "Answers", "Timestamp"]).to_csv(CLASSWORK_STATUS_FILE, index=False)
 
+    # Append new record
     df = pd.read_csv(CLASSWORK_STATUS_FILE)
     answers_str = "; ".join([f"Q{i+1}: {ans.strip()}" for i, ans in enumerate(answers) if ans.strip()])
-    new_row = {"StudentName": name.strip(), "Matric": matric.strip(), "Week": week, "Answers": answers_str, "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    new_row = {
+        "StudentName": name.strip(),
+        "Matric": matric.strip(),
+        "Week": week,
+        "Answers": answers_str,
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(CLASSWORK_FILE, index=False)
+    df.to_csv(CLASSWORK_STATUS_FILE, index=False)
+
     st.success(f"✅ Classwork answers saved for {name} ({week})")
+
 
 def save_file(course_code, student_name, week, uploaded_file, folder_name):
     """Safely save uploaded file to the appropriate course and folder."""
@@ -860,6 +880,8 @@ def student_view():
 # ===============================================================
 
 # Retrieve classwork text from lecture_info
+    if "attended_week" in st.session_state:
+            st.warning("Please attend a lecture before accessing classwork.")
     classwork_text = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
 
 # Debugging helper (optional)
@@ -1063,7 +1085,6 @@ def student_view():
 def admin_view(course_code):
 
     st.title("👩‍🏫 Admin Dashboard")
-    st.subheader("🔐 Teacher / Admin Panel")
 
     # -------------------------
     # Authentication
@@ -1631,6 +1652,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
