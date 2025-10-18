@@ -847,7 +847,7 @@ def student_view():
 
     if classwork:
         st.markdown("### 🧩 Classwork Questions")
-        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+        questions = [q.strip() for q in classwork.split(";") if q.strip()]
 
     # Check if classwork is open
         if not is_classwork_open(course_code, week):
@@ -1587,6 +1587,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
