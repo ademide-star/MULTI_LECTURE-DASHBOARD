@@ -750,11 +750,9 @@ def mark_attendance_entry(course_code, name, matric, week):
 
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.to_csv(file_path, index=False)
-
         return True
-
     except Exception as e:
-        st.error(f"⚠️ Error marking attendance: {e}")
+        st.error(f"⚠️ Error saving attendance: {e}")
         return False
 
 
@@ -818,61 +816,46 @@ def student_view():
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
-        week = st.selectbox("Select Lecture Week", [str(w) for w in lectures_df["Week"].tolist()], key=f"{course_code}_att_week")
-        attendance_code = st.text_input("Enter Attendance Code (Ask your lecturer)", key=f"{course_code}_att_code")
+        week = st.selectbox(
+            "Select Lecture Week",
+            [str(w) for w in lectures_df["Week"].tolist()],
+            key=f"{course_code}_att_week"
+        )
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
     # -------------------------------
-    # ⚙️ ATTENDANCE CONFIG
+    # 🧾 ATTENDANCE VALIDATION (NO CODE)
     # -------------------------------
-    COURSE_CODE = {
-        "BIO203": {"valid_code": "BIO203-ZT7"},
-        "BCH201": {"valid_code": "BCH201-ZT8"},
-        "MCB221": {"valid_code": "MCB221-ZT9"},
-        "BIO113": {"valid_code": "BIO113-ZT1"},
-        "BIO306": {"valid_code": "BIO306-ZT2"},
-    }
-
-    # -------------------------------
-# 🧾 ATTENDANCE VALIDATION
-# -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
             return
-        elif not attendance_code.strip():
-            st.warning("Please enter the attendance code for today.")
-            return
 
-        if course_code not in COURSE_CODE:
-            st.error(f"⚠️ No attendance code configured for {course_code}.")
-            return
-
-        valid_code = COURSE_CODE[course_code]["valid_code"]
-
-    # 1️⃣ Check if attendance is open (controlled by admin)
+        # ✅ Check if attendance is open
         if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
             return
 
-    # 2️⃣ Validate attendance code
-        if attendance_code != valid_code:
-            st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-            return
-
-    # 3️⃣ Prevent duplicate marking
+        # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name):
             st.info("✅ Attendance already marked for this week.")
-            st.session_state["attended_week"] = str(week)
             return
 
-    # 4️⃣ Mark attendance
+        # ✅ Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
-            st.success(f"✅ Attendance recorded successfully for Week {week}.")
+            st.success(f"🎉 Attendance recorded successfully for {course_code} - Week {week}.")
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
+
+    # -------------------------------
+    # 📚 LECTURE PREVIEW (Optional)
+    # -------------------------------
+    st.divider()
+    st.subheader("📖 Available Lectures")
+    st.dataframe(lectures_df[["Week", "Topic", "Date"]], use_container_width=True)
+
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -1745,14 +1728,46 @@ def admin_view(course_code):
 # -------------------------------
     st.subheader("🎛 Attendance Control")
 
-    selected_course = st.selectbox("Select Course to Manage", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
-    open_attendance = st.toggle(f"🔓 Allow students to mark attendance for {selected_course}", 
-                            key=f"{selected_course}_attendance_open")
+# Select course
+    selected_course = st.selectbox(
+        "Select Course to Manage", 
+        ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
+)
+
+# Select week
+    selected_week = st.selectbox(
+        "Select Week", 
+        [f"Week {i}" for i in range(1, 15)], 
+        key=f"{selected_course}_week_select"
+)
+
+# Create a unique key for that course-week combination
+    attendance_key = f"{selected_course}_{selected_week}_attendance_open"
+
+# Attendance toggle
+    open_attendance = st.toggle(
+        f"🔓 Allow students to mark attendance for {selected_course} ({selected_week})", 
+        key=attendance_key
+)
 
     if open_attendance:
-        st.success(f"✅ Attendance is OPEN for {selected_course}")
+        st.success(f"✅ Attendance is OPEN for {selected_course} - {selected_week}")
     else:
-        st.warning(f"🚫 Attendance is CLOSED for {selected_course}")
+        st.warning(f"🚫 Attendance is CLOSED for {selected_course} - {selected_week}")
+
+# 📁 Delete attendance record option
+    attendance_folder = os.path.join("data", "attendance")
+    os.makedirs(attendance_folder, exist_ok=True)
+    attendance_file = os.path.join(attendance_folder, f"{selected_course}_{selected_week}.csv")
+
+    if os.path.exists(attendance_file):
+        st.info(f"📂 Found record: {attendance_file}")
+        if st.button(f"🗑 Delete Attendance Record for {selected_course} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
+            os.remove(attendance_file)
+            st.success(f"✅ Deleted attendance record for {selected_course} - {selected_week}")
+    else:
+        st.info(f"No attendance record yet for {selected_course} - {selected_week}")
+
 
  
 
@@ -1791,6 +1806,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
