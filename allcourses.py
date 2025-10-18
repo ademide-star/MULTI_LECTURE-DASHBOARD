@@ -824,6 +824,18 @@ def student_view():
                         save_classwork(name, matric, week, answers)
             else:
                 st.info("Classwork not yet released.")
+                pdf_path = os.path.join(MODULES_DIR, f"{course_code}_{lecture_info.get('Week', '').replace(' ', '_')}.pdf")
+            if os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as pdf_file:
+                    st.download_button(
+                        label=f"📥 Download {lecture_info.get('Week', 'Lecture')} Module PDF",
+                        data=pdf_file.read(),
+                        file_name=f"{course_code}_{lecture_info.get('Week', 'Lecture')}.pdf",
+                        mime="application/pdf",
+                        key=f"{course_code}_pdf_dl"
+                    )
+            else:
+                st.info("Lecture note not uploaded yet.")
         except Exception as e:
             st.error(f"⚠️ Error displaying lecture details: {e}")
 
@@ -1483,6 +1495,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
