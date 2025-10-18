@@ -811,19 +811,6 @@ def student_view():
         return
 
     # -------------------------------
-    # 🕒 ATTENDANCE FORM
-    # -------------------------------
-    with st.form(f"{course_code}_attendance_form"):
-        name = st.text_input("Full Name", key=f"{course_code}_student_name")
-        matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
-        week = st.selectbox(
-            "Select Lecture Week",
-            [str(w) for w in lectures_df["Week"].tolist()],
-            key=f"{course_code}_att_week"
-        )
-        submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-
-    # -------------------------------
     # 🧾 ATTENDANCE VALIDATION (NO CODE)
     # -------------------------------
     if submit_attendance:
@@ -834,15 +821,17 @@ def student_view():
         # ✅ Check if attendance is open
         if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-        else:
-    # Attendance marking form here
-            student_name = st.text_input("Enter your full name")
-            matric_number = st.text_input("Enter your matric number")
-            attendance_code = st.text_input("Enter today's attendance code")
-
-            if st.button("Submit Attendance"):
+        
+         # -------------------------------
+    # 🕒 ATTENDANCE FORM
+    # -------------------------------
+    with st.form(f"{course_code}_attendance_form"):
+        name = st.text_input("Full Name", key=f"{course_code}_student_name")
+        matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
+        week = st.selectbox("Select Lecture Week", lectures_df["Week"].tolist(), key=f"{course_code}_att_week")
+        submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
         # Process attendance submission
-                st.success("✅ Attendance marked successfully!")
+        st.success("✅ Attendance marked successfully!")
 
         # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name):
@@ -1803,6 +1792,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
