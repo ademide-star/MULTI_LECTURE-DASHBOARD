@@ -1104,7 +1104,7 @@ def admin_view(course_code):
         
         topic = st.text_input("Lecture Topic", value=lectures_df.at[row_idx, "Topic"])
         brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"])
-        classwork = st.text_area("Classwork (separate questions with ;)", value=lectures_df.at[row_idx, "Classwork"])
+        classwork_text = st.text_area("Classwork (separate questions with ;)", value=lectures_df.at[row_idx, "Classwork"])
         assignment = st.text_area("Assignment (separate questions with ;)", value=lectures_df.at[row_idx, "Assignment"])
 
         st.markdown("**Upload PDF Files (Optional)**")
@@ -1587,6 +1587,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
