@@ -1747,30 +1747,28 @@ def admin_view(course_code):
 
 # Attendance toggle
     open_attendance = st.toggle(
-        f"🔓 Allow students to mark attendance for {selected_course} ({selected_week})", 
+        f"🔓 Allow students to mark attendance for {course_code} ({selected_week})", 
         key=attendance_key
 )
 
     if open_attendance:
-        st.success(f"✅ Attendance is OPEN for {selected_course} - {selected_week}")
+        st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
     else:
-        st.warning(f"🚫 Attendance is CLOSED for {selected_course} - {selected_week}")
+        st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
 
 # 📁 Delete attendance record option
     attendance_folder = os.path.join("data", "attendance")
     os.makedirs(attendance_folder, exist_ok=True)
-    attendance_file = os.path.join(attendance_folder, f"{selected_course}_{selected_week}.csv")
+    attendance_file = os.path.join(attendance_folder, f"{course_code}_{selected_week}.csv")
 
     if os.path.exists(attendance_file):
         st.info(f"📂 Found record: {attendance_file}")
-        if st.button(f"🗑 Delete Attendance Record for {selected_course} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
+        if st.button(f"🗑 Delete Attendance Record for {course_code} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
             os.remove(attendance_file)
-            st.success(f"✅ Deleted attendance record for {selected_course} - {selected_week}")
+            st.success(f"✅ Deleted attendance record for {course_code} - {selected_week}")
     else:
-        st.info(f"No attendance record yet for {selected_course} - {selected_week}")
+        st.info(f"No attendance record yet for {course_code} - {selected_week}")
 
-
- 
 
     ATTENDANCE_FOLDER = "attendance_records"
 
@@ -1797,8 +1795,6 @@ def admin_view(course_code):
         else:
             st.info("No attendance files found.")
 
-
-
 # 🚪 SHOW VIEW BASED ON ROLE
 # ===============================================================
 if st.session_state["role"] == "Admin":
@@ -1807,6 +1803,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
