@@ -582,6 +582,66 @@ def display_module_pdf(week):
     else:
         st.info("Lecture PDF module not yet uploaded.")
 
+def mark_attendance_entry(course_code, name, matric, week):
+    """Marks attendance for a given student safely, even if CSV is corrupted or has duplicate headers."""
+    try:
+        file_path = get_file(course_code, "attendance_form")
+
+        # ✅ Load DataFrame safely or initialize a new one
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_csv(file_path)
+
+                # 🚨 Fix duplicate columns automatically
+                if not df.columns.is_unique:
+                    df.columns = pd.io.parsers.ParserBase({'names': df.columns})._maybe_dedup_names(df.columns)
+
+                # ✅ Drop any unnamed or empty columns
+                df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            except Exception:
+                # If file is corrupted, reinitialize it
+                df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+        else:
+            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+
+        # ✅ Normalize column names
+        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+
+        # ✅ Ensure required columns exist
+        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
+            if col not in df.columns:
+                df[col] = None
+
+        # ✅ Convert to proper dtypes
+        df["StudentName"] = df["StudentName"].astype(str)
+        df["Matric"] = df["Matric"].astype(str)
+        df["Week"] = df["Week"].astype(str)
+
+        # ✅ Check if already marked
+        if ((df["StudentName"].str.lower() == name.strip().lower()) &
+            (df["Week"] == str(week))).any():
+            return False
+
+        # ✅ Add new record
+        new_entry = {
+            "StudentName": name.strip(),
+            "Matric": matric.strip(),
+            "Week": str(week),
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+
+        # ✅ Reset index cleanly
+        df = df.loc[:, ~df.columns.duplicated()]
+        df.reset_index(drop=True, inplace=True)
+
+        # ✅ Save safely
+        df.to_csv(file_path, index=False)
+        return True
+
+    except Exception as e:
+        st.error(f"⚠️ Error marking attendance: {e}")
+        return False
 
 
 
@@ -1398,6 +1458,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
