@@ -832,9 +832,17 @@ def student_view():
             return
 
         # ✅ Check if attendance is open
-        if not st.session_state.get(f"{course_code}_attendance_open", False):
+        if not st.session_state.get(f"{selected_course}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-            return
+        else:
+    # Attendance marking form here
+            student_name = st.text_input("Enter your full name")
+            matric_number = st.text_input("Enter your matric number")
+            attendance_code = st.text_input("Enter today's attendance code")
+
+            if st.button("Submit Attendance"):
+        # Process attendance submission
+                st.success("✅ Attendance marked successfully!")
 
         # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name):
@@ -1799,6 +1807,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
