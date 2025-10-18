@@ -643,65 +643,68 @@ def get_file(course_code, file_type):
 
 
 def mark_attendance_entry(course_code, name, matric, week):
-    """Safely mark attendance — cleans duplicates, fixes indexes, and auto-creates files."""
+    """Robust attendance marker — auto-fixes missing columns, duplicates, and broken files."""
     try:
         file_path = get_file(course_code, "attendance")
         if not file_path:
-            raise ValueError("⚠️ Attendance file path not found — check get_file() mapping.")
+            raise ValueError("⚠️ Invalid attendance file path for this course.")
 
         # ✅ Ensure folder exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-        # ✅ Load or create new DataFrame
+        # ✅ Load file or create new one
         if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
+            try:
+                df = pd.read_csv(file_path)
+            except Exception:
+                # File exists but unreadable — recreate it cleanly
+                df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
         else:
-            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
+            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Status", "Timestamp"])
 
-        # ✅ Drop any duplicate or unnamed columns
-        df = df.loc[:, ~df.columns.duplicated()]
-        df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
+        # ✅ Normalize all column names (fixes case sensitivity)
+        df.columns = [str(c).strip().title().replace(" ", "") for c in df.columns]
 
-        # ✅ Reset index cleanly
-        df.reset_index(drop=True, inplace=True)
-
-        # ✅ Ensure all required columns exist
-        required_cols = ["StudentName", "Matric", "Week", "Timestamp"]
-        for col in required_cols:
+        # ✅ Ensure required columns exist
+        required = ["StudentName", "Matric", "Week", "Status", "Timestamp"]
+        for col in required:
             if col not in df.columns:
                 df[col] = None
 
-        # ✅ Standardize header names
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
+        # ✅ Remove duplicate/unnamed columns and fix index
+        df = df.loc[:, ~df.columns.duplicated()]
+        df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
+        df.reset_index(drop=True, inplace=True)
 
-        # ✅ Convert to strings
+        # ✅ Convert to string (avoid dtype errors)
         for col in ["StudentName", "Matric", "Week"]:
             df[col] = df[col].astype(str).fillna("")
 
-        # ✅ Check if already marked
-        duplicate_mask = (
+        # ✅ Check for duplicates
+        already = df[
             (df["StudentName"].str.lower() == name.strip().lower()) &
             (df["Week"].astype(str) == str(week))
-        )
-        if duplicate_mask.any():
-            return False  # already marked
+        ]
+        if not already.empty:
+            return False  # Already marked
 
-        # ✅ Add new record
+        # ✅ Append new record
         new_entry = {
             "StudentName": name.strip(),
             "Matric": matric.strip(),
             "Week": str(week),
+            "Status": "Present",
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
 
-        # ✅ Save cleaned file
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.to_csv(file_path, index=False)
         return True
 
     except Exception as e:
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
+
 
 
 
@@ -1529,6 +1532,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
