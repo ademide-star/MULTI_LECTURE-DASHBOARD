@@ -797,7 +797,7 @@ def student_view():
 
                 st.session_state["attended_week"] = str(week)  # store as string
 
-                if not (start_time <= now_t <= end_time):
+            if not (start_time <= now_t <= end_time):
                     st.error(f"⏰ Attendance for {course_code} is only open between "
                         f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
             elif attendance_code != valid_code:
@@ -1520,6 +1520,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
