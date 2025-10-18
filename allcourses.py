@@ -661,6 +661,39 @@ def get_file(course_code, file_type):
     }
     return file_map.get(file_type, "")
 
+def has_marked_attendance(course_code, week, name, matric=None):
+    """Check if a student has already marked attendance for a specific course and week."""
+    try:
+        # 📁 Define the folder and weekly file
+        attendance_folder = os.path.join("data", "attendance")
+        file_path = os.path.join(attendance_folder, f"{course_code}_Week_{week}.csv")
+
+        # 🚫 If file doesn't exist yet
+        if not os.path.exists(file_path):
+            return False
+
+        # ✅ Load attendance file
+        df = pd.read_csv(file_path)
+
+        # ✅ Normalize column names
+        df.columns = [str(c).strip().title().replace(" ", "") for c in df.columns]
+
+        # ✅ Check if the student has already marked attendance
+        if matric:
+            already = df[
+                (df["Studentname"].str.lower() == name.strip().lower()) &
+                (df["Matric"].str.lower() == matric.strip().lower())
+            ]
+        else:
+            already = df[
+                (df["Studentname"].str.lower() == name.strip().lower())
+            ]
+
+        return not already.empty
+
+    except Exception as e:
+        st.error(f"⚠️ Error checking attendance: {e}")
+        return False
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Save attendance in week-by-week files, with safety checks and no duplicates."""
@@ -1758,6 +1791,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
