@@ -805,7 +805,12 @@ def student_view():
                 pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"]).to_csv(file_path, index=False)
                 st.info(f"📘 Created new lecture file for {course_code}. You can add content in Admin panel.")
 
-            lectures_df = pd.read_csv(file_path)
+            lecture_data = get_lecture_brief(course_code)
+            if not lecture_data:
+                st.warning(f"No lecture briefs available for {course_code}.")
+                return
+            lectures_df = pd.DataFrame(lecture_data)
+
             st.session_state["lectures_df"] = lectures_df
         except Exception as e:
             st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
@@ -1518,6 +1523,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
