@@ -891,9 +891,6 @@ def student_view():
             timer_placeholder.info("⏳ Classwork not yet opened by Admin or time expired.")
             progress_placeholder.progress(1.0)
 
-    else:
-        st.info("Classwork not yet released.")
-
 
 # ============================================================
 # 📚 Lecture Materials Viewer (PDFs)
@@ -1513,39 +1510,22 @@ def admin_view(course_code):
             st.write(df.columns)
         else:
             st.warning("Attendance file not found!")
-    # -------------------------
-# 🧩 Admin Classwork Control
-# -------------------------
-            st.header("🧩 Classwork Control")
+    # -------------------------------------
+# 🧩 CLASSWORK CONTROL
+# -------------------------------------
+        st.header("🧩 Classwork Control")
 
-# Ensure lectures_df is loaded
-            lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
-            week_options = lectures_df["Week"].unique().tolist() if not lectures_df.empty else ["Week 1"]
+        week_to_control = st.selectbox(
+            "Select Week to Open/Close Classwork", 
+            lectures_df["Week"].unique(), 
+            key="admin_cw_control"
+)
 
-# Admin selects course and week
-            course_code = st.selectbox("Select Course", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"], key="admin_course")
-            week_to_control = st.selectbox("Select Week to Open/Close Classwork", week_options, key=f"{course_code}_admin_week_control")
+        if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key="admin_open_cw"):
+            open_classwork(course_code, week_to_control)
+            st.success(f"✅ Classwork for {week_to_control} is now open for 20 minutes.")
 
-# Open Classwork button
-            if st.button(f"📂 Open Classwork for {course_code} - {week_to_control}"):
-                key = f"{course_code}_{week_to_control}_cw_end"
-                st.session_state[key] = datetime.now() + timedelta(minutes=20)  # 20-minute timer for all students
-                st.success(f"✅ Classwork for {course_code} ({week_to_control}) is now OPEN for 20 minutes!")
-
-# Close Classwork button
-            if st.button(f"⏹ Close Classwork for {course_code} - {week_to_control}"):
-                key = f"{course_code}_{week_to_control}_cw_end"
-                if key in st.session_state:
-                    st.session_state[key] = datetime.now()  # immediately expire timer
-                    st.warning(f"⚠️ Classwork for {course_code} ({week_to_control}) is now CLOSED!")
-
-# Optional: auto-close classwork after 20 min (if you have this function defined)
-            try:
-                if "close_classwork_after_20min" in globals() and callable(close_classwork_after_20min):
-                    close_classwork_after_20min(course_code)
-            except Exception:
-                pass
-
+        close_classwork_after_20min(course_code)
 # Footer timestamp
             st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
@@ -1559,6 +1539,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
