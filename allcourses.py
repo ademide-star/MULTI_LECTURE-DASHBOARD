@@ -843,6 +843,9 @@ def student_view():
 
     
     # 🧩 Classwork Section #
+    st.write("DEBUG: Lecture info keys:", list(lecture_info.keys()))
+    st.write("DEBUG: Classwork value:", lecture_info.get("Classwork"))
+
     classwork = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
 
     if classwork:
@@ -1510,6 +1513,13 @@ def admin_view(course_code):
 # 🧩 Admin Classwork Control (Visible Always)
 # -------------------------------------
     st.header("🧩 Classwork Control")
+    st.markdown("### 🧩 Classwork Control")
+    open_cw = st.checkbox(f"✅ Open classwork for Week {week}", value=is_classwork_open(course_code, week))
+
+    if open_cw:
+        open_classwork(course_code, week)
+    else:
+        close_classwork(course_code, week)
 
 # Load lectures for the selected course
     if "lectures_df" in st.session_state and not st.session_state["lectures_df"].empty:
@@ -1573,7 +1583,7 @@ def admin_view(course_code):
             st.session_state[key] = datetime.now()
 
             st.warning(f"⚠️ Classwork for {week_to_control} is now CLOSED!")
-
+     
     # Footer timestamp
         st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
@@ -1587,6 +1597,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
