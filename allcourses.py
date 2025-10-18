@@ -584,25 +584,19 @@ def display_module_pdf(week):
         st.info("Lecture PDF module not yet uploaded.")
 
 
-
-    # ✅ Fallback: Ensure file path exists if get_file failed
-    file_path = get_file(course_code, "attendance_form")
-    if not file_path or file_path.strip() == "":
-        file_path = os.path.join("data", f"{course_code}_attendance.csv")
-        os.makedirs("modules", exist_ok=True)
-
-
-MODULE_DIR = "modules"  # or "database" or whatever you prefer
-os.makedirs(MODULE_DIR, exist_ok=True)
+BASE_DIR = "database"
+os.makedirs(BASE_DIR, exist_ok=True)
 
 def get_file(course_code, file_type):
     """Generate a valid file path for different file types."""
     file_map = {
+        "attendance": os.path.join(BASE_DIR, f"{course_code}_attendance.csv"),
         "attendance_form": os.path.join(BASE_DIR, f"{course_code}_attendance.csv"),
         "lectures": os.path.join(BASE_DIR, f"{course_code}_lectures.csv"),
         "scores": os.path.join(BASE_DIR, f"{course_code}_scores.csv"),
     }
     return file_map.get(file_type, "")
+
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Marks attendance for a given student safely with auto-column creation."""
@@ -748,7 +742,6 @@ def student_view():
             st.success(f"Access granted for {week}")
        
 # ✅ Ensure lectures_df is available
-        lecture_info = {}
         # ✅ Retrieve selected lecture safely
         lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0]
         lectures_df = st.session_state.get("lectures_df", pd.read_csv(get_file(course_code, "lectures")))
@@ -1468,6 +1461,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
