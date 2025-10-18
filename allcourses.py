@@ -584,90 +584,6 @@ def display_module_pdf(week):
         st.info("Lecture PDF module not yet uploaded.")
 
 
-def mark_attendance_entry(course_code, name, matric, week):
-    """Marks attendance robustly — cleans file, enforces unique columns, fixes index issues."""
-    try:
-        file_path = get_file(course_code, "attendance_form")
-
-        # ✅ Step 1: Ensure parent folder exists
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-        # ✅ Step 2: Try reading the file safely
-        if os.path.exists(file_path):
-            try:
-                df = pd.read_csv(file_path)
-
-                # 🔧 Fix duplicate or unnamed columns (modern Pandas compatible)
-                df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False, na=False)]
-
-                # ✅ Deduplicate column names — works on all Pandas versions
-                try:
-                    from pandas.io.common import dedup_names
-                    # Handle both Pandas ≥2.2 and <2.2 versions
-                    try:
-                        df.columns = dedup_names(df.columns.tolist(), is_potential_multiindex=False)
-                    except TypeError:
-                        df.columns = dedup_names(df.columns.tolist())
-                except ImportError:
-                    # Manual fallback if dedup_names unavailable
-                    seen = {}
-                    new_cols = []
-                    for col in df.columns:
-                        if col in seen:
-                            seen[col] += 1
-                            new_cols.append(f"{col}_{seen[col]}")
-                        else:
-                            seen[col] = 0
-                            new_cols.append(col)
-                    df.columns = new_cols
-
-                # 🔧 Reset index to avoid reindex errors
-                df.reset_index(drop=True, inplace=True)
-
-            except Exception as e:
-                st.warning(f"⚠️ Attendance file corrupted, reinitializing: {e}")
-                df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
-        else:
-            df = pd.DataFrame(columns=["StudentName", "Matric", "Week", "Timestamp"])
-
-        # ✅ Step 3: Normalize column names
-        df.columns = [c.strip().title().replace(" ", "") for c in df.columns]
-
-        # ✅ Step 4: Ensure required columns exist
-        for col in ["StudentName", "Matric", "Week", "Timestamp"]:
-            if col not in df.columns:
-                df[col] = None
-
-        # ✅ Step 5: Convert all to strings (prevents dtype issues)
-        for col in ["StudentName", "Matric", "Week"]:
-            df[col] = df[col].astype(str)
-
-        # ✅ Step 6: Check if already marked
-        already = df[
-            (df["StudentName"].str.lower() == name.strip().lower()) &
-            (df["Week"] == str(week))
-        ]
-        if not already.empty:
-            return False  # already marked
-
-        # ✅ Step 7: Add new entry
-        new_entry = {
-            "StudentName": name.strip(),
-            "Matric": matric.strip(),
-            "Week": str(week),
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-        df.reset_index(drop=True, inplace=True)
-
-        # ✅ Step 8: Save cleanly (always overwrite with fresh, unique headers)
-        df.to_csv(file_path, index=False)
-        return True
-
-    except Exception as e:
-        st.error(f"⚠️ Error marking attendance: {e}")
-        return False
 
     # ✅ Fallback: Ensure file path exists if get_file failed
     file_path = get_file(course_code, "attendance_form")
@@ -784,6 +700,10 @@ def student_view():
        
 # ✅ Ensure lectures_df is available
         lecture_info = {}
+        # ✅ Retrieve selected lecture safely
+        lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0]
+        lectures_df = st.session_state.get("lectures_df", pd.read_csv(get_file(course_code, "lectures")))
+        st.session_state["lectures_df"] = lectures_df
 
         try:
             if "lectures_df" not in st.session_state:
@@ -801,8 +721,9 @@ def student_view():
             if week not in lectures_df["Week"].values:
                 st.warning(f"⚠️ No lecture found for {week}.")
                 st.stop()
-
-                lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict()
+            else:
+        # Convert to dict to safely use .get()
+                lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0].to_dict() 
         except Exception as e:
             st.error(f"⚠️ Could not load lecture data for {course_code}: {e}")
             st.stop()
@@ -1498,6 +1419,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
