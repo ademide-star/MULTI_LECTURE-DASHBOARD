@@ -842,10 +842,10 @@ def student_view():
         st.info("Assignment not yet released.")
 
     # ---------------------- Classwork Section ---------------------- #
-    classwork_text = clean_text(lecture_info.get("Classwork"))
-    if classwork_text:
-        st.markdown("### 🧩 Classwork Questions")
-        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+        classwork_text = clean_text(lecture_info.get("Classwork"))
+        if classwork_text:
+            st.markdown("### 🧩 Classwork Questions")
+            questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
 
     # Check if admin has opened classwork
         if not is_classwork_open(course_code, week):
@@ -1593,6 +1593,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
