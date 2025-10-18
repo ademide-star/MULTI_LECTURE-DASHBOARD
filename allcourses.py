@@ -843,9 +843,6 @@ def student_view():
 
     
     # 🧩 Classwork Section #
-    import streamlit as st
-from datetime import datetime
-import os
 
 # ==============================
 # 🧠 Helper functions (connects to Admin Control)
@@ -1635,7 +1632,6 @@ def close_classwork(course_code, week):
 # ==============================
 # 🧩 Admin Classwork Control Panel
 # ==============================
-def admin_classwork_control(course_code):
     st.header("🧩 Classwork Control Panel")
 
     # Load lectures (mock fallback if not in session)
@@ -1685,6 +1681,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
