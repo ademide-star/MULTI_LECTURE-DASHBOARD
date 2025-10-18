@@ -1530,7 +1530,11 @@ def admin_view(course_code):
     st.header("🧩 Classwork Control")
 
 # Load lectures for the selected course
-    lectures_df = st.session_state.get("lectures_df") or load_lectures(course_code)
+    if "lectures_df" in st.session_state and not st.session_state["lectures_df"].empty:
+        lectures_df = st.session_state["lectures_df"]
+    else:
+        lectures_df = load_lectures(course_code)
+
     if lectures_df.empty:
         st.info("No lectures found for this course.")
     else:
@@ -1601,6 +1605,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
