@@ -1667,15 +1667,22 @@ def admin_view(course_code):
 # List existing attendance files
     attendance_files = [f for f in os.listdir(ATTENDANCE_FOLDER) if f.endswith(".csv")]
 
-    st.subheader("🗑️ Delete Attendance Record")
+    st.subheader("🗑️ Delete Weekly Attendance Record")
+    base_folder = "attendance_records"
+    if os.path.exists(base_folder):
+        all_files = []
+        for root, _, files in os.walk(base_folder):
+            for f in files:
+                if f.endswith(".csv"):
+                    all_files.append(os.path.join(root, f))
 
-    if attendance_files:
-        file_to_delete = st.selectbox("Select file to delete:", attendance_files)
-        if st.button("Delete Selected File"):
-            os.remove(os.path.join(ATTENDANCE_FOLDER, file_to_delete))
-            st.success(f"✅ '{file_to_delete}' deleted successfully!")
-    else:
-        st.info("No attendance files found.")
+        if all_files:
+            selected = st.selectbox("Select attendance file to delete:", all_files)
+            if st.button("Delete Selected File"):
+                os.remove(selected)
+                st.success(f"✅ Deleted: {selected}")
+        else:
+            st.info("No attendance files found.")
 
 
 
@@ -1687,6 +1694,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
