@@ -663,11 +663,11 @@ def student_view():
                 st.warning("Please enter the attendance code for today.")
             else:
                 COURSE_TIMINGS = {
-                    "BIO203": {"valid_code": "BIO203-ZT7", "start": "24:00", "end": "22:00"},
-                    "BCH201": {"valid_code": "BCH201-ZT8", "start": "24:00", "end": "22:00"},
-                    "MCB221": {"valid_code": "MCB221-ZT9", "start": "24:00", "end": "22:20"},
-                    "BIO113": {"valid_code": "BIO113-ZT1", "start": "24:00", "end": "22:00"},
-                    "BIO306": {"valid_code": "BIO306-ZT2", "start": "24:00", "end": "22:00"},
+                    "BIO203": {"valid_code": "BIO203-ZT7", "start": "01:00", "end": "22:00"},
+                    "BCH201": {"valid_code": "BCH201-ZT8", "start": "01:00", "end": "22:00"},
+                    "MCB221": {"valid_code": "MCB221-ZT9", "start": "01:00", "end": "22:20"},
+                    "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
+                    "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
                 }
 
                 if not course_code or course_code not in COURSE_TIMINGS:
@@ -1390,6 +1390,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
