@@ -887,7 +887,7 @@ def student_view():
 
                 else:
                     timer_placeholder.info("⏳ Time's up! Classwork is closed.")
-                    progress_placeholder.progress(1.0
+                    progress_placeholder.progress(1.0)
             else:
                 st.info("Classwork not yet released.")
 
@@ -1593,6 +1593,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
