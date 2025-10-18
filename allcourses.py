@@ -705,27 +705,6 @@ def mark_attendance_entry(course_code, name, matric, week):
         st.error(f"⚠️ Error marking attendance: {e}")
         return False
 
-try:
-    file_path = get_file(course_code, "lectures")
-
-    # ✅ Ensure the folder exists
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    # ✅ Auto-create if the file doesn't exist yet
-    if not os.path.exists(file_path):
-        df_template = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
-        df_template.to_csv(file_path, index=False)
-        st.info(f"📘 Created a new lecture file for {course_code}. Please add lecture details in Admin view.")
-
-    # ✅ Now safely load the CSV
-    lectures_df = pd.read_csv(file_path)
-    st.session_state["lectures_df"] = lectures_df
-
-except Exception as e:
-    st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
-    st.stop()
-
-
 
 def student_view():
     if st.session_state.get("role") == "Student":
@@ -823,8 +802,26 @@ def student_view():
 # ✅ Ensure lectures_df is available
         # ✅ Retrieve selected lecture safely
         lecture_info = lectures_df[lectures_df["Week"] == week].iloc[0]
-        lectures_df = st.session_state.get("lectures_df", pd.read_csv(get_file(course_code, "lectures")))
-        st.session_state["lectures_df"] = lectures_df
+        try:
+            file_path = get_file(course_code, "lectures")
+
+    # ✅ Ensure the folder exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    # ✅ Auto-create if the file doesn't exist yet
+            if not os.path.exists(file_path):
+                df_template = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment"])
+                df_template.to_csv(file_path, index=False)
+                st.info(f"📘 Created a new lecture file for {course_code}. Please add lecture details in Admin view.")
+
+    # ✅ Now safely load the CSV
+            lectures_df = pd.read_csv(file_path)
+            st.session_state["lectures_df"] = lectures_df
+
+        except Exception as e:
+            st.error(f"⚠️ Unable to load lecture file for {course_code}: {e}")
+            st.stop()
+            st.session_state["lectures_df"] = lectures_df
 
         try:
             file_path = get_file(course_code, "lectures")
@@ -1551,6 +1548,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
