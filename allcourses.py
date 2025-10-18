@@ -843,50 +843,102 @@ def student_view():
 
     
     # 🧩 Classwork Section #
-    st.write("DEBUG: Lecture info keys:", list(lecture_info.keys()))
-    st.write("DEBUG: Classwork value:", lecture_info.get("Classwork"))
+    import streamlit as st
+from datetime import datetime
+import os
 
-    classwork = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
+# ==============================
+# 🧠 Helper functions (connects to Admin Control)
+# ==============================
+def get_classwork_status_path(course_code):
+    return os.path.join("classwork_status", f"{course_code}_classwork_status.csv")
 
-    if classwork:
-        st.markdown("### 🧩 Classwork Questions")
-        questions = [q.strip() for q in classwork.split(";") if q.strip()]
+def is_classwork_open(course_code, week):
+    """Check if classwork is open for the selected week."""
+    path = get_classwork_status_path(course_code)
+    if not os.path.exists(path):
+        return False
+    import pandas as pd
+    df = pd.read_csv(path)
+    mask = (df["Course"] == course_code) & (df["Week"] == week)
+    if mask.any():
+        return bool(df.loc[mask, "Open"].iloc[0])
+    return False
 
-    # Check if classwork is open
-        if not is_classwork_open(course_code, week):
-            st.info("⏳ Classwork not yet opened by Admin.")
-        else:
-            remaining_sec = get_remaining_time(course_code, week)
-            timer_placeholder = st.empty()
-            progress_placeholder = st.empty()
+def get_remaining_time(course_code, week):
+    """Return remaining seconds in countdown."""
+    key = f"{course_code}_{week}_cw_end"
+    if key not in st.session_state:
+        return 0
+    delta = st.session_state[key] - datetime.now()
+    return max(0, int(delta.total_seconds()))
 
-            if remaining_sec > 0:
-            # Auto-refresh every second
-                st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
-
-                minutes, seconds = divmod(remaining_sec, 60)
-                timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d} minutes")
-
-                total_duration = 20 * 60
-                progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
-                progress_placeholder.progress(progress)
-
-            # Classwork input form
-                with st.form(f"cw_form_{course_code}_{week}"):
-                    answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                    submit_cw = st.form_submit_button(
-                        "Submit Answers",
-                        disabled=remaining_sec == 0 or not is_classwork_open(course_code, week)
-                )
-                    if submit_cw:
-                        save_classwork(name, matric, week, answers)
-                        st.success("✅ Classwork submitted successfully!")
-
-            else:
-                timer_placeholder.info("⏳ Time's up! Classwork is closed.")
-                progress_placeholder.progress(1.0)
+def save_classwork(name, matric, week, answers):
+    """Save student classwork submission."""
+    import pandas as pd
+    file_path = f"classwork_submissions/{week}_submissions.csv"
+    os.makedirs("classwork_submissions", exist_ok=True)
+    df = pd.DataFrame([{
+        "Name": name,
+        "Matric": matric,
+        "Week": week,
+        "Answers": "; ".join(answers),
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }])
+    # Append if exists
+    if os.path.exists(file_path):
+        df.to_csv(file_path, mode="a", index=False, header=False)
     else:
-        st.info("No classwork uploaded for this lecture.")
+        df.to_csv(file_path, index=False)
+    st.success("✅ Classwork submitted successfully!")
+
+# ==============================
+# 🧩 Student Classwork Display
+# ==============================
+def student_classwork_section(course_code, week, lecture_info, name, matric):
+    classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
+
+    if not classwork_text:
+        st.info("📘 No classwork uploaded for this lecture.")
+        return
+
+    st.markdown("### 🧩 Classwork Questions")
+    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+
+    # Check open/close status
+    if not is_classwork_open(course_code, week):
+        st.info("⏳ Classwork not yet opened by Admin.")
+        return
+
+    # Calculate remaining time
+    remaining_sec = get_remaining_time(course_code, week)
+    timer_placeholder = st.empty()
+    progress_placeholder = st.empty()
+
+    if remaining_sec > 0:
+        # Auto-refresh every second while open
+        st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
+
+        minutes, seconds = divmod(remaining_sec, 60)
+        timer_placeholder.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d}")
+
+        total_duration = 20 * 60
+        progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
+        progress_placeholder.progress(progress)
+
+        with st.form(f"cw_form_{course_code}_{week}"):
+            answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
+            submit_cw = st.form_submit_button("Submit Answers")
+
+            if submit_cw:
+                if not any(answers):
+                    st.warning("⚠️ Please answer at least one question before submitting.")
+                else:
+                    save_classwork(name, matric, week, answers)
+    else:
+        timer_placeholder.info("⏳ Time's up! Classwork is closed.")
+        progress_placeholder.progress(1.0)
+
 
 # ---------------------- Lecture Materials (PDFs) ---------------------- #
     st.divider()
@@ -1509,83 +1561,119 @@ def admin_view(course_code):
         else:
             st.warning("Attendance file not found!")
 
-# -------------------------------------
-# 🧩 Admin Classwork Control (Visible Always)
-# -------------------------------------
-    st.header("🧩 Classwork Control")
-    st.markdown("### 🧩 Classwork Control")
-    open_cw = st.checkbox(f"✅ Open classwork for Week {week}", value=is_classwork_open(course_code, week))
 
-    if open_cw:
-        open_classwork(course_code, week)
-    else:
-        close_classwork(course_code, week)
+# ==============================
+# 🧠 Helper Functions
+# ==============================
 
-# Load lectures for the selected course
-    if "lectures_df" in st.session_state and not st.session_state["lectures_df"].empty:
-        lectures_df = st.session_state["lectures_df"]
+def get_classwork_status_path(course_code):
+    """Return the CSV path for storing classwork status."""
+    folder = "classwork_status"
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, f"{course_code}_classwork_status.csv")
+
+def load_classwork_status(course_code):
+    """Load or initialize classwork status file."""
+    file_path = get_classwork_status_path(course_code)
+    if os.path.exists(file_path):
+        try:
+            return pd.read_csv(file_path)
+        except Exception:
+            return pd.DataFrame(columns=["Course", "Week", "Open"])
     else:
-        lectures_df = load_lectures(course_code)
+        return pd.DataFrame(columns=["Course", "Week", "Open"])
+
+def save_classwork_status(df, course_code):
+    """Save classwork status safely."""
+    file_path = get_classwork_status_path(course_code)
+    try:
+        df.to_csv(file_path, index=False)
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Error saving classwork status: {e}")
+        return False
+
+def is_classwork_open(course_code, week):
+    """Check if classwork is currently open for the given week."""
+    df = load_classwork_status(course_code)
+    mask = (df["Course"] == course_code) & (df["Week"] == week)
+    if mask.any():
+        return bool(df.loc[mask, "Open"].iloc[0])
+    return False
+
+def open_classwork(course_code, week, duration_min=20):
+    """Open classwork for a specific duration."""
+    df = load_classwork_status(course_code)
+    mask = (df["Course"] == course_code) & (df["Week"] == week)
+
+    if mask.any():
+        df.loc[mask, "Open"] = True
+    else:
+        df = pd.concat([df, pd.DataFrame([{
+            "Course": course_code,
+            "Week": week,
+            "Open": True
+        }])], ignore_index=True)
+
+    if save_classwork_status(df, course_code):
+        st.session_state[f"{course_code}_{week}_cw_end"] = datetime.now() + timedelta(minutes=duration_min)
+        st.success(f"✅ Classwork for {week} is now OPEN for {duration_min} minutes!")
+
+def close_classwork(course_code, week):
+    """Close classwork for a specific week."""
+    df = load_classwork_status(course_code)
+    mask = (df["Course"] == course_code) & (df["Week"] == week)
+
+    if mask.any():
+        df.loc[mask, "Open"] = False
+
+    if save_classwork_status(df, course_code):
+        st.session_state[f"{course_code}_{week}_cw_end"] = datetime.now()
+        st.warning(f"⚠️ Classwork for {week} is now CLOSED!")
+
+
+# ==============================
+# 🧩 Admin Classwork Control Panel
+# ==============================
+def admin_classwork_control(course_code):
+    st.header("🧩 Classwork Control Panel")
+
+    # Load lectures (mock fallback if not in session)
+    lectures_df = (
+        st.session_state.get("lectures_df")
+        if "lectures_df" in st.session_state and not st.session_state["lectures_df"].empty
+        else pd.DataFrame({"Week": ["Week 1", "Week 2", "Week 3"]})
+    )
 
     if lectures_df.empty:
         st.info("No lectures found for this course.")
-    else:
-    # Select week to control
-        week_options = lectures_df["Week"].unique().tolist()
-        week_to_control = st.selectbox(
-            "Select Week to Open/Close Classwork",
-            week_options,
-            key=f"{course_code}_admin_cw_week"
+        return
+
+    week_options = lectures_df["Week"].unique().tolist()
+    week_to_control = st.selectbox(
+        "Select Week to Open/Close Classwork",
+        week_options,
+        key=f"{course_code}_admin_cw_week"
     )
 
-    # Path to CSV tracking classwork status
-        CLASSWORK_STATUS_FILE = f"classwork_status/{course_code}_classwork_status.csv"
-        os.makedirs(os.path.dirname(CLASSWORK_STATUS_FILE), exist_ok=True)
+    # Display current status
+    if is_classwork_open(course_code, week_to_control):
+        st.info(f"✅ Classwork for {week_to_control} is currently OPEN.")
+    else:
+        st.warning(f"🚫 Classwork for {week_to_control} is currently CLOSED.")
 
-    # Load or create status CSV
-        if os.path.exists(CLASSWORK_STATUS_FILE):
-            df_status = pd.read_csv(CLASSWORK_STATUS_FILE)
-        else:
-            df_status = pd.DataFrame(columns=["Course", "Week", "Open"])
+    # --- Buttons for Control ---
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"📖 Open {week_to_control} (20 mins)", key=f"open_{course_code}_{week_to_control}"):
+            open_classwork(course_code, week_to_control, duration_min=20)
 
-    # ------------------------
-    # 📖 Open Classwork Button
-    # ------------------------
-        if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key=f"open_cw_{course_code}"):
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = True
-            else:
-                df_status = pd.concat([df_status, pd.DataFrame([{
-                    "Course": course_code,
-                    "Week": week_to_control,
-                    "Open": True
-                }])], ignore_index=True)
+    with col2:
+        if st.button(f"⏹ Close {week_to_control}", key=f"close_{course_code}_{week_to_control}"):
+            close_classwork(course_code, week_to_control)
 
-        # Save status
-            df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
-
-        # Set timer (20 minutes)
-            key = f"{course_code}_{week_to_control}_cw_end"
-            st.session_state[key] = datetime.now() + timedelta(minutes=20)
-
-            st.success(f"✅ Classwork for {week_to_control} is now OPEN for 20 minutes!")
-
-    # ------------------------
-    # ⏹ Close Classwork Button
-    # ------------------------
-        if st.button(f"⏹ Close Classwork for {week_to_control}", key=f"close_cw_{course_code}"):
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[(df_status["Course"] == course_code) & (df_status["Week"] == week_to_control), "Open"] = False
-                df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
-
-        # Expire timer immediately
-            key = f"{course_code}_{week_to_control}_cw_end"
-            st.session_state[key] = datetime.now()
-
-            st.warning(f"⚠️ Classwork for {week_to_control} is now CLOSED!")
-     
     # Footer timestamp
-        st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+    st.markdown(f"---\n*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
 
 
 
@@ -1597,6 +1685,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
