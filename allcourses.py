@@ -869,8 +869,6 @@ def student_view():
         lecture_info = lecture_row.squeeze().to_dict()
     else:
         lecture_info = {}
-    else:
-        lecture_info = {}
 
     st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
     brief = clean_text(lecture_info.get("Brief"))
@@ -1679,6 +1677,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
