@@ -824,10 +824,11 @@ def student_view():
                         save_classwork(name, matric, week, answers)
             else:
                 st.info("Classwork not yet released.")
-
+        except Exception as e:
+            st.error(f"⚠️ Error displaying lecture details: {e}")
 
 # ============================================================
-# 📘 Lecture Materials Viewer
+#         📘 Lecture Materials Viewer
 # ============================================================
         st.divider()
         st.subheader("📚 Lecture Materials")
@@ -1482,6 +1483,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
