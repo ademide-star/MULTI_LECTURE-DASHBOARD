@@ -832,7 +832,7 @@ def student_view():
             return
 
         # ✅ Check if attendance is open
-        if not st.session_state.get(f"{selected_course}_attendance_open", False):
+        if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
         else:
     # Attendance marking form here
@@ -1803,6 +1803,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
