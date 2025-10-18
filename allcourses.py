@@ -801,8 +801,8 @@ def student_view():
     }
 
     # -------------------------------
-    # 🧾 ATTENDANCE VALIDATION
-    # -------------------------------
+# 🧾 ATTENDANCE VALIDATION
+# -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
@@ -812,28 +812,29 @@ def student_view():
             return
 
         if course_code not in COURSE_CODE:
-            st.error(f"⚠️ No code configured for {course_code}.")
+            st.error(f"⚠️ No attendance code configured for {course_code}.")
             return
 
         valid_code = COURSE_CODE[course_code]["valid_code"]
-    
 
-        # Check code
+    # 1️⃣ Check if attendance is open (controlled by admin)
+        if not st.session_state.get(f"{course_code}_attendance_open", False):
+            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+            return
+
+    # 2️⃣ Validate attendance code
         if attendance_code != valid_code:
             st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
             return
 
-        # Check duplicate attendance
+    # 3️⃣ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name):
             st.info("✅ Attendance already marked for this week.")
             st.session_state["attended_week"] = str(week)
-    # Check if attendance is open (controlled by admin)
-        if not st.session_state.get(f"{course_code}_attendance_open", False):
-            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-        elif attendance_code != COURSE_CODE[course_code]["valid_code"]:
-            st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
-        else:
-            ok = mark_attendance_entry(course_code, name, matric, week)
+            return
+
+    # 4️⃣ Mark attendance
+        ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
             st.success(f"✅ Attendance recorded successfully for Week {week}.")
@@ -1667,6 +1668,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
