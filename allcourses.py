@@ -1191,31 +1191,94 @@ def admin_view(course_code):
             st.dataframe(lectures_df, use_container_width=True)
 
     # -------------------------
-    # Student Records
-    # -------------------------
+# Student Records
+# -------------------------
     st.header("📋 Student Records")
+
+# Base attendance folder (where week-by-week files are stored)
+    attendance_folder = os.path.join("data", "attendance")
+    os.makedirs(attendance_folder, exist_ok=True)
+
+# ATTENDANCE RECORDS
+    st.subheader("🕒 Attendance Records (Week by Week)")
+
+    attendance_files = [
+        f for f in os.listdir(attendance_folder) if f.endswith(".csv")
+]
+
+    if attendance_files:
+        selected_file = st.selectbox(
+            "Select Attendance Week File to View/Delete",
+            sorted(attendance_files),
+            key="select_attendance_file"
+    )
+
+        selected_path = os.path.join(attendance_folder, selected_file)
+
+        try:
+            df = pd.read_csv(selected_path)
+            st.dataframe(df, use_container_width=True)
+
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                st.download_button(
+                    label=f"⬇️ Download {selected_file}",
+                    data=df.to_csv(index=False).encode(),
+                    file_name=selected_file,
+                    mime="text/csv",
+                    key=f"download_{selected_file}"
+            )
+
+            with col2:
+                if st.button(f"🗑️ Delete {selected_file}", key=f"delete_{selected_file}"):
+                    os.remove(selected_path)
+                    st.warning(f"⚠️ {selected_file} deleted successfully.")
+                    st.experimental_rerun()
+
+        except Exception as e:
+            st.error(f"Error reading {selected_file}: {e}")
+
+    else:
+        st.info("No attendance files found yet.")
+
+# --------------------------------------
+# CLASSWORK & SEMINAR RECORDS (unchanged)
+# --------------------------------------
     for file, label in [
-        (ATTENDANCE_FILE, "Attendance Records"),
         (CLASSWORK_FILE, "Classwork Submissions"),
         (SEMINAR_FILE, "Seminar Submissions")
-    ]:
+]:
         st.divider()
         st.markdown(f"### {label}")
+
         if os.path.exists(file):
             try:
                 df = pd.read_csv(file)
                 st.dataframe(df, use_container_width=True)
-                st.download_button(
-                    label=f"⬇️ Download {label} CSV",
-                    data=df.to_csv(index=False).encode(),
-                    file_name=os.path.basename(file),
-                    mime="text/csv",
-                    key=f"{label}_download"
+
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    st.download_button(
+                        label=f"⬇️ Download {label} CSV",
+                        data=df.to_csv(index=False).encode(),
+                        file_name=os.path.basename(file),
+                        mime="text/csv",
+                        key=f"{label}_download"
                 )
+
+                with col2:
+                    if st.button(f"🗑️ Delete {label}", key=f"{label}_delete"):
+                        os.remove(file)
+                        st.warning(f"⚠️ {label} deleted successfully.")
+                        st.experimental_rerun()
+
             except Exception as e:
                 st.error(f"Failed to read {label}: {e}")
         else:
             st.info(f"No {label.lower()} yet.")
+
 
     # -------------------------
     # View & Grade Uploaded Files
@@ -1694,6 +1757,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
