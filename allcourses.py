@@ -857,7 +857,7 @@ def student_view():
     st.subheader("📘 Lecture Briefs and Classwork")
     attended_week = st.session_state.get("attended_week")
 
-    week = str(st.session_state["attended_week"])
+    week = str(st.session_state.get("attended_week", ""))
     st.success(f"Access granted for {week}")
 
     lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
@@ -1671,6 +1671,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
