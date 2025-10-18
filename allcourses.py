@@ -792,12 +792,12 @@ def student_view():
     # -------------------------------
     # ⚙️ ATTENDANCE CONFIG
     # -------------------------------
-    COURSE_TIMINGS = {
-        "BIO203": {"valid_code": "BIO203-ZT7", "start": "01:00", "end": "22:00"},
-        "BCH201": {"valid_code": "BCH201-ZT8", "start": "01:00", "end": "22:00"},
-        "MCB221": {"valid_code": "MCB221-ZT9", "start": "01:00", "end": "22:20"},
-        "BIO113": {"valid_code": "BIO113-ZT1", "start": "01:00", "end": "22:00"},
-        "BIO306": {"valid_code": "BIO306-ZT2", "start": "01:00", "end": "22:00"},
+    COURSE_CODE = {
+        "BIO203": {"valid_code": "BIO203-ZT7"},
+        "BCH201": {"valid_code": "BCH201-ZT8"},
+        "MCB221": {"valid_code": "MCB221-ZT9"},
+        "BIO113": {"valid_code": "BIO113-ZT1"},
+        "BIO306": {"valid_code": "BIO306-ZT2"},
     }
 
     # -------------------------------
@@ -811,20 +811,12 @@ def student_view():
             st.warning("Please enter the attendance code for today.")
             return
 
-        if course_code not in COURSE_TIMINGS:
-            st.error(f"⚠️ No timing configured for {course_code}.")
+        if course_code not in COURSE_CODE:
+            st.error(f"⚠️ No code configured for {course_code}.")
             return
 
-        valid_code = COURSE_TIMINGS[course_code]["valid_code"]
-        start_time = datetime.strptime(COURSE_TIMINGS[course_code]["start"], "%H:%M").time()
-        end_time = datetime.strptime(COURSE_TIMINGS[course_code]["end"], "%H:%M").time()
-        now_t = (datetime.utcnow() + timedelta(hours=1)).time()  # Nigeria UTC+1
-
-        # Check time validity
-        if not (start_time <= now_t <= end_time):
-            st.error(f"⏰ Attendance for {course_code} is only open between "
-                     f"{start_time.strftime('%I:%M %p')} and {end_time.strftime('%I:%M %p')}.")
-            return
+        valid_code = COURSE_CODE[course_code]["valid_code"]
+    
 
         # Check code
         if attendance_code != valid_code:
@@ -835,12 +827,10 @@ def student_view():
         if has_marked_attendance(course_code, week, name):
             st.info("✅ Attendance already marked for this week.")
             st.session_state["attended_week"] = str(week)
-        else:
-            ok = mark_attendance_entry(course_code, name, matric, week)
     # Check if attendance is open (controlled by admin)
         if not st.session_state.get(f"{course_code}_attendance_open", False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-        elif attendance_code != COURSE_TIMINGS[course_code]["valid_code"]:
+        elif attendance_code != COURSE_CODE[course_code]["valid_code"]:
             st.error("❌ Invalid attendance code. Ask your lecturer for today’s code.")
         else:
             ok = mark_attendance_entry(course_code, name, matric, week)
@@ -1677,6 +1667,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
