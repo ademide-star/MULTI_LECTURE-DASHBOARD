@@ -1022,7 +1022,7 @@ def mark_attendance_entry(course_code, name, matric, week):
         return False
 
 # ---------------------- Student View ---------------------- #
-def student_view():
+def student_view(course_code):
     if st.session_state.get("role") != "Student":
         return
 
@@ -2093,6 +2093,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
