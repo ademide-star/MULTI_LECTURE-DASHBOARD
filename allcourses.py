@@ -1364,7 +1364,7 @@ def student_view(course_code):
                                         st.rerun()  # Refresh to show success message
                 else:
                     st.info("No classwork questions available for this week.")
-            else:
+             else:
                 st.info("No classwork assigned for this week yet.")
 
                 # Assignment section
@@ -2639,6 +2639,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
