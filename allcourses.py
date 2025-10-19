@@ -932,7 +932,7 @@ def student_view():
         st.error("⚠️ Lecture file missing or invalid format.")
         return
 
-     from attendance_utils import get_attendance_status
+from attendance_utils import get_attendance_status
 
 # 🕒 ATTENDANCE FORM
 # -------------------------------
@@ -1850,7 +1850,7 @@ def admin_view(course_code):
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
 
-    from attendance_utils import set_attendance_status, get_attendance_status, get_all_attendance_status
+from attendance_utils import set_attendance_status, get_attendance_status, get_all_attendance_status
 
 # 🕒 Attendance Control (Admin)
 # -------------------------------
@@ -1985,6 +1985,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
