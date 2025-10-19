@@ -1170,7 +1170,13 @@ def set_classwork_status(course_code, week, is_open, open_time=None):
 def student_view(course_code):
     if st.session_state.get("role") != "Student":
         return
-
+    # Initialize student identity in session state
+    if "student_identity" not in st.session_state:
+        st.session_state.student_identity = {"name": "", "matric": ""}
+    
+    # Get student identity from session state
+    student_name = st.session_state.student_identity["name"]
+    student_matric = st.session_state.student_identity["matric"]
     # ✅ Always ensure required folders exist first
     ensure_directories()
 
@@ -1215,24 +1221,37 @@ def student_view(course_code):
 
 
 # 🕒 ATTENDANCE FORM
-    # -------------------------------
+# -------------------------------
     with st.form(f"{course_code}_attendance_form"):
-        name = st.text_input("Full Name", key=f"{course_code}_student_name")
-        matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
+        name = st.text_input("Full Name", 
+                        value=student_name,  # Pre-fill with existing name
+                        key=f"{course_code}_student_name")
+        matric = st.text_input("Matric Number", 
+                          value=student_matric,  # Pre-fill with existing matric
+                          key=f"{course_code}_student_matric")
         week = st.selectbox(
             "Select Week",
             [f"Week {i}" for i in range(1, 16)],
             key=f"{course_code}_att_week"
-        )
+    )
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
-    # -------------------------------
-    # 🧾 ATTENDANCE VALIDATION
-    # -------------------------------
+# -------------------------------
+# 🧾 ATTENDANCE VALIDATION
+# -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
             st.stop()
+
+    # Save identity to session state
+        st.session_state.student_identity = {"name": name.strip(), "matric": matric.strip()}
+    
+    # ✅ Use the EXACT same key format as admin
+        week_key = week.replace(" ", "")
+        attendance_key = f"att_open_{course_code}_{week_key}"
+    
+    # Rest of your attendance validation code...
 
         # Get status from persistent storage
         status_data = get_attendance_status(course_code, week)
@@ -1291,64 +1310,62 @@ def student_view(course_code):
                 if row["Brief"] and str(row["Brief"]).strip():
                     st.markdown(f"**Description:** {row['Brief']}")
                 
-                # 🧩 Classwork Section - FIXED: use row instead of lecture_info
+                # 🧩 Classwork Section - FIXED: use session state identity
                 classwork_text = str(row.get("Classwork", "") or "").strip()
                 if classwork_text:
                     st.markdown("### 🧩 Classwork Questions")
-                    student_name_d = st.text_input("Full Name", key=f"{course_code}_d_name")
-                    matric_d = st.text_input("Matric Number", key=f"{course_code}_d_matric")
-        
-                    # Split questions by semicolon
+
+    # Split questions by semicolon
                     questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-        
+
                     if questions:
-                        # Check if classwork is open
+        # Check if classwork is open
                         classwork_status = is_classwork_open(course_code, week)
-            
+
                         with st.form(f"cw_form_{week.replace(' ', '_')}"):  # Unique key for each week
                             st.write("**Answer the following questions:**")
-                
-                            # Create answer inputs
+
+            # Create answer inputs
                             answers = []
                             for i, question in enumerate(questions):
                                 st.write(f"**Q{i+1}:** {question}")
                                 answer = st.text_area(
                                     f"Your answer for Q{i+1}",
-                                    placeholder=f"Type your answer for Q{i+1} here...",
-                                    key=f"q{i}_{week.replace(' ', '_')}",  # Unique key
-                                    height=100,
-                                    disabled=not classwork_status
-                                )
+                                        placeholder=f"Type your answer for Q{i+1} here...",
+                                        key=f"q{i}_{week.replace(' ', '_')}",  # Unique key
+                                        height=100,
+                                        disabled=not classwork_status
+                )
                                 answers.append(answer)
                                 if i < len(questions) - 1:  # Don't add divider after last question
                                     st.divider()
-                
-                            # Submit button
+
+            # Submit button
                             submit_cw = st.form_submit_button(
                                 "📤 Submit Classwork Answers", 
-                                disabled=not classwork_status,
-                                use_container_width=True
-                            )
-                
-                            # Auto-close check
+                                    disabled=not classwork_status,
+                                    use_container_width=True
+            )
+
+            # Auto-close check
                             close_classwork_after_20min(course_code, week)
-                
+
                             if submit_cw:
-                                # Validate answers
-                                if not name or not matric:
-                                    st.error("❌ Please enter your name and matric number first.")
+                # Use session state identity instead of form inputs
+                                if not student_name or not student_matric:
+                                    st.error("❌ Please mark attendance first to set your identity, or enter your name and matric number in the attendance form.")
                                 elif any(not answer.strip() for answer in answers):
                                     st.error("❌ Please answer all questions before submitting.")
                                 else:
-                                    # Save classwork
-                                    success = save_classwork(name, matric, week, answers)
+                    # Save classwork using session state identity
+                                    success = save_classwork(student_name, student_matric, week, answers)
                                     if success:
                                         st.balloons()
                                         st.rerun()  # Refresh to show success message
-                    else:
-                        st.info("No classwork questions available for this week.")
                 else:
-                    st.info("No classwork assigned for this week yet.")
+                    st.info("No classwork questions available for this week.")
+            else:
+                st.info("No classwork assigned for this week yet.")
 
                 # Assignment section
                 if row["Assignment"] and str(row["Assignment"]).strip():
@@ -2622,6 +2639,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
