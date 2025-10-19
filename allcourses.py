@@ -1257,16 +1257,6 @@ def student_view(course_code):
         status_data = get_attendance_status(course_code, week)
         is_attendance_open = status_data.get("is_open", False)
         
-        # Show all status for debugging
-        all_status = get_all_attendance_status()
-        st.write("**All status in JSON file:**")
-        if all_status:
-            for key, value in all_status.items():
-                st.write(f"- `{key}`: `{value}`")
-        else:
-            st.write("No status found in JSON file")
-        st.write("---")
-        
         if not is_attendance_open:
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
             st.stop()
@@ -1274,7 +1264,7 @@ def student_view(course_code):
         # Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
-            st.stop()
+            st.rerun()
 
         # Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
@@ -2639,6 +2629,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
