@@ -106,6 +106,59 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 import os
 import pandas as pd
+# Fixed helper functions
+def has_marked_attendance(course_code, week, name, matric):
+    try:
+        attendance_file = f"attendance_{course_code}_{week.replace(' ', '')}.csv"
+        
+        if not os.path.exists(attendance_file):
+            return False
+        
+        df = pd.read_csv(attendance_file)
+        
+        # Convert to string and clean data
+        df['Name'] = df['Name'].astype(str).str.strip().str.lower()
+        df['Matric'] = df['Matric'].astype(str).str.strip().str.lower()
+        
+        name_clean = name.strip().lower()
+        matric_clean = matric.strip().lower()
+        
+        # Check for existing entry
+        existing = df[(df['Name'] == name_clean) & (df['Matric'] == matric_clean)]
+        return len(existing) > 0
+        
+    except Exception as e:
+        st.error(f"⚠️ Error checking attendance: {e}")
+        return True  # Prevent marking if error
+
+
+def mark_attendance_entry(course_code, name, matric, week):
+    try:
+        attendance_file = f"attendance_{course_code}_{week.replace(' ', '')}.csv"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        new_data = {
+            'Name': [name.strip()],
+            'Matric': [matric.strip()], 
+            'Week': [week],
+            'Timestamp': [timestamp]
+        }
+        
+        new_df = pd.DataFrame(new_data)
+        
+        if os.path.exists(attendance_file):
+            existing_df = pd.read_csv(attendance_file)
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+        else:
+            combined_df = new_df
+            
+        combined_df.to_csv(attendance_file, index=False)
+        return True
+        
+    except Exception as e:
+        st.error(f"⚠️ Error recording attendance: {e}")
+        return False
+
 def save_file(course_code, student_name, matric, week, file_obj, upload_type):
     upload_dir = os.path.join("student_uploads", course_code, upload_type)
     os.makedirs(upload_dir, exist_ok=True)
@@ -797,7 +850,6 @@ def student_view():
     st.title("🎓 Student Dashboard")
     st.info("Welcome! Access your lectures, upload assignments, and mark attendance here.")
 
-    # -------------------------------
     # 🎓 COURSE SELECTION
     # -------------------------------
     course_code = st.selectbox("Select Course", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
@@ -826,6 +878,7 @@ def student_view():
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
         attendance_key = f"{course_code}_{week}_attendance_open"
         file_name = f"{course_code}_{week}.csv"
+        
 # 🕒 ATTENDANCE VALIDATION
 # -------------------------------
     if submit_attendance:
@@ -850,7 +903,7 @@ def student_view():
             all_attendance_keys = [key for key in st.session_state.keys() if 'att_open' in key]
             if all_attendance_keys:
                 for key in sorted(all_attendance_keys):
-                st.write(f"- `{key}`: `{st.session_state[key]}`")
+                    st.write(f"- `{key}`: `{st.session_state[key]}`")
             else:
                 st.write("No attendance keys found!")
         
@@ -1876,6 +1929,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
