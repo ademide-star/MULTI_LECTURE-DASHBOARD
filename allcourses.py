@@ -159,6 +159,74 @@ def mark_attendance_entry(course_code, name, matric, week):
         st.error(f"⚠️ Error recording attendance: {e}")
         return False
 
+import json
+import os
+from datetime import datetime
+
+ATTENDANCE_STATUS_FILE = "attendance_status.json"
+
+def init_attendance_status():
+    """Initialize the attendance status file if it doesn't exist"""
+    if not os.path.exists(ATTENDANCE_STATUS_FILE):
+        default_status = {}
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(default_status, f)
+
+def get_attendance_status(course_code, week):
+    """Get attendance status for a specific course and week"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"{course_code}_{week_key}"
+        
+        return status_data.get(key, False)
+    except:
+        return False
+
+def set_attendance_status(course_code, week, is_open, open_time=None):
+    """Set attendance status for a specific course and week"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"{course_code}_{week_key}"
+        
+        if is_open:
+            status_data[key] = {
+                "is_open": True,
+                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
+            }
+        else:
+            status_data[key] = {
+                "is_open": False,
+                "open_time": None
+            }
+        
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(status_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        print(f"Error setting attendance status: {e}")
+        return False
+
+def get_all_attendance_status():
+    """Get all attendance status for debugging"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
 def save_file(course_code, student_name, matric, week, file_obj, upload_type):
     upload_dir = os.path.join("student_uploads", course_code, upload_type)
     os.makedirs(upload_dir, exist_ok=True)
@@ -864,8 +932,9 @@ def student_view():
         st.error("⚠️ Lecture file missing or invalid format.")
         return
 
- # -------------------------------
- # 🕒 ATTENDANCE FORM
+     from attendance_utils import get_attendance_status
+
+# 🕒 ATTENDANCE FORM
 # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
@@ -876,47 +945,38 @@ def student_view():
             key=f"{course_code}_att_week"
     )
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-        attendance_key = f"{course_code}_{week}_attendance_open"
-        file_name = f"{course_code}_{week}.csv"
-        
-# 🕒 ATTENDANCE VALIDATION
+
+# -------------------------------
+# 🧾 ATTENDANCE VALIDATION
 # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ FIXED: Use the EXACT same key format as admin
-        week_key = week.replace(" ", "")  # "Week 1" becomes "Week1"
-        attendance_key = f"att_open_{course_code}_{week_key}"
+    # ✅ FIXED: Get status from persistent storage instead of session state
+        status_data = get_attendance_status(course_code, week)
+        is_attendance_open = status_data and status_data.get("is_open", False)
     
-    # Enhanced debug info
-        with st.expander("🔍 Debug Information"):
-            st.write(f"Course: `{course_code}`")
-            st.write(f"Week: `{week}`")
-            st.write(f"Formatted week key: `{week_key}`")
-            st.write(f"Looking for key: `{attendance_key}`")
-            st.write(f"Key exists in session state: `{attendance_key in st.session_state}`")
-        
-        # Show all relevant keys
-            st.write("All attendance keys in session state:")
-            all_attendance_keys = [key for key in st.session_state.keys() if 'att_open' in key]
-            if all_attendance_keys:
-                for key in sorted(all_attendance_keys):
-                    st.write(f"- `{key}`: `{st.session_state[key]}`")
-            else:
-                st.write("No attendance keys found!")
-        
-            if attendance_key in st.session_state:
-                st.write(f"Key value: `{st.session_state[attendance_key]}`")
-                st.write(f"Key value type: `{type(st.session_state[attendance_key])}`")
+    # Debug information
+        st.write("---")
+        st.subheader("🔍 Debug Information")
+        st.write(f"**Course:** `{course_code}`")
+        st.write(f"**Week:** `{week}`")
+        st.write(f"**Status from JSON:** `{status_data}`")
+        st.write(f"**Attendance Open:** `{is_attendance_open}`")
     
-    # ✅ FIXED: More explicit check
-        is_attendance_open = st.session_state.get(attendance_key, False)
-        st.write(f"Attendance open status: `{is_attendance_open}`")
+    # Show all status for debugging
+        from attendance_utils import get_all_attendance_status
+        all_status = get_all_attendance_status()
+        st.write("**All status in JSON file:**")
+        for key, value in all_status.items():
+            st.write(f"- `{key}`: `{value}`")
+        st.write("---")
     
         if not is_attendance_open:
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+            st.stop()
 
     # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
@@ -930,6 +990,7 @@ def student_view():
             st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
+        
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
@@ -1789,14 +1850,12 @@ def admin_view(course_code):
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
 
+    from attendance_utils import set_attendance_status, get_attendance_status, get_all_attendance_status
+
 # 🕒 Attendance Control (Admin)
 # -------------------------------
-    # Add this at the top of your admin dashboard to clear old keys
-    keys_to_remove = [key for key in st.session_state.keys() if 'att_open' in key]
-    for key in keys_to_remove:
-        del st.session_state[key]
     st.subheader("🎛 Attendance Control")
-    
+
     course_code = st.selectbox(
         "Select Course to Manage", 
         ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
@@ -1808,71 +1867,68 @@ def admin_view(course_code):
         key=f"{course_code}_week_select"
 )
 
-# ✅ SIMPLER: Use consistent key format
-    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '')}"
-    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '')}"
-    attendance_key = f"{course_code}_{selected_week}_attendance_open"
-    file_name = f"{course_code}_{selected_week}.csv"  # no double Week
-# Initialize the state if it doesn't exist
-    if attendance_key not in st.session_state:
-        st.session_state[attendance_key] = False
+# Get current status from persistent storage
+    current_status = get_attendance_status(course_code, selected_week)
+    is_currently_open = current_status and current_status.get("is_open", False)
 
-# Display current status first
-    if st.session_state[attendance_key]:
+# Display current status
+    if is_currently_open:
         st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
     else:
         st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
 
-# Use buttons instead of toggle for more reliable state management
+# Use buttons for attendance control
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
-            st.session_state[attendance_key] = True
-            st.session_state[timer_key] = datetime.now()
-            st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
-            st.rerun()
+            success = set_attendance_status(course_code, selected_week, True, datetime.now())
+            if success:
+                st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
+                st.rerun()
+            else:
+                st.error("❌ Failed to open attendance")
 
     with col2:
         if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
-            st.session_state[attendance_key] = False
-            if timer_key in st.session_state:
-                del st.session_state[timer_key]
-            st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
-            st.rerun()
+            success = set_attendance_status(course_code, selected_week, False)
+            if success:
+                st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
+                st.rerun()
+            else:
+                st.error("❌ Failed to close attendance")
 
 # Auto-close functionality
-    if st.session_state.get(attendance_key) and st.session_state.get(timer_key):
-        elapsed = (datetime.now() - st.session_state[timer_key]).total_seconds()
-        remaining = max(0, 600 - elapsed)  # 10 minutes
-    
-        if remaining <= 0:
-            st.session_state[attendance_key] = False
-            if timer_key in st.session_state:
-                del st.session_state[timer_key]
-            st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
-            st.rerun()
-        else:
-            mins = int(remaining // 60)
-            secs = int(remaining % 60)
-            st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+    if is_currently_open and current_status.get("open_time"):
+        try:
+            open_time = datetime.fromisoformat(current_status["open_time"])
+            elapsed = (datetime.now() - open_time).total_seconds()
+            remaining = max(0, 600 - elapsed)  # 10 minutes
+        
+            if remaining <= 0:
+                set_attendance_status(course_code, selected_week, False)
+                st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
+                st.rerun()
+            else:
+                mins = int(remaining // 60)
+                secs = int(remaining % 60)
+                st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+        except Exception as e:
+            st.error(f"Error in auto-close: {e}")
 
 # Debug information
-    with st.expander("🔍 Session State Debug Info"):
-        st.write("All attendance-related keys in session state:")
-        attendance_keys = [key for key in st.session_state.keys() if key.startswith('att_open_')]
-        if attendance_keys:
-            for key in sorted(attendance_keys):
-                st.write(f"- `{key}`: `{st.session_state[key]}`")
+    with st.expander("🔍 Persistent Storage Debug Info"):
+        st.write("All attendance status in JSON file:")
+        all_status = get_all_attendance_status()
+        if all_status:
+            for key, value in all_status.items():
+                st.write(f"- `{key}`: `{value}`")
         else:
-            st.write("No attendance keys found in session state")
+            st.write("No attendance status found in JSON file")
     
         st.write(f"Current course: `{course_code}`")
         st.write(f"Current week: `{selected_week}`")
-        st.write(f"Looking for key: `{attendance_key}`")
-        st.write(f"Key exists: `{attendance_key in st.session_state}`")
-        if attendance_key in st.session_state:
-            st.write(f"Key value: `{st.session_state[attendance_key]}`")
+        st.write(f"Current status: `{current_status}`")
 
 # 📁 Delete attendance record option
     attendance_folder = os.path.join("data", "attendance")
@@ -1929,6 +1985,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
