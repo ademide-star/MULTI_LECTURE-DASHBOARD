@@ -1187,13 +1187,30 @@ def student_view(course_code):
 
     lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
 
-    # Topic & Brief
-    if not lectures_df.empty:
-        lecture_row = lectures_df.loc[lectures_df["Week"] == week]
+    # ---------------------------------------------
+# 📖 Topic & Lecture Brief
+# ---------------------------------------------
+    if lectures_df is None or lectures_df.empty or "Week" not in lectures_df.columns:
+        st.warning("⚠️ No lecture data found for this course.")
+        return
+
+# Ensure week is always a string
+    week = str(week)
+
+# Initialize lecture_row safely
+    lecture_row = pd.DataFrame()
+
+# Match lecture by week (avoid type mismatches)
+    if not lectures_df.empty and "Week" in lectures_df.columns:
+        lecture_row = lectures_df.loc[lectures_df["Week"].astype(str) == week]
+
+# Convert to dict if found
     if not lecture_row.empty:
         lecture_info = lecture_row.squeeze().to_dict()
     else:
         lecture_info = {}
+        st.info(f"No lecture content found for {week}.")
+
 
     st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
     brief = clean_text(lecture_info.get("Brief"))
@@ -2164,6 +2181,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
