@@ -1041,28 +1041,78 @@ def mark_attendance_entry(course_code, name, matric, week):
         st.error(f"⚠️ Error recording attendance: {e}")
         return False
 
+import os
+import pandas as pd
+from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
+import streamlit as st
+
+# ===============================================================
+# 🧱 HELPER: Ensure All Required Directories Exist
+# ===============================================================
+def ensure_directories():
+    """Create all required folders used in student/admin dashboards."""
+    dirs = [
+        "data",
+        "uploads",
+        "student_uploads",
+        "scores",
+        "modules",
+        "classwork_status",
+        "video_lectures",
+    ]
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
 
                                
-# ---------------------- Student View ---------------------- #
+# ===============================================================
+# 🎓 STUDENT VIEW DASHBOARD
+# ===============================================================
 def student_view(course_code):
     if st.session_state.get("role") != "Student":
         return
+
+    # ✅ Always ensure required folders exist first
+    ensure_directories()
 
     st.title("🎓 Student Dashboard")
     st.info("Welcome! Access your lectures, upload assignments, and mark attendance here.")
 
     # 🎓 COURSE SELECTION
-    # -------------------------------
-    course_code = st.selectbox("Select Course", ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"])
+    course_code = st.selectbox(
+        "Select Course",
+        ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
+    )
 
-    # Load lecture data
-    if "lectures_df" in st.session_state and st.session_state["lectures_df"] is not None:
-        lectures_df = st.session_state["lectures_df"]
-    else:
-        lectures_df = load_lectures(course_code)
+    # ===============================================================
+    # 📘 LOAD LECTURES
+    # ===============================================================
+    try:
+        if "lectures_df" in st.session_state and st.session_state["lectures_df"] is not None:
+            lectures_df = st.session_state["lectures_df"]
+        else:
+            LECTURE_FILE = get_file(course_code, "lectures")
+            os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
 
-    if lectures_df.empty or "Week" not in lectures_df.columns:
-        st.error("⚠️ Lecture file missing or invalid format.")
+            if not os.path.exists(LECTURE_FILE):
+                # Create blank structure if missing
+                lectures_df = pd.DataFrame(
+                    columns=["Week", "Topic", "Brief", "Assignment", "Classwork"]
+                )
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+            else:
+                lectures_df = pd.read_csv(LECTURE_FILE)
+
+        # Ensure essential columns exist
+        for col in ["Week", "Topic", "Brief", "Assignment", "Classwork"]:
+            if col not in lectures_df.columns:
+                lectures_df[col] = ""
+
+        st.session_state["lectures_df"] = lectures_df
+
+    except Exception as e:
+        st.error(f"⚠️ Error loading lecture file: {e}")
         return
 
 
@@ -2114,6 +2164,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
