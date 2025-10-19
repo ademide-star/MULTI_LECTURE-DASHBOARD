@@ -834,7 +834,7 @@ def student_view():
             st.stop()
 
     # ✅ Use the EXACT same key format as admin
-        attendance_key = f"att_open_{course_code}_{week.replace(' ', '_')}"
+        attendance_key = f"att_open_{course_code}_{week.replace(' ', '')}"
     
     # Enhanced debug info
         with st.expander("🔍 Debug Information"):
@@ -854,11 +854,6 @@ def student_view():
     
         if not st.session_state.get(attendance_key, False):
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-            st.info("💡 **Troubleshooting:** If you believe attendance should be open, ask your lecturer to:")
-            st.info("1. Go to Admin Dashboard → Attendance Control")
-            st.info("2. Select the correct course and week")
-            st.info("3. Click the 'OPEN Attendance' button")
-            st.stop()
 
     # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
@@ -1747,8 +1742,8 @@ def admin_view(course_code):
 )
 
 # ✅ SIMPLER: Use consistent key format
-    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '_')}"
-    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '_')}"
+    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '')}"
+    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '')}"
 
 # Initialize the state if it doesn't exist
     if attendance_key not in st.session_state:
@@ -1866,6 +1861,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
