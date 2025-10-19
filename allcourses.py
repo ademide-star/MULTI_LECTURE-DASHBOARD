@@ -1064,7 +1064,104 @@ def ensure_directories():
     for d in dirs:
         os.makedirs(d, exist_ok=True)
 
+# Classwork status management
+def get_classwork_status(course_code, week):
+    """Get classwork status for a specific course and week"""
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"classwork_{course_code}_{week_key}"
+        
+        return status_data.get(key, {"is_open": False, "open_time": None})
+    except Exception as e:
+        return {"is_open": False, "open_time": None}
 
+def set_classwork_status(course_code, week, is_open, open_time=None):
+    """Set classwork status for a specific course and week"""
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"classwork_{course_code}_{week_key}"
+        
+        if is_open:
+            status_data[key] = {
+                "is_open": True,
+                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
+            }
+        else:
+            status_data[key] = {
+                "is_open": False,
+                "open_time": None
+            }
+        
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(status_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error setting classwork status: {e}")
+        return False
+
+def is_classwork_open(course_code, week):
+    """Check if classwork is open for submission"""
+    status = get_classwork_status(course_code, week)
+    return status.get("is_open", False)
+
+def close_classwork_after_20min(course_code, week):
+    """Auto-close classwork after 20 minutes"""
+    status = get_classwork_status(course_code, week)
+    
+    if status.get("is_open", False) and status.get("open_time"):
+        try:
+            open_time = datetime.fromisoformat(status["open_time"])
+            elapsed = (datetime.now() - open_time).total_seconds()
+            
+            if elapsed > 1200:  # 20 minutes in seconds
+                set_classwork_status(course_code, week, False)
+                return True  # Classwork was closed
+        except Exception as e:
+            st.error(f"Error in classwork auto-close: {e}")
+    
+    return False  # Classwork remains open
+
+def save_classwork(name, matric, week, answers):
+    """Save classwork submissions"""
+    try:
+        classwork_file = CLASSWORK_FILE
+        
+        # Create submission data
+        submission_data = {
+            'Name': name,
+            'Matric': matric,
+            'Week': week,
+            'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'Answers': json.dumps(answers)  # Store answers as JSON string
+        }
+        
+        # Save to CSV
+        if os.path.exists(classwork_file):
+            df = pd.read_csv(classwork_file)
+            # Check if student already submitted for this week
+            existing = df[(df['Name'] == name) & (df['Matric'] == matric) & (df['Week'] == week)]
+            if not existing.empty:
+                st.warning("⚠️ You have already submitted classwork for this week.")
+                return False
+            
+            df = pd.concat([df, pd.DataFrame([submission_data])], ignore_index=True)
+        else:
+            df = pd.DataFrame([submission_data])
+        
+        df.to_csv(classwork_file, index=False)
+        st.success("✅ Classwork submitted successfully!")
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error saving classwork: {e}")
+        return False
                                
 # ===============================================================
 # 🎓 STUDENT VIEW DASHBOARD
@@ -1115,50 +1212,7 @@ def student_view(course_code):
         st.error(f"⚠️ Error loading lecture file: {e}")
         return
 
-    # ===============================================================
-    # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS
-    # ===============================================================
-    st.header(f"📚 {course_code} Lecture Materials")
-    
-    if lectures_df.empty or lectures_df["Week"].isna().all():
-        st.info("No lecture materials available yet. Check back later!")
-        return
 
-    # Display each week's materials
-    for _, row in lectures_df.iterrows():
-        if pd.isna(row["Week"]) or row["Week"] == "":
-            continue
-            
-        with st.expander(f"📖 {row['Week']}: {row['Topic']}", expanded=False):
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                if row["Brief"] and str(row["Brief"]).strip():
-                    st.markdown(f"**Description:** {row['Brief']}")
-                
-                if row["Classwork"] and str(row["Classwork"]).strip():
-                    st.markdown(f"**Classwork:** {row['Classwork']}")
-                
-                if row["Assignment"] and str(row["Assignment"]).strip():
-                    st.markdown(f"**Assignment:** {row['Assignment']}")
-            
-            with col2:
-                # 🎯 FIXED: PDF Download for students
-                pdf_file = row["PDF_File"]
-                if pdf_file and os.path.exists(pdf_file):
-                    try:
-                        with open(pdf_file, "rb") as pdf_file_obj:
-                            st.download_button(
-                                label="📥 Download PDF",
-                                data=pdf_file_obj,
-                                file_name=os.path.basename(pdf_file),
-                                mime="application/pdf",
-                                key=f"student_pdf_{row['Week']}"
-                            )
-                    except Exception as e:
-                        st.error(f"⚠️ Error loading PDF: {e}")
-                else:
-                    st.info("No PDF available")
 # 🕒 ATTENDANCE FORM
     # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
@@ -1210,126 +1264,105 @@ def student_view(course_code):
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
         
-    # ---------------------------------------------
-    # 📘 Lecture Briefs and Classwork
-    # ---------------------------------------------
-    st.divider()
-    st.subheader("📘 Lecture Briefs and Classwork")
-    attended_week = st.session_state.get("attended_week")
-
-    week = str(st.session_state.get("attended_week", ""))
-    st.success(f"Access granted for Week {week}")
-
-    lectures_df = st.session_state["lectures_df"] if "lectures_df" in st.session_state else load_lectures(course_code)
-
-    # ---------------------------------------------
-# 📖 Topic & Lecture Brief
-# ---------------------------------------------
-    if lectures_df is None or lectures_df.empty or "Week" not in lectures_df.columns:
-        st.warning("⚠️ No lecture data found for this course.")
+  # ===============================================================
+    # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS
+    # ===============================================================
+    st.header(f"📚 {course_code} Lecture Materials")
+    CLASSWORK_FILE = get_file(course_code, "classwork")
+    if lectures_df.empty or lectures_df["Week"].isna().all():
+        st.info("No lecture materials available yet. Check back later!")
         return
 
-# Ensure week is always a string
-    week = str(week)
-
-# Initialize lecture_row safely
-    lecture_row = pd.DataFrame()
-
-# Match lecture by week (avoid type mismatches)
-    if not lectures_df.empty and "Week" in lectures_df.columns:
-        lecture_row = lectures_df.loc[lectures_df["Week"].astype(str) == week]
-
-# Convert to dict if found
-    if not lecture_row.empty:
-        lecture_info = lecture_row.squeeze().to_dict()
-    else:
-        lecture_info = {}
-        st.info(f"No lecture content found for {week}.")
-
-
-    st.subheader(f"📖 {week}: {lecture_info.get('Topic', 'No topic available')}")
-    brief = clean_text(lecture_info.get("Brief"))
-    if brief:
-        st.write(f"**Lecture Brief:** {brief}")
-    else:
-        st.info("Lecture brief not yet available.")
-
-    # Assignment
-    assignment = clean_text(lecture_info.get("Assignment"))
-    if assignment:
-        st.subheader("📚 Assignment")
-        st.markdown(f"**Assignment:** {assignment}")
-    else:
-        st.info("Assignment not yet released.")
-
-    
-# ===============================================================
-# 🧩 STUDENT CLASSWORK DISPLAY (FULLY FIXED VERSION)
-# ===============================================================
-
-# Retrieve classwork text from lecture_info
-   
-    classwork_text = str(clean_text(lecture_info.get("Classwork", "")) or "").strip()
-
-# Debugging helper (optional)
-# st.write("DEBUG: Classwork value =", classwork_text)
-
-    if classwork_text:
-        st.markdown("### 🧩 Classwork Questions")
-        questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-
-    # ✅ Load classwork status file
-        CLASSWORK_STATUS_FILE = os.path.join("classwork_status", f"{course_code}_classwork_status.csv")
-        os.makedirs(os.path.dirname(CLASSWORK_STATUS_FILE), exist_ok=True)
-
-        is_open = False
-        if os.path.exists(CLASSWORK_STATUS_FILE):
-            df_status = pd.read_csv(CLASSWORK_STATUS_FILE)
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week) & (df_status["Open"] == True)).any():
-                is_open = True
-
-    # ✅ Check if classwork is open
-        if not is_open:
-            st.info("⏳ Classwork not yet opened by Admin.")
-        else:
-        # Remaining time
-            end_key = f"{course_code}_{week}_cw_end"
-            end_time = st.session_state.get(end_key)
-            if not end_time:
-                end_time = datetime.now() + timedelta(minutes=20)
-                st.session_state[end_key] = end_time
-
-            remaining_sec = int((end_time - datetime.now()).total_seconds())
-
-            if remaining_sec > 0:
-            # Auto-refresh every second
-                st_autorefresh(interval=1000, key=f"{course_code}_{week}_cw_timer")
-
-                minutes, seconds = divmod(remaining_sec, 60)
-                st.info(f"⏱ Time remaining: {minutes:02d}:{seconds:02d}")
-
-            # Progress bar
-                total_duration = 20 * 60
-                progress = min(max((total_duration - remaining_sec) / total_duration, 0), 1)
-                st.progress(progress)
-
-            # 📝 Classwork form
-                with st.form(f"classwork_form_{course_code}_{week}"):
-                    answers = [st.text_input(f"Q{i+1}: {q}") for i, q in enumerate(questions)]
-                    submit_btn = st.form_submit_button("Submit Answers")
-
-                    if submit_btn:
-                        save_classwork(name, matric, week, answers)
-                        st.success("✅ Classwork submitted successfully!")
-
+    # Display each week's materials
+    for _, row in lectures_df.iterrows():
+        if pd.isna(row["Week"]) or row["Week"] == "":
+            continue
+            
+        with st.expander(f"📖 {row['Week']}: {row['Topic']}", expanded=False):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                if row["Brief"] and str(row["Brief"]).strip():
+                    st.markdown(f"**Description:** {row['Brief']}")
+                
+                    # 🧩 Classwork Section
+    # -------------------------------
+                classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
+                if classwork_text:
+                    st.markdown("### 🧩 Classwork Questions")
+        
+        # Split questions by semicolon
+                    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+        
+                    if questions:
+            # Check if classwork is open
+                        classwork_status = is_classwork_open(course_code, week)
+            
+                        with st.form("cw_form"):
+                            st.write("**Answer the following questions:**")
+                
+                # Create answer inputs
+                            answers = []
+                            for i, question in enumerate(questions):
+                                st.write(f"**Q{i+1}:** {question}")
+                                answer = st.text_area(
+                                    f"Your answer for Q{i+1}",
+                                    placeholder=f"Type your answer for Q{i+1} here...",
+                                    key=f"q{i}_{week}",
+                                    height=100,
+                                    disabled=not classwork_status
+                    )
+                                answers.append(answer)
+                                st.divider()
+                
+                # Submit button
+                            submit_cw = st.form_submit_button(
+                                "📤 Submit Classwork Answers", 
+                                disabled=not classwork_status,
+                                use_container_width=True
+                )
+                
+                # Auto-close check
+                            close_classwork_after_20min(course_code, week)
+                
+                            if submit_cw:
+                    # Validate answers
+                                if not name or not matric:
+                                    st.error("❌ Please enter your name and matric number first.")
+                                elif any(not answer.strip() for answer in answers):
+                                    st.error("❌ Please answer all questions before submitting.")
+                                else:
+                        # Save classwork
+                                    success = save_classwork(name, matric, week, answers)
+                                if success:
+                                    st.balloons()
+                                else:
+                                    st.info("📝 Classwork questions will appear here when the lecturer opens them.")
+                    else:
+                        st.info("No classwork questions available for this week.")
             else:
-                st.warning("⏰ Time's up! Classwork is closed.")
-                st.progress(1.0)
-    else:
-        st.info("📚 No classwork uploaded for this lecture.")
-
-
-
+                st.info("No classwork assigned for this week yet.")
+                
+                if row["Assignment"] and str(row["Assignment"]).strip():
+                    st.markdown(f"**Assignment:** {row['Assignment']}")
+            
+            with col2:
+                # 🎯 FIXED: PDF Download for students
+                pdf_file = row["PDF_File"]
+                if pdf_file and os.path.exists(pdf_file):
+                    try:
+                        with open(pdf_file, "rb") as pdf_file_obj:
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_file_obj,
+                                file_name=os.path.basename(pdf_file),
+                                mime="application/pdf",
+                                key=f"student_pdf_{row['Week']}"
+                            )
+                    except Exception as e:
+                        st.error(f"⚠️ Error loading PDF: {e}")
+                else:
+                    st.info("No PDF available")
       # ===============================================================
         # 🎓 Student Dashboard — View Scores
         # ===============================================================
@@ -2046,19 +2079,83 @@ def admin_view(course_code):
         else:
             st.info(f"No {label.lower()} yet.")
 
-    # Debug information
-    with st.expander("🔍 Persistent Storage Debug Info"):
-        st.write("All attendance status in JSON file:")
-        all_status = get_all_attendance_status()
-        if all_status:
-            for key, value in all_status.items():
-                st.write(f"- `{key}`: `{value}`")
-        else:
-            st.write("No attendance status found in JSON file")
-        
-        st.write(f"Current course: `{course_code}`")
-        st.write(f"Current week: `{selected_week}`")
-        st.write(f"Current status: `{current_status}`")
+       # 📋 Classwork Submissions Viewing
+    # -------------------------------
+    st.header("📝 Classwork Submissions")
+    
+    if os.path.exists(CLASSWORK_FILE):
+        try:
+            classwork_df = pd.read_csv(CLASSWORK_FILE)
+            
+            if not classwork_df.empty:
+                # Filter options
+                col1, col2 = st.columns(2)
+                with col1:
+                    view_week = st.selectbox(
+                        "View submissions for week:",
+                        ["All Weeks"] + [f"Week {i}" for i in range(1, 16)],
+                        key="classwork_view_week"
+                    )
+                
+                with col2:
+                    search_student = st.text_input("🔍 Search student:", placeholder="Name or Matric...")
+                
+                # Filter data
+                filtered_df = classwork_df.copy()
+                if view_week != "All Weeks":
+                    filtered_df = filtered_df[filtered_df['Week'] == view_week]
+                
+                if search_student:
+                    filtered_df = filtered_df[
+                        filtered_df['Name'].str.contains(search_student, case=False, na=False) |
+                        filtered_df['Matric'].str.contains(search_student, case=False, na=False)
+                    ]
+                
+                if not filtered_df.empty:
+                    st.dataframe(filtered_df, use_container_width=True)
+                    
+                    # Download option
+                    csv_data = filtered_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Classwork Submissions",
+                        data=csv_data,
+                        file_name=f"classwork_{course_code}_submissions.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                    # View individual answers
+                    st.subheader("📖 View Detailed Answers")
+                    selected_index = st.selectbox(
+                        "Select submission to view answers:",
+                        range(len(filtered_df)),
+                        format_func=lambda x: f"{filtered_df.iloc[x]['Name']} - {filtered_df.iloc[x]['Matric']} - {filtered_df.iloc[x]['Week']}"
+                    )
+                    
+                    if selected_index is not None:
+                        submission = filtered_df.iloc[selected_index]
+                        st.write(f"**Student:** {submission['Name']} ({submission['Matric']})")
+                        st.write(f"**Week:** {submission['Week']}")
+                        st.write(f"**Submitted:** {submission['Timestamp']}")
+                        
+                        # Parse and display answers
+                        try:
+                            answers = json.loads(submission['Answers'])
+                            st.write("**Answers:**")
+                            for i, answer in enumerate(answers):
+                                st.write(f"**Q{i+1}:** {answer}")
+                                st.divider()
+                        except:
+                            st.write("**Answers:** Unable to parse answers")
+                else:
+                    st.info("No classwork submissions found matching your criteria.")
+            else:
+                st.info("No classwork submissions yet.")
+                
+        except Exception as e:
+            st.error(f"Error loading classwork submissions: {e}")
+    else:
+        st.info("No classwork submissions file found yet.")
     # -------------------------
     # View & Grade Uploaded Files
     # -------------------------
@@ -2402,83 +2499,64 @@ def admin_view(course_code):
             st.warning("Attendance file not found!")
 
 # -------------------------------------
-# ===============================================================
-# 🧩 ADMIN CLASSWORK CONTROL (FULLY FIXED VERSION)
-# ===============================================================
+    # 🎛 Classwork Control
+    # -------------------------------
+    st.subheader("🎛 Classwork Control")
 
-    st.header("🧩 Classwork Control")
-
-# Load lectures for the selected course
-    if "lectures_df" in st.session_state and not st.session_state["lectures_df"].empty:
-        lectures_df = st.session_state["lectures_df"]
-    else:
-        lectures_df = load_lectures(course_code)
-
-    if lectures_df.empty:
-        st.info("No lectures found for this course.")
-    else:
-    # Select week to control
-        week_options = lectures_df["Week"].unique().tolist()
-        week_to_control = st.selectbox(
-            "Select Week to Open/Close Classwork",
-            week_options,
-            key=f"{course_code}_admin_cw_week"
+    classwork_week = st.selectbox(
+        "Select Week for Classwork", 
+        [f"Week {i}" for i in range(1, 16)], 
+        key=f"{course_code}_classwork_week"
     )
 
-    # ✅ Build the file path correctly
-        CLASSWORK_STATUS_DIR = "classwork_status"
-        os.makedirs(CLASSWORK_STATUS_DIR, exist_ok=True)
-        CLASSWORK_STATUS_FILE = os.path.join(CLASSWORK_STATUS_DIR, f"{course_code}_classwork_status.csv")
+    # Get current classwork status
+    current_classwork_status = get_classwork_status(course_code, classwork_week)
+    is_classwork_open = current_classwork_status.get("is_open", False)
 
-    # ✅ Load or create the status CSV
-        if os.path.exists(CLASSWORK_STATUS_FILE):
-            df_status = pd.read_csv(CLASSWORK_STATUS_FILE)
-        else:
-            df_status = pd.DataFrame(columns=["Course", "Week", "Open"])
+    # Display current status
+    if is_classwork_open:
+        st.success(f"✅ Classwork is CURRENTLY OPEN for {course_code} - {classwork_week}")
+    else:
+        st.warning(f"🚫 Classwork is CURRENTLY CLOSED for {course_code} - {classwork_week}")
 
-        st.markdown(f"### Managing Classwork for **{course_code}** – Week **{week_to_control}**")
+    # Classwork control buttons
+    col1, col2 = st.columns(2)
 
-    # ------------------------
-    # 📖 OPEN CLASSWORK BUTTON
-    # ------------------------
-        if st.button(f"📖 Open Classwork for {week_to_control} (20 mins)", key=f"open_cw_{course_code}"):
-        # Ensure entry exists or update existing
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[
-                    (df_status["Course"] == course_code) & (df_status["Week"] == week_to_control),
-                    "Open"
-                ] = True
+    with col1:
+        if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary"):
+            success = set_classwork_status(course_code, classwork_week, True, datetime.now())
+            if success:
+                st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
+                st.rerun()
             else:
-                df_status = pd.concat([df_status, pd.DataFrame([{
-                    "Course": course_code,
-                    "Week": week_to_control,
-                    "Open": True
-                }])], ignore_index=True)
+                st.error("❌ Failed to open classwork")
 
-        # ✅ Save safely
-            df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
+    with col2:
+        if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary"):
+            success = set_classwork_status(course_code, classwork_week, False)
+            if success:
+                st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
+                st.rerun()
+            else:
+                st.error("❌ Failed to close classwork")
 
-        # Set timer (20 minutes)
-            st.session_state[f"{course_code}_{week_to_control}_cw_end"] = datetime.now() + timedelta(minutes=20)
-            st.success(f"✅ Classwork for Week {week_to_control} is now OPEN for 20 minutes!")
-
-    # ------------------------
-    # ⏹ CLOSE CLASSWORK BUTTON
-    # ------------------------
-        if st.button(f"⏹ Close Classwork for {week_to_control}", key=f"close_cw_{course_code}"):
-            if ((df_status["Course"] == course_code) & (df_status["Week"] == week_to_control)).any():
-                df_status.loc[
-                    (df_status["Course"] == course_code) & (df_status["Week"] == week_to_control),
-                    "Open"
-                ] = False
-                df_status.to_csv(CLASSWORK_STATUS_FILE, index=False)
-
-        # Expire timer
-            st.session_state[f"{course_code}_{week_to_control}_cw_end"] = datetime.now()
-            st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
-
-    
-
+    # Auto-close functionality for classwork
+    if is_classwork_open and current_classwork_status.get("open_time"):
+        try:
+            open_time = datetime.fromisoformat(current_classwork_status["open_time"])
+            elapsed = (datetime.now() - open_time).total_seconds()
+            remaining = max(0, 1200 - elapsed)  # 20 minutes in seconds
+            
+            if remaining <= 0:
+                set_classwork_status(course_code, classwork_week, False)
+                st.error(f"⏰ Classwork for {course_code} - {classwork_week} has automatically closed after 20 minutes.")
+                st.rerun()
+            else:
+                mins = int(remaining // 60)
+                secs = int(remaining % 60)
+                st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
+        except Exception as e:
+            st.error(f"Error in classwork auto-close: {e}")
     
     
 # 📁 Delete attendance record option
@@ -2536,6 +2614,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
