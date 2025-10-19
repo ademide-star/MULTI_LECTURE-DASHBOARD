@@ -1421,6 +1421,128 @@ def student_view(course_code):
     os.makedirs(base_dir, exist_ok=True)
 
 
+
+def view_attendance_records(course_code, week):
+    """Display attendance records for a specific course and week"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = f"attendance_{course_code}_{week_key}.csv"
+        
+        if not os.path.exists(attendance_file):
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        df = pd.read_csv(attendance_file)
+        
+        if df.empty:
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        st.success(f"📊 Attendance Records for {course_code} - {week}")
+        
+        # Display the dataframe
+        st.dataframe(df, use_container_width=True)
+        
+        # Show statistics
+        total_students = len(df)
+        st.info(f"**Total students attended:** {total_students}")
+        
+        # Provide download option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download CSV",
+            data=csv,
+            file_name=f"attendance_{course_code}_{week_key}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error loading attendance records: {e}")
+
+def show_attendance_summary(course_code):
+    """Show summary of attendance across all weeks"""
+    try:
+        summary_data = []
+        
+        for week_num in range(1, 16):
+            week = f"Week {week_num}"
+            week_key = week.replace(" ", "")
+            attendance_file = f"attendance_{course_code}_{week_key}.csv"
+            
+            if os.path.exists(attendance_file):
+                df = pd.read_csv(attendance_file)
+                student_count = len(df)
+                
+                # Get attendance status
+                status_data = get_attendance_status(course_code, week)
+                is_open = status_data.get("is_open", False)
+                status = "🟢 OPEN" if is_open else "🔴 CLOSED"
+                
+                summary_data.append({
+                    "Week": week,
+                    "Students Attended": student_count,
+                    "Status": status
+                })
+            else:
+                status_data = get_attendance_status(course_code, week)
+                is_open = status_data.get("is_open", False)
+                status = "🟢 OPEN" if is_open else "🔴 CLOSED"
+                
+                summary_data.append({
+                    "Week": week,
+                    "Students Attended": 0,
+                    "Status": status
+                })
+        
+        if summary_data:
+            summary_df = pd.DataFrame(summary_data)
+            st.dataframe(summary_df, use_container_width=True)
+            
+            # Calculate totals
+            total_students = summary_df["Students Attended"].sum()
+            weeks_with_attendance = len(summary_df[summary_df["Students Attended"] > 0])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Attendance Records", total_students)
+            with col2:
+                st.metric("Weeks with Attendance", weeks_with_attendance)
+        else:
+            st.info("No attendance records found for any week.")
+            
+    except Exception as e:
+        st.error(f"Error generating attendance summary: {e}")
+
+def get_all_courses_attendance():
+    """Get attendance summary for all courses"""
+    courses = ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
+    all_courses_data = []
+    
+    for course in courses:
+        total_students = 0
+        weeks_with_data = 0
+        
+        for week_num in range(1, 16):
+            week = f"Week {week_num}"
+            week_key = week.replace(" ", "")
+            attendance_file = f"attendance_{course}_{week_key}.csv"
+            
+            if os.path.exists(attendance_file):
+                try:
+                    df = pd.read_csv(attendance_file)
+                    total_students += len(df)
+                    weeks_with_data += 1
+                except:
+                    pass
+        
+        all_courses_data.append({
+            "Course": course,
+            "Total Students": total_students,
+            "Weeks Recorded": weeks_with_data
+        })
+    
+    return pd.DataFrame(all_courses_data)
 def admin_view(course_code):
 
     st.title("👩‍🏫 Admin Dashboard")
@@ -2037,9 +2159,7 @@ def admin_view(course_code):
             st.session_state[f"{course_code}_{week_to_control}_cw_end"] = datetime.now()
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
-
-
-
+    
     # 🕒 Attendance Control (Admin)
     # -------------------------------
     st.subheader("🎛 Attendance Control")
@@ -2099,6 +2219,40 @@ def admin_view(course_code):
         except Exception as e:
             st.error(f"Error in auto-close: {e}")
 
+    # 🎯 VIEW ATTENDANCE RECORDS
+    # -------------------------------
+    st.subheader("📊 View Attendance Records")
+    
+    # Let admin select which week's attendance to view
+    view_week = st.selectbox(
+        "Select Week to View", 
+        [f"Week {i}" for i in range(1, 16)], 
+        key=f"{course_code}_view_week"
+    )
+    
+    if st.button("📋 Load Attendance Records", type="secondary"):
+        view_attendance_records(course_code, view_week)
+    
+    # Also show a summary of all weeks
+    st.subheader("📈 Attendance Summary")
+    show_attendance_summary(course_code)
+
+    # 🌐 GLOBAL OVERVIEW (Optional)
+    # -------------------------------
+    st.subheader("🌐 Global Attendance Overview")
+
+    if st.button("🔄 Refresh Global Overview", type="secondary"):
+        global_df = get_all_courses_attendance()
+        
+        if not global_df.empty:
+            st.dataframe(global_df, use_container_width=True)
+            
+            # Show some metrics
+            total_all_courses = global_df["Total Students"].sum()
+            st.metric("Total Attendance Across All Courses", total_all_courses)
+        else:
+            st.info("No attendance data found for any course.")
+
     # Debug information
     with st.expander("🔍 Persistent Storage Debug Info"):
         st.write("All attendance status in JSON file:")
@@ -2112,7 +2266,6 @@ def admin_view(course_code):
         st.write(f"Current course: `{course_code}`")
         st.write(f"Current week: `{selected_week}`")
         st.write(f"Current status: `{current_status}`")
-
 # 📁 Delete attendance record option
     attendance_folder = os.path.join("data", "attendance")
     os.makedirs(attendance_folder, exist_ok=True)
@@ -2168,6 +2321,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
