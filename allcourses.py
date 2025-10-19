@@ -1123,7 +1123,7 @@ def save_classwork(name, matric, week, answers):
         st.error(f"❌ Error saving classwork: {e}")
         return False
         
- def get_classwork_status(course_code, week):
+def get_classwork_status(course_code, week):
     """Get classwork status for a specific course and week"""
     try:
         with open(ATTENDANCE_STATUS_FILE, 'r') as f:
@@ -1162,7 +1162,8 @@ def set_classwork_status(course_code, week, is_open, open_time=None):
         return True
     except Exception as e:
         st.error(f"Error setting classwork status: {e}")
-        return False                              
+        return False
+                        
 # ===============================================================
 # 🎓 STUDENT VIEW DASHBOARD
 # ===============================================================
@@ -2621,6 +2622,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
