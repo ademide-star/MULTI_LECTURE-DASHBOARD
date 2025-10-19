@@ -1265,6 +1265,7 @@ def student_view(course_code):
         if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
             st.stop()
+            st.rerun()
 
         # Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
@@ -2630,6 +2631,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
