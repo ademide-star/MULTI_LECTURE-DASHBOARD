@@ -1021,6 +1021,28 @@ def mark_attendance_entry(course_code, name, matric, week):
         st.error(f"⚠️ Error recording attendance: {e}")
         return False
 
+def init_lectures(course_code, default_weeks):
+    """Create or load lectures CSV for a course. Returns DataFrame."""
+    LECTURE_FILE = get_file(course_code, "lectures")
+    if not os.path.exists(LECTURE_FILE):
+        lecture_data = {
+            "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
+            "Topic": default_weeks,
+            "Brief": [""] * len(default_weeks),
+            "Assignment": [""] * len(default_weeks),
+            "Classwork": [""] * len(default_weeks),
+        }
+        pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
+    df = pd.read_csv(LECTURE_FILE)
+    for col in ["Brief", "Assignment", "Classwork"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("")
+    return df
+
+default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
+lectures_df = init_lectures(course_code, default_topics)
+
 # ---------------------- Student View ---------------------- #
 def student_view(course_code):
     if st.session_state.get("role") != "Student":
@@ -1042,7 +1064,6 @@ def student_view(course_code):
     if lectures_df.empty or "Week" not in lectures_df.columns:
         st.error("⚠️ Lecture file missing or invalid format.")
         return
-
 
 
 # 🕒 ATTENDANCE FORM
@@ -2093,6 +2114,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
