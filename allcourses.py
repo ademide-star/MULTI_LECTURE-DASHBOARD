@@ -1162,7 +1162,46 @@ def save_classwork(name, matric, week, answers):
     except Exception as e:
         st.error(f"❌ Error saving classwork: {e}")
         return False
-                               
+ def get_classwork_status(course_code, week):
+    """Get classwork status for a specific course and week"""
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"classwork_{course_code}_{week_key}"
+        
+        return status_data.get(key, {"is_open": False, "open_time": None})
+    except Exception as e:
+        return {"is_open": False, "open_time": None}
+
+def set_classwork_status(course_code, week, is_open, open_time=None):
+    """Set classwork status for a specific course and week"""
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"classwork_{course_code}_{week_key}"
+        
+        if is_open:
+            status_data[key] = {
+                "is_open": True,
+                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
+            }
+        else:
+            status_data[key] = {
+                "is_open": False,
+                "open_time": None
+            }
+        
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(status_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error setting classwork status: {e}")
+        return False                              
 # ===============================================================
 # 🎓 STUDENT VIEW DASHBOARD
 # ===============================================================
@@ -1264,11 +1303,14 @@ def student_view(course_code):
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
         
-  # ===============================================================
-    # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS
+      # ===============================================================
+    # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS AND CLASSWORK
     # ===============================================================
     st.header(f"📚 {course_code} Lecture Materials")
+    
+    # Define CLASSWORK_FILE here
     CLASSWORK_FILE = get_file(course_code, "classwork")
+    
     if lectures_df.empty or lectures_df["Week"].isna().all():
         st.info("No lecture materials available yet. Check back later!")
         return
@@ -1278,6 +1320,8 @@ def student_view(course_code):
         if pd.isna(row["Week"]) or row["Week"] == "":
             continue
             
+        week = row["Week"]  # Define week variable for this iteration
+            
         with st.expander(f"📖 {row['Week']}: {row['Topic']}", expanded=False):
             col1, col2 = st.columns([3, 1])
             
@@ -1285,83 +1329,86 @@ def student_view(course_code):
                 if row["Brief"] and str(row["Brief"]).strip():
                     st.markdown(f"**Description:** {row['Brief']}")
                 
-                    # 🧩 Classwork Section
-    # -------------------------------
-                classwork_text = str(lecture_info.get("Classwork", "") or "").strip()
+                # 🧩 Classwork Section - FIXED: use row instead of lecture_info
+                classwork_text = str(row.get("Classwork", "") or "").strip()
                 if classwork_text:
                     st.markdown("### 🧩 Classwork Questions")
         
-        # Split questions by semicolon
+                    # Split questions by semicolon
                     questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
         
                     if questions:
-            # Check if classwork is open
+                        # Check if classwork is open
                         classwork_status = is_classwork_open(course_code, week)
             
-                        with st.form("cw_form"):
+                        with st.form(f"cw_form_{week.replace(' ', '_')}"):  # Unique key for each week
                             st.write("**Answer the following questions:**")
                 
-                # Create answer inputs
+                            # Create answer inputs
                             answers = []
                             for i, question in enumerate(questions):
                                 st.write(f"**Q{i+1}:** {question}")
                                 answer = st.text_area(
                                     f"Your answer for Q{i+1}",
                                     placeholder=f"Type your answer for Q{i+1} here...",
-                                    key=f"q{i}_{week}",
+                                    key=f"q{i}_{week.replace(' ', '_')}",  # Unique key
                                     height=100,
                                     disabled=not classwork_status
-                    )
+                                )
                                 answers.append(answer)
-                                st.divider()
+                                if i < len(questions) - 1:  # Don't add divider after last question
+                                    st.divider()
                 
-                # Submit button
+                            # Submit button
                             submit_cw = st.form_submit_button(
                                 "📤 Submit Classwork Answers", 
                                 disabled=not classwork_status,
                                 use_container_width=True
-                )
+                            )
                 
-                # Auto-close check
+                            # Auto-close check
                             close_classwork_after_20min(course_code, week)
                 
                             if submit_cw:
-                    # Validate answers
+                                # Validate answers
                                 if not name or not matric:
                                     st.error("❌ Please enter your name and matric number first.")
                                 elif any(not answer.strip() for answer in answers):
                                     st.error("❌ Please answer all questions before submitting.")
                                 else:
-                        # Save classwork
+                                    # Save classwork
                                     success = save_classwork(name, matric, week, answers)
                                     if success:
                                         st.balloons()
+                                        st.rerun()  # Refresh to show success message
+                        else:
+                            st.info("📝 Classwork questions will appear here when the lecturer opens them.")
                     else:
-                        st.info("📝 Classwork questions will appear here when the lecturer opens them.")
+                        st.info("No classwork questions available for this week.")
                 else:
-                    st.info("No classwork questions available for this week.")
+                    st.info("No classwork assigned for this week yet.")
 
-                
+                # Assignment section
                 if row["Assignment"] and str(row["Assignment"]).strip():
                     st.markdown(f"**Assignment:** {row['Assignment']}")
             
-                with col2:
-                # 🎯 FIXED: PDF Download for students
-                    pdf_file = row["PDF_File"]
-                    if pdf_file and os.path.exists(pdf_file):
-                        try:
-                            with open(pdf_file, "rb") as pdf_file_obj:
-                                st.download_button(
-                                    label="📥 Download PDF",
-                                    data=pdf_file_obj,
-                                    file_name=os.path.basename(pdf_file),
-                                    mime="application/pdf",
-                                    key=f"student_pdf_{row['Week']}"
+            with col2:
+                # PDF Download for students
+                pdf_file = row.get("PDF_File", "")
+                if pdf_file and os.path.exists(pdf_file):
+                    try:
+                        with open(pdf_file, "rb") as pdf_file_obj:
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_file_obj,
+                                file_name=os.path.basename(pdf_file),
+                                mime="application/pdf",
+                                key=f"student_pdf_{row['Week'].replace(' ', '_')}"
                             )
-                        except Exception as e:
-                            st.error(f"⚠️ Error loading PDF: {e}")
-                    else:
-                        st.info("No PDF available")
+                    except Exception as e:
+                        st.error(f"⚠️ Error loading PDF: {e}")
+                else:
+                    st.info("No PDF available")
       # ===============================================================
         # 🎓 Student Dashboard — View Scores
         # ===============================================================
@@ -2613,6 +2660,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
