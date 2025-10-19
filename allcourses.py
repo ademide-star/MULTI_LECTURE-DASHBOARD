@@ -813,7 +813,7 @@ def student_view():
         return
 
  # -------------------------------
-# 🕒 ATTENDANCE FORM
+ # 🕒 ATTENDANCE FORM
 # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
@@ -833,17 +833,31 @@ def student_view():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ UPDATED: Use the same key format as admin
+    # ✅ Use the EXACT same key format as admin
         attendance_key = f"att_open_{course_code}_{week.replace(' ', '_')}"
-
-    # Debug info
-        st.write(f"🔍 Checking key: `{attendance_key}`")
-        st.write(f"🔍 Key exists: `{attendance_key in st.session_state}`")
-        if attendance_key in st.session_state:
-            st.write(f"🔍 Key value: `{st.session_state[attendance_key]}`")
-
+    
+    # Enhanced debug info
+        with st.expander("🔍 Debug Information"):
+            st.write(f"Course: `{course_code}`")
+            st.write(f"Week: `{week}`")
+            st.write(f"Looking for key: `{attendance_key}`")
+            st.write(f"Key exists in session state: `{attendance_key in st.session_state}`")
+        
+        # Show all relevant keys
+            st.write("All attendance keys in session state:")
+            all_attendance_keys = [key for key in st.session_state.keys() if 'att_open' in key]
+            if all_attendance_keys:
+                for key in sorted(all_attendance_keys):
+                    st.write(f"- `{key}`: `{st.session_state[key]}`")
+            else:
+                st.write("No attendance keys found!")
+    
         if not st.session_state.get(attendance_key, False):
-            st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+            st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+            st.info("💡 **Troubleshooting:** If you believe attendance should be open, ask your lecturer to:")
+            st.info("1. Go to Admin Dashboard → Attendance Control")
+            st.info("2. Select the correct course and week")
+            st.info("3. Click the 'OPEN Attendance' button")
             st.stop()
 
     # ✅ Prevent duplicate marking
@@ -1717,8 +1731,10 @@ def admin_view(course_code):
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
 # -------------------------------
-# 🕒 Attendance Control (Admin) - Callback Version
-# -------------------------------
+# 🕒 Attendance Control (Admin)
+# ----------------------------------------
+----#
+
     st.subheader("🎛 Attendance Control")
 
     course_code = st.selectbox(
@@ -1732,51 +1748,70 @@ def admin_view(course_code):
         key=f"{course_code}_week_select"
 )
 
-# ✅ SAFE: Simple keys
-    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '')}"
-    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '')}"
+# ✅ SIMPLER: Use consistent key format
+    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '_')}"
+    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '_')}"
 
-# Initialize state safely
+# Initialize the state if it doesn't exist
     if attendance_key not in st.session_state:
         st.session_state[attendance_key] = False
 
-# Use callback to handle state changes safely
-    def on_toggle_change():
-        if st.session_state.toggle_attendance:
-            st.session_state[timer_key] = datetime.now()
+# Display current status first
+    if st.session_state[attendance_key]:
+        st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
+    else:
+        st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
+
+# Use buttons instead of toggle for more reliable state management
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
             st.session_state[attendance_key] = True
-        else:
+            st.session_state[timer_key] = datetime.now()
+            st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
+            st.rerun()
+
+    with col2:
+        if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
             st.session_state[attendance_key] = False
             if timer_key in st.session_state:
                 del st.session_state[timer_key]
+            st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
+            st.rerun()
 
-# Toggle with callback
-    open_attendance = st.toggle(
-        f"🔓 Allow students to mark attendance for {course_code} ({selected_week})",
-        value=st.session_state[attendance_key],
-        key="toggle_attendance",
-        on_change=on_toggle_change
-)
-
-# Display status
-    if st.session_state[attendance_key]:
-        st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
+# Auto-close functionality
+    if st.session_state.get(attendance_key) and st.session_state.get(timer_key):
+        elapsed = (datetime.now() - st.session_state[timer_key]).total_seconds()
+        remaining = max(0, 600 - elapsed)  # 10 minutes
     
-    # Auto-close logic
-        if timer_key in st.session_state:
-            elapsed = (datetime.now() - st.session_state[timer_key]).total_seconds()
-            remaining = max(0, 600 - elapsed)
-        
-            if remaining <= 0:
-                st.session_state[attendance_key] = False
+        if remaining <= 0:
+            st.session_state[attendance_key] = False
+            if timer_key in st.session_state:
                 del st.session_state[timer_key]
-                st.warning(f"⏰ Attendance automatically closed.")
-            else:
-                mins = int(remaining // 60)
-                secs = int(remaining % 60)
-                st.info(f"⏳ Auto-closes in {mins:02d}:{secs:02d}")
-    else:
-        st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
+            st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
+            st.rerun()
+        else:
+            mins = int(remaining // 60)
+            secs = int(remaining % 60)
+            st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+
+# Debug information
+    with st.expander("🔍 Session State Debug Info"):
+        st.write("All attendance-related keys in session state:")
+        attendance_keys = [key for key in st.session_state.keys() if key.startswith('att_open_')]
+        if attendance_keys:
+            for key in sorted(attendance_keys):
+                st.write(f"- `{key}`: `{st.session_state[key]}`")
+        else:
+            st.write("No attendance keys found in session state")
+    
+        st.write(f"Current course: `{course_code}`")
+        st.write(f"Current week: `{selected_week}`")
+        st.write(f"Looking for key: `{attendance_key}`")
+        st.write(f"Key exists: `{attendance_key in st.session_state}`")
+        if attendance_key in st.session_state:
+            st.write(f"Key value: `{st.session_state[attendance_key]}`")
 
 # 📁 Delete attendance record option
     attendance_folder = os.path.join("data", "attendance")
@@ -1833,6 +1868,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
