@@ -833,8 +833,14 @@ def student_view():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ Make key match admin’s open toggle
+    # ✅ FIXED: Ensure week format matches admin exactly
         attendance_key = f"{course_code}_{week}_attendance_open"
+
+    # Debug info (you can remove this after testing)
+        st.write(f"Checking attendance key: {attendance_key}")
+        st.write(f"Key exists in session state: {attendance_key in st.session_state}")
+        if attendance_key in st.session_state:
+            st.write(f"Key value: {st.session_state[attendance_key]}")
 
         if not st.session_state.get(attendance_key, False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
@@ -852,7 +858,6 @@ def student_view():
             st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
-
 
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
@@ -1724,31 +1729,30 @@ def admin_view(course_code):
 
     selected_week = st.selectbox(
         "Select Week", 
-        [f"Week {i}" for i in range(1, 15)], 
+        [f"Week {i}" for i in range(1, 16)],  # Fixed: Changed 15 to 16 to match student range
         key=f"{course_code}_week_select"
 )
 
-    # ✅ The key must match exactly what admin uses
-    attendance_key = f"{course_code}_{week}_attendance_open"
+# ✅ FIXED: Use selected_week instead of week in the key
+    attendance_key = f"{course_code}_{selected_week}_attendance_open"
     timer_key = f"{course_code}_{selected_week}_open_time"
 
 # Toggle to open attendance
     open_attendance = st.toggle(
         f"🔓 Allow students to mark attendance for {course_code} ({selected_week})", 
-        key=attendance_key
+        key=attendance_key,
+        value=st.session_state.get(attendance_key, False)  # Added to maintain state
 )
 
 # Record start time when opened
     if open_attendance:
         if timer_key not in st.session_state:
             st.session_state[timer_key] = datetime.now()
-        st.session_state[f"{course_code}_attendance_open"] = True
-        st.session_state[f"{course_code}_open_week"] = selected_week
+        st.session_state[attendance_key] = True  # ✅ Explicitly set the key
         st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
     else:
     # Close manually
-        st.session_state[f"{course_code}_attendance_open"] = False
-        st.session_state[f"{course_code}_open_week"] = None
+        st.session_state[attendance_key] = False  # ✅ Explicitly set the key
         if timer_key in st.session_state:
             del st.session_state[timer_key]
         st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
@@ -1759,27 +1763,27 @@ def admin_view(course_code):
         remaining = max(0, 600 - elapsed)  # 600 seconds = 10 minutes
 
         if remaining <= 0:
-            st.session_state[f"{course_code}_attendance_open"] = False
+            st.session_state[attendance_key] = False  # ✅ Explicitly close the attendance
+            if timer_key in st.session_state:
+                del st.session_state[timer_key]
             st.warning(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed.")
         else:
             mins = int(remaining // 60)
             secs = int(remaining % 60)
             st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
 
-
-
 # 📁 Delete attendance record option
-        attendance_folder = os.path.join("data", "attendance")
-        os.makedirs(attendance_folder, exist_ok=True)
-        attendance_file = os.path.join(attendance_folder, f"{course_code}_{selected_week}.csv")
+            attendance_folder = os.path.join("data", "attendance")
+            os.makedirs(attendance_folder, exist_ok=True)
+            attendance_file = os.path.join(attendance_folder, f"{course_code}_{selected_week}.csv")
 
-        if os.path.exists(attendance_file):
-            st.info(f"📂 Found record: {attendance_file}")
-            if st.button(f"🗑 Delete Attendance Record for {course_code} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
-                os.remove(attendance_file)
-                st.success(f"✅ Deleted attendance record for {course_code} - {selected_week}")
-        else:
-            st.info(f"No attendance record yet for {course_code} - {selected_week}")
+            if os.path.exists(attendance_file):
+                st.info(f"📂 Found record: {attendance_file}")
+                if st.button(f"🗑 Delete Attendance Record for {course_code} - {selected_week}", key=f"del_{selected_course}_{selected_week}"):
+                    os.remove(attendance_file)
+                    st.success(f"✅ Deleted attendance record for {course_code} - {selected_week}")
+            else:
+                st.info(f"No attendance record yet for {course_code} - {selected_week}")
 
 
         ATTENDANCE_FOLDER = "attendance_records"
@@ -1823,6 +1827,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
