@@ -105,8 +105,28 @@ os.makedirs(course_dir, exist_ok=True)
 UPLOADS_DIR = os.path.join(UPLOAD_DIR, course_code)
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-import os
-import pandas as pd
+def load_lectures(course_code):
+    """Load lecture file safely for a given course."""
+    LECTURE_FILE = get_file(course_code, "lectures")
+
+    if not os.path.exists(LECTURE_FILE):
+        # Try to create a blank one so students don't see an error
+        os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+        df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork"])
+        df.to_csv(LECTURE_FILE, index=False)
+        return df
+
+    try:
+        df = pd.read_csv(LECTURE_FILE)
+        required_cols = ["Week", "Topic", "Brief", "Assignment", "Classwork"]
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = ""
+        return df
+    except Exception as e:
+        st.error(f"Error loading lecture file: {e}")
+        return pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork"])
+
 # Fixed helper functions
 def has_marked_attendance(course_code, week, name, matric):
     try:
@@ -1021,37 +1041,6 @@ def mark_attendance_entry(course_code, name, matric, week):
         st.error(f"⚠️ Error recording attendance: {e}")
         return False
 
-def init_lectures(course_code, default_weeks):
-    """Create or load lectures CSV for a course. Returns DataFrame."""
-    LECTURE_FILE = get_file(course_code, "lectures")
-    if not os.path.exists(LECTURE_FILE):
-        lecture_data = {
-            "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
-            "Topic": default_weeks,
-            "Brief": [""] * len(default_weeks),
-            "Assignment": [""] * len(default_weeks),
-            "Classwork": [""] * len(default_weeks),
-        }
-        pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
-    df = pd.read_csv(LECTURE_FILE)
-    for col in ["Brief", "Assignment", "Classwork"]:
-        if col not in df.columns:
-            df[col] = ""
-        df[col] = df[col].fillna("")
-    return df
-
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-
-def init_lectures(course_code, topics):
-    """Initialize lecture weeks dataframe."""
-    df_path = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
-    if os.path.exists(df_path):
-        return pd.read_csv(df_path)
-    else:
-        df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
-        df.to_csv(df_path, index=False)
-        return df
 
                                
 # ---------------------- Student View ---------------------- #
@@ -2125,6 +2114,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
