@@ -6,9 +6,9 @@ from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
 import zipfile
 import io
+import json
 import base64
-from attendance_utils import get_attendance_status
-from attendance_utils import set_attendance_status, get_attendance_status, get_all_attendance_status
+
 
 ATTENDANCE_FILE = "attendance.csv"
 LECTURE_FILE = "lectures.csv"
@@ -909,7 +909,129 @@ def get_remaining_time(course_code, week):
         return max(int(remaining.total_seconds()), 0)
     return 0
 
+# =============================================
+# PERSISTENT STORAGE FUNCTIONS
+# =============================================
 
+ATTENDANCE_STATUS_FILE = "attendance_status.json"
+
+def init_attendance_status():
+    """Initialize the attendance status file if it doesn't exist"""
+    if not os.path.exists(ATTENDANCE_STATUS_FILE):
+        default_status = {}
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(default_status, f)
+
+def get_attendance_status(course_code, week):
+    """Get attendance status for a specific course and week"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"{course_code}_{week_key}"
+        
+        return status_data.get(key, {"is_open": False, "open_time": None})
+    except Exception as e:
+        st.error(f"Error reading attendance status: {e}")
+        return {"is_open": False, "open_time": None}
+
+def set_attendance_status(course_code, week, is_open, open_time=None):
+    """Set attendance status for a specific course and week"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            status_data = json.load(f)
+        
+        week_key = week.replace(" ", "")
+        key = f"{course_code}_{week_key}"
+        
+        if is_open:
+            status_data[key] = {
+                "is_open": True,
+                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
+            }
+        else:
+            status_data[key] = {
+                "is_open": False,
+                "open_time": None
+            }
+        
+        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
+            json.dump(status_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error setting attendance status: {e}")
+        return False
+
+def get_all_attendance_status():
+    """Get all attendance status for debugging"""
+    init_attendance_status()
+    
+    try:
+        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def has_marked_attendance(course_code, week, name, matric):
+    """Check if student has already marked attendance"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = f"attendance_{course_code}_{week_key}.csv"
+        
+        if not os.path.exists(attendance_file):
+            return False
+        
+        df = pd.read_csv(attendance_file)
+        
+        # Convert to string and clean data
+        df['Name'] = df['Name'].astype(str).str.strip().str.lower()
+        df['Matric'] = df['Matric'].astype(str).str.strip().str.lower()
+        
+        name_clean = name.strip().lower()
+        matric_clean = matric.strip().lower()
+        
+        # Check for existing entry
+        existing = df[(df['Name'] == name_clean) & (df['Matric'] == matric_clean)]
+        return len(existing) > 0
+        
+    except Exception as e:
+        st.error(f"⚠️ Error checking attendance: {e}")
+        return True  # Prevent marking if error
+
+def mark_attendance_entry(course_code, name, matric, week):
+    """Record attendance entry"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = f"attendance_{course_code}_{week_key}.csv"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        new_data = {
+            'Name': [name.strip()],
+            'Matric': [matric.strip()], 
+            'Week': [week],
+            'Timestamp': [timestamp]
+        }
+        
+        new_df = pd.DataFrame(new_data)
+        
+        if os.path.exists(attendance_file):
+            existing_df = pd.read_csv(attendance_file)
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+        else:
+            combined_df = new_df
+            
+        combined_df.to_csv(attendance_file, index=False)
+        return True
+        
+    except Exception as e:
+        st.error(f"⚠️ Error recording attendance: {e}")
+        return False
 
 # ---------------------- Student View ---------------------- #
 def student_view():
@@ -936,7 +1058,7 @@ def student_view():
 
 
 # 🕒 ATTENDANCE FORM
-# -------------------------------
+    # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
@@ -944,47 +1066,49 @@ def student_view():
             "Select Week",
             [f"Week {i}" for i in range(1, 16)],
             key=f"{course_code}_att_week"
-    )
+        )
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
-# -------------------------------
-# 🧾 ATTENDANCE VALIDATION
-# -------------------------------
+    # -------------------------------
+    # 🧾 ATTENDANCE VALIDATION
+    # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ FIXED: Get status from persistent storage instead of session state
+        # Get status from persistent storage
         status_data = get_attendance_status(course_code, week)
-        is_attendance_open = status_data and status_data.get("is_open", False)
-    
-    # Debug information
+        is_attendance_open = status_data.get("is_open", False)
+        
+        # Debug information
         st.write("---")
         st.subheader("🔍 Debug Information")
         st.write(f"**Course:** `{course_code}`")
         st.write(f"**Week:** `{week}`")
         st.write(f"**Status from JSON:** `{status_data}`")
         st.write(f"**Attendance Open:** `{is_attendance_open}`")
-    
-    # Show all status for debugging
-        from attendance_utils import get_all_attendance_status
+        
+        # Show all status for debugging
         all_status = get_all_attendance_status()
         st.write("**All status in JSON file:**")
-        for key, value in all_status.items():
-            st.write(f"- `{key}`: `{value}`")
+        if all_status:
+            for key, value in all_status.items():
+                st.write(f"- `{key}`: `{value}`")
+        else:
+            st.write("No status found in JSON file")
         st.write("---")
-    
+        
         if not is_attendance_open:
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
             st.stop()
 
-    # ✅ Prevent duplicate marking
+        # Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
             st.stop()
 
-    # ✅ Mark attendance
+        # Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
@@ -1853,32 +1977,27 @@ def admin_view(course_code):
 
 
 
-# 🕒 Attendance Control (Admin)
-# -------------------------------
+    # 🕒 Attendance Control (Admin)
+    # -------------------------------
     st.subheader("🎛 Attendance Control")
-
-    course_code = st.selectbox(
-        "Select Course to Manage", 
-        ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
-)
 
     selected_week = st.selectbox(
         "Select Week", 
         [f"Week {i}" for i in range(1, 16)], 
         key=f"{course_code}_week_select"
-)
+    )
 
-# Get current status from persistent storage
+    # Get current status from persistent storage
     current_status = get_attendance_status(course_code, selected_week)
-    is_currently_open = current_status and current_status.get("is_open", False)
+    is_currently_open = current_status.get("is_open", False)
 
-# Display current status
+    # Display current status
     if is_currently_open:
         st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
     else:
         st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
 
-# Use buttons for attendance control
+    # Use buttons for attendance control
     col1, col2 = st.columns(2)
 
     with col1:
@@ -1899,13 +2018,13 @@ def admin_view(course_code):
             else:
                 st.error("❌ Failed to close attendance")
 
-# Auto-close functionality
+    # Auto-close functionality
     if is_currently_open and current_status.get("open_time"):
         try:
             open_time = datetime.fromisoformat(current_status["open_time"])
             elapsed = (datetime.now() - open_time).total_seconds()
             remaining = max(0, 600 - elapsed)  # 10 minutes
-        
+            
             if remaining <= 0:
                 set_attendance_status(course_code, selected_week, False)
                 st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
@@ -1917,7 +2036,7 @@ def admin_view(course_code):
         except Exception as e:
             st.error(f"Error in auto-close: {e}")
 
-# Debug information
+    # Debug information
     with st.expander("🔍 Persistent Storage Debug Info"):
         st.write("All attendance status in JSON file:")
         all_status = get_all_attendance_status()
@@ -1926,7 +2045,7 @@ def admin_view(course_code):
                 st.write(f"- `{key}`: `{value}`")
         else:
             st.write("No attendance status found in JSON file")
-    
+        
         st.write(f"Current course: `{course_code}`")
         st.write(f"Current week: `{selected_week}`")
         st.write(f"Current status: `{current_status}`")
@@ -1986,6 +2105,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
