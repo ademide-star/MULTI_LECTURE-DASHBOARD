@@ -1186,6 +1186,14 @@ def student_view(course_code):
     if st.session_state.get("refresh_needed", False):
         st.session_state["refresh_needed"] = False  # Reset flag
         st.rerun()
+        # ✅ Display success/info message after refresh
+    if "attendance_message" in st.session_state:
+        msg = st.session_state["attendance_message"]
+        if "successfully" in msg:
+            st.success(msg)
+        else:
+            st.info(msg)
+        del st.session_state["attendance_message"]
 
     # 🎓 COURSE SELECTION
     course_code = st.selectbox(
@@ -1275,20 +1283,18 @@ def student_view(course_code):
 
     # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
-            st.info("✅ Attendance already marked for this week.")
+            st.session_state["attendance_message"] = f"✅ Attendance already marked for {course_code} - Week {week}."
             st.session_state["refresh_needed"] = True
             st.rerun()
 
     # ✅ Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
-            st.session_state["attended_week"] = str(week)
-            st.session_state["refresh_needed"] = True  # 🔁 Flag for refresh
-            st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
-            st.rerun()  # ✅ Force full refresh so updated data shows
+            st.session_state["attendance_message"] = f"🎉 Attendance recorded successfully for {course_code} - Week {week}."
+            st.session_state["refresh_needed"] = True
+            st.rerun()
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
-
         
      # ===============================================================
     # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS AND CLASSWORK
@@ -2645,6 +2651,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
