@@ -824,22 +824,24 @@ def student_view():
             key=f"{course_code}_att_week"
     )
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-
-# -------------------------------
-# 🧾 ATTENDANCE VALIDATION
+        attendance_key = f"{course_code}_{week}_attendance_open"
+        file_name = f"{course_code}_{week}.csv"
+# 🕒 ATTENDANCE VALIDATION
 # -------------------------------
     if submit_attendance:
         if not name.strip() or not matric.strip():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ Use the EXACT same key format as admin
-        attendance_key = f"att_open_{course_code}_{week.replace(' ', '')}"
+    # ✅ FIXED: Use the EXACT same key format as admin
+        week_key = week.replace(" ", "")  # "Week 1" becomes "Week1"
+        attendance_key = f"att_open_{course_code}_{week_key}"
     
     # Enhanced debug info
         with st.expander("🔍 Debug Information"):
             st.write(f"Course: `{course_code}`")
             st.write(f"Week: `{week}`")
+            st.write(f"Formatted week key: `{week_key}`")
             st.write(f"Looking for key: `{attendance_key}`")
             st.write(f"Key exists in session state: `{attendance_key in st.session_state}`")
         
@@ -848,11 +850,19 @@ def student_view():
             all_attendance_keys = [key for key in st.session_state.keys() if 'att_open' in key]
             if all_attendance_keys:
                 for key in sorted(all_attendance_keys):
-                    st.write(f"- `{key}`: `{st.session_state[key]}`")
+                st.write(f"- `{key}`: `{st.session_state[key]}`")
             else:
                 st.write("No attendance keys found!")
+        
+            if attendance_key in st.session_state:
+                st.write(f"Key value: `{st.session_state[attendance_key]}`")
+                st.write(f"Key value type: `{type(st.session_state[attendance_key])}`")
     
-        if not st.session_state.get(attendance_key, False):
+    # ✅ FIXED: More explicit check
+        is_attendance_open = st.session_state.get(attendance_key, False)
+        st.write(f"Attendance open status: `{is_attendance_open}`")
+    
+        if not is_attendance_open:
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
 
     # ✅ Prevent duplicate marking
@@ -1748,7 +1758,8 @@ def admin_view(course_code):
 # ✅ SIMPLER: Use consistent key format
     attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '')}"
     timer_key = f"timer_{course_code}_{selected_week.replace(' ', '')}"
-
+    attendance_key = f"{course_code}_{selected_week}_attendance_open"
+    file_name = f"{selected_course}_{selected_week}.csv"  # no double Week
 # Initialize the state if it doesn't exist
     if attendance_key not in st.session_state:
         st.session_state[attendance_key] = False
@@ -1865,6 +1876,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
