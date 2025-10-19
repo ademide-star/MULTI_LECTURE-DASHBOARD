@@ -1730,11 +1730,9 @@ def admin_view(course_code):
             st.session_state[f"{course_code}_{week_to_control}_cw_end"] = datetime.now()
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
-# -------------------------------
-# 🕒 Attendance Control (Admin)
-# ----------------------------------------
-----#
 
+# 🕒 Attendance Control (Admin)
+# -------------------------------
     st.subheader("🎛 Attendance Control")
 
     course_code = st.selectbox(
@@ -1868,6 +1866,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
