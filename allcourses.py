@@ -1043,6 +1043,17 @@ def init_lectures(course_code, default_weeks):
 default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
 lectures_df = init_lectures(course_code, default_topics)
 
+def init_lectures(course_code, topics):
+    """Initialize lecture weeks dataframe."""
+    df_path = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
+    if os.path.exists(df_path):
+        return pd.read_csv(df_path)
+    else:
+        df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
+        df.to_csv(df_path, index=False)
+        return df
+
+                               
 # ---------------------- Student View ---------------------- #
 def student_view(course_code):
     if st.session_state.get("role") != "Student":
@@ -2114,6 +2125,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
