@@ -1182,6 +1182,10 @@ def student_view(course_code):
 
     st.title("🎓 Student Dashboard")
     st.info("Welcome! Access your lectures, upload assignments, and mark attendance here.")
+    # 🔄 Auto-refresh after attendance marking
+    if st.session_state.get("refresh_needed", False):
+        st.session_state["refresh_needed"] = False  # Reset flag
+        st.rerun()
 
     # 🎓 COURSE SELECTION
     course_code = st.selectbox(
@@ -1253,28 +1257,38 @@ def student_view(course_code):
     
     # Rest of your attendance validation code...
 
-        # Get status from persistent storage
+        # -------------------------------
+# 🧾 ATTENDANCE VALIDATION
+# -------------------------------
+    if submit_attendance:
+        if not name.strip() or not matric.strip():
+            st.warning("Please enter your full name and matric number.")
+            st.stop()
+
+    # ✅ Check if attendance is open
         status_data = get_attendance_status(course_code, week)
         is_attendance_open = status_data.get("is_open", False)
-        
+
         if not is_attendance_open:
             st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
             st.stop()
 
-        # Prevent duplicate marking
+    # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
-            st.stop()
+            st.session_state["refresh_needed"] = True
             st.rerun()
 
-        # Mark attendance
+    # ✅ Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
+            st.session_state["refresh_needed"] = True  # 🔁 Flag for refresh
             st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
-            st.rerun()
+            st.rerun()  # ✅ Force full refresh so updated data shows
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
+
         
      # ===============================================================
     # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS AND CLASSWORK
@@ -2631,6 +2645,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
