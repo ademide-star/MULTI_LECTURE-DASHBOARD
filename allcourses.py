@@ -1024,7 +1024,19 @@ def has_marked_attendance(course_code, week, name, matric):
         st.error(f"⚠️ Error checking attendance: {e}")
         return True  # Prevent marking if error
 
-
+def get_file(course_code, file_type):
+    """Get file path for course-specific files"""
+    data_dir = "data"
+    os.makedirs(data_dir, exist_ok=True)
+    
+    if file_type == "lectures":
+        return os.path.join(data_dir, f"{course_code}_lectures.csv")
+    elif file_type == "classwork":
+        return os.path.join(data_dir, f"{course_code}_classwork.csv")
+    elif file_type == "seminar":
+        return os.path.join(data_dir, f"{course_code}_seminar.csv")
+    else:
+        return os.path.join(data_dir, f"{course_code}_{file_type}.csv")
 
 
 
@@ -1034,6 +1046,7 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import streamlit as st
 
+LECTURE_FILE = get_file(course_code, "lectures")
 # ===============================================================
 # 🧱 HELPER: Ensure All Required Directories Exist
 # ===============================================================
@@ -1073,7 +1086,7 @@ def student_view(course_code):
     )
 
     # ===============================================================
-    # 📘 LOAD LECTURES
+    # 📘 LOAD LECTURES WITH PDF SUPPORT
     # ===============================================================
     try:
         if "lectures_df" in st.session_state and st.session_state["lectures_df"] is not None:
@@ -1085,14 +1098,14 @@ def student_view(course_code):
             if not os.path.exists(LECTURE_FILE):
                 # Create blank structure if missing
                 lectures_df = pd.DataFrame(
-                    columns=["Week", "Topic", "Brief", "Assignment", "Classwork"]
+                    columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"]
                 )
                 lectures_df.to_csv(LECTURE_FILE, index=False)
             else:
                 lectures_df = pd.read_csv(LECTURE_FILE)
 
         # Ensure essential columns exist
-        for col in ["Week", "Topic", "Brief", "Assignment", "Classwork"]:
+        for col in ["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"]:
             if col not in lectures_df.columns:
                 lectures_df[col] = ""
 
@@ -1102,7 +1115,50 @@ def student_view(course_code):
         st.error(f"⚠️ Error loading lecture file: {e}")
         return
 
+    # ===============================================================
+    # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS
+    # ===============================================================
+    st.header(f"📚 {course_code} Lecture Materials")
+    
+    if lectures_df.empty or lectures_df["Week"].isna().all():
+        st.info("No lecture materials available yet. Check back later!")
+        return
 
+    # Display each week's materials
+    for _, row in lectures_df.iterrows():
+        if pd.isna(row["Week"]) or row["Week"] == "":
+            continue
+            
+        with st.expander(f"📖 {row['Week']}: {row['Topic']}", expanded=False):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                if row["Brief"] and str(row["Brief"]).strip():
+                    st.markdown(f"**Description:** {row['Brief']}")
+                
+                if row["Classwork"] and str(row["Classwork"]).strip():
+                    st.markdown(f"**Classwork:** {row['Classwork']}")
+                
+                if row["Assignment"] and str(row["Assignment"]).strip():
+                    st.markdown(f"**Assignment:** {row['Assignment']}")
+            
+            with col2:
+                # 🎯 FIXED: PDF Download for students
+                pdf_file = row["PDF_File"]
+                if pdf_file and os.path.exists(pdf_file):
+                    try:
+                        with open(pdf_file, "rb") as pdf_file_obj:
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_file_obj,
+                                file_name=os.path.basename(pdf_file),
+                                mime="application/pdf",
+                                key=f"student_pdf_{row['Week']}"
+                            )
+                    except Exception as e:
+                        st.error(f"⚠️ Error loading PDF: {e}")
+                else:
+                    st.info("No PDF available")
 # 🕒 ATTENDANCE FORM
     # -------------------------------
     with st.form(f"{course_code}_attendance_form"):
@@ -1126,14 +1182,6 @@ def student_view(course_code):
         # Get status from persistent storage
         status_data = get_attendance_status(course_code, week)
         is_attendance_open = status_data.get("is_open", False)
-        
-        # Debug information
-        st.write("---")
-        st.subheader("🔍 Debug Information")
-        st.write(f"**Course:** `{course_code}`")
-        st.write(f"**Week:** `{week}`")
-        st.write(f"**Status from JSON:** `{status_data}`")
-        st.write(f"**Attendance Open:** `{is_attendance_open}`")
         
         # Show all status for debugging
         all_status = get_all_attendance_status()
@@ -1280,36 +1328,6 @@ def student_view(course_code):
     else:
         st.info("📚 No classwork uploaded for this lecture.")
 
-
-# ---------------------- Lecture Materials (PDFs) ---------------------- #
-    st.divider()
-    st.subheader("📚 Lecture Materials")
-
-    modules_dir = "modules"
-    lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
-    classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
-    assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
-
-
-    def show_pdf(file_path, label):
-        if os.path.exists(file_path):
-            st.markdown(f"**{label}**")
-        # Download button
-            with open(file_path, "rb") as pdf_file:
-                st.download_button(
-                    label=f"📥 Download {label}",
-                    data=pdf_file.read(),
-                    file_name=os.path.basename(file_path),
-                    mime="application/pdf"
-            )
-       
-        else:
-            st.info(f"{label} not uploaded yet.")
-
-# Display all PDFs
-    show_pdf(lecture_pdf_path, f"Lecture Note ({week})")
-    show_pdf(classwork_pdf_path, f"Classwork ({week})")
-    show_pdf(assignment_pdf_path, f"Assignment ({week})")
 
 
       # ===============================================================
@@ -1805,49 +1823,87 @@ def admin_view(course_code):
         if week in lectures_df["Week"].values:
             row_idx = lectures_df[lectures_df["Week"] == week].index[0]
         else:
-            new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": ""}
+            new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": "", "PDF_File": ""}
             lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
             row_idx = lectures_df[lectures_df["Week"] == week].index[0]
             st.session_state["lectures_df"] = lectures_df
 
-         # Access existing/default values safely
-        topic_default = lectures_df.at[row_idx, "Topic"]
-        brief_default = lectures_df.at[row_idx, "Brief"]
-        classwork_default = lectures_df.at[row_idx, "Classwork"]
-        assignment_default = lectures_df.at[row_idx, "Assignment"]  
-        
-        topic = st.text_input("Lecture Topic", value=lectures_df.at[row_idx, "Topic"])
-        brief = st.text_area("Lecture Brief", value=lectures_df.at[row_idx, "Brief"])
-        classwork = st.text_area("Classwork (separate questions with ;)", value=lectures_df.at[row_idx, "Classwork"])
-        assignment = st.text_area("Assignment (separate questions with ;)", value=lectures_df.at[row_idx, "Assignment"])
+        # Existing text fields
+        topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
+        brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
+        classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
+        assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
 
+        # 🎯 FIXED: PDF Upload with persistent storage
         st.markdown("**Upload PDF Files (Optional)**")
-        lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"])
-        classwork_pdf = st.file_uploader("Classwork PDF", type=["pdf"])
-        assignment_pdf = st.file_uploader("Assignment PDF", type=["pdf"])
-
-        if st.button(f"💾 Save Lecture / Classwork / Assignment ({week})", key=f"save_{week}"):
-            lectures_df.loc[row_idx, ["Topic", "Brief", "Classwork", "Assignment"]] = [topic, brief, classwork, assignment]
+        
+        # Create PDF directory for this course
+        pdf_dir = os.path.join("pdfs", course_code)
+        os.makedirs(pdf_dir, exist_ok=True)
+        
+        # PDF Upload
+        lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
+        
+        # Display current PDF if exists
+        current_pdf = lectures_df.at[row_idx, "PDF_File"]
+        if current_pdf and os.path.exists(current_pdf):
+            st.info(f"📎 Current PDF: {os.path.basename(current_pdf)}")
             
-            lectures_df.to_csv(LECTURE_FILE, index=False)
-            st.session_state["lectures_df"] = lectures_df
-            st.success(f"✅ Lecture, Classwork, and Assignment for {week} saved!")
+            # Show PDF download button
+            with open(current_pdf, "rb") as pdf_file:
+                st.download_button(
+                    label="📥 Download Current PDF",
+                    data=pdf_file,
+                    file_name=os.path.basename(current_pdf),
+                    mime="application/pdf",
+                    key=f"download_{week}"
+                )
+            
+            # Option to remove PDF
+            if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
+                try:
+                    os.remove(current_pdf)
+                    lectures_df.at[row_idx, "PDF_File"] = ""
+                    st.success("PDF removed successfully!")
+                except Exception as e:
+                    st.error(f"Error removing PDF: {e}")
+
+        # Handle new PDF upload
+        if lecture_pdf is not None:
+            # Save PDF to file system
+            pdf_filename = f"{course_code}_{week.replace(' ', '')}_{lecture_pdf.name}"
+            pdf_path = os.path.join(pdf_dir, pdf_filename)
+            
+            try:
+                with open(pdf_path, "wb") as f:
+                    f.write(lecture_pdf.getbuffer())
+                
+                # Update DataFrame with PDF path
+                lectures_df.at[row_idx, "PDF_File"] = pdf_path
+                st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
+                
+            except Exception as e:
+                st.error(f"❌ Error saving PDF: {e}")
+
+        # Update the DataFrame with text fields
+        lectures_df.at[row_idx, "Topic"] = topic
+        lectures_df.at[row_idx, "Brief"] = brief
+        lectures_df.at[row_idx, "Classwork"] = classwork
+        lectures_df.at[row_idx, "Assignment"] = assignment
+
+        # Save button for all changes
+        if st.button("💾 Save Changes", key=f"save_{week}"):
+            try:
+                # Save to CSV
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+                st.session_state["lectures_df"] = lectures_df
+                st.success("✅ All changes saved successfully!")
+            except Exception as e:
+                st.error(f"❌ Error saving changes: {e}")
             
             modules_dir = "modules"
             os.makedirs(modules_dir, exist_ok=True)
-            # Save PDFs
-            if lecture_pdf:
-                lecture_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_lecture.pdf")
-                with open(lecture_pdf_path, "wb") as f: f.write(lecture_pdf.getbuffer())
-                st.success(f"✅ Lecture PDF uploaded for {week}")
-            if classwork_pdf:
-                classwork_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_classwork.pdf")
-                with open(classwork_pdf_path, "wb") as f: f.write(classwork_pdf.getbuffer())
-                st.success(f"✅ Classwork PDF uploaded for {week}")
-            if assignment_pdf:
-                assignment_pdf_path = os.path.join(modules_dir, f"{course_code}_{week}_assignment.pdf")
-                with open(assignment_pdf_path, "wb") as f: f.write(assignment_pdf.getbuffer())
-                st.success(f"✅ Assignment PDF uploaded for {week}")
+            
 
             st.dataframe(lectures_df, use_container_width=True)
     
@@ -2480,6 +2536,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
