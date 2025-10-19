@@ -399,32 +399,45 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
     df.to_csv(log_path, index=False)
 
 
-def has_marked_attendance(course_code, week, name):
+# =========================================================
+# ✅ FINAL — Unified Attendance Helper Functions
+# =========================================================
+LOG_DIR = "attendance"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+def has_marked_attendance(course_code, week, name, matric):
     """Check if student already marked attendance."""
     path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
     if not os.path.exists(path):
         return False
     df = pd.read_csv(path)
-    return ((df["Name"] == name) & (df["Week"] == week)).any()
-
+    return ((df["Name"].str.strip().str.lower() == name.strip().lower()) &
+            (df["Matric"].str.strip().str.lower() == matric.strip().lower()) &
+            (df["Week"].astype(str).str.strip().str.lower() == week.strip().lower())
+           ).any()
 
 def mark_attendance_entry(course_code, name, matric, week):
     """Mark student attendance and save persistently."""
     path = os.path.join(LOG_DIR, f"{course_code}_attendance.csv")
+    os.makedirs(LOG_DIR, exist_ok=True)
+
     data = {
-        "Name": [name],
-        "Matric": [matric],
+        "Name": [name.strip()],
+        "Matric": [matric.strip()],
         "Week": [week],
         "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
     }
+
     new_row = pd.DataFrame(data)
     if os.path.exists(path):
         df = pd.read_csv(path)
         df = pd.concat([df, new_row], ignore_index=True)
     else:
         df = new_row
+
     df.to_csv(path, index=False)
     return True
+
 
 def view_and_download_files(course_code, file_type, week):
     """Displays uploaded files for a given type and week, with ZIP download."""
@@ -2181,6 +2194,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
