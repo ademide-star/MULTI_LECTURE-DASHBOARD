@@ -1850,66 +1850,116 @@ def admin_view(course_code):
                 st.success(f"✅ Assignment PDF uploaded for {week}")
 
             st.dataframe(lectures_df, use_container_width=True)
+    
+    # 🕒 Attendance Control (Admin)
+    # -------------------------------
+    st.subheader("🎛 Attendance Control")
 
-    # -------------------------
-# Student Records
-# -------------------------
-    st.header("📋 Student Records")
-
-# Base attendance folder (where week-by-week files are stored)
-    attendance_folder = os.path.join("data", "attendance")
-    os.makedirs(attendance_folder, exist_ok=True)
-
-# ATTENDANCE RECORDS
-    st.subheader("🕒 Attendance Records (Week by Week)")
-
-    attendance_files = [
-        f for f in os.listdir(attendance_folder) if f.endswith(".csv")
-]
-
-    if attendance_files:
-        selected_file = st.selectbox(
-            "Select Attendance Week File to View/Delete",
-            sorted(attendance_files),
-            key="select_attendance_file"
+    selected_week = st.selectbox(
+        "Select Week", 
+        [f"Week {i}" for i in range(1, 16)], 
+        key=f"{course_code}_week_select"
     )
 
-        selected_path = os.path.join(attendance_folder, selected_file)
+    # Get current status from persistent storage
+    current_status = get_attendance_status(course_code, selected_week)
+    is_currently_open = current_status.get("is_open", False)
 
-        try:
-            df = pd.read_csv(selected_path)
-            st.dataframe(df, use_container_width=True)
-
-            col1, col2 = st.columns([2, 1])
-
-            with col1:
-                st.download_button(
-                    label=f"⬇️ Download {selected_file}",
-                    data=df.to_csv(index=False).encode(),
-                    file_name=selected_file,
-                    mime="text/csv",
-                    key=f"download_{selected_file}"
-            )
-
-            with col2:
-                if st.button(f"🗑️ Delete {selected_file}", key=f"delete_{selected_file}"):
-                    os.remove(selected_path)
-                    st.warning(f"⚠️ {selected_file} deleted successfully.")
-                    st.experimental_rerun()
-
-        except Exception as e:
-            st.error(f"Error reading {selected_file}: {e}")
-
+    # Display current status
+    if is_currently_open:
+        st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
     else:
-        st.info("No attendance files found yet.")
+        st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
 
-# --------------------------------------
-# CLASSWORK & SEMINAR RECORDS (unchanged)
-# --------------------------------------
+    # Use buttons for attendance control
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
+            success = set_attendance_status(course_code, selected_week, True, datetime.now())
+            if success:
+                st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
+                st.rerun()
+            else:
+                st.error("❌ Failed to open attendance")
+
+    with col2:
+        if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
+            success = set_attendance_status(course_code, selected_week, False)
+            if success:
+                st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
+                st.rerun()
+            else:
+                st.error("❌ Failed to close attendance")
+
+    # Auto-close functionality
+    if is_currently_open and current_status.get("open_time"):
+        try:
+            open_time = datetime.fromisoformat(current_status["open_time"])
+            elapsed = (datetime.now() - open_time).total_seconds()
+            remaining = max(0, 600 - elapsed)  # 10 minutes
+            
+            if remaining <= 0:
+                set_attendance_status(course_code, selected_week, False)
+                st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
+                st.rerun()
+            else:
+                mins = int(remaining // 60)
+                secs = int(remaining % 60)
+                st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+        except Exception as e:
+            st.error(f"Error in auto-close: {e}")
+
+    # 🎯 ENHANCED ATTENDANCE VIEWING
+    # -------------------------------
+    st.header("📊 Attendance Records")
+    
+    # Create tabs for different viewing options
+    tab1, tab2, tab3 = st.tabs([
+        "👥 Student Details", 
+        "📈 Weekly Summary", 
+        "📋 Complete History"
+    ])
+    
+    with tab1:
+        st.subheader("Student Attendance Details")
+        view_week = st.selectbox(
+            "Select Week to View", 
+            [f"Week {i}" for i in range(1, 16)], 
+            key=f"{course_code}_view_week"
+        )
+        view_student_attendance_details(course_code, view_week)
+    
+    with tab2:
+        st.subheader("Weekly Attendance Summary")
+        show_attendance_summary(course_code)
+    
+    with tab3:
+        view_all_students_attendance(course_code)
+
+    # 🌐 GLOBAL OVERVIEW
+    # -------------------------------
+    st.header("🌐 Global Attendance Overview")
+
+    if st.button("🔄 Refresh Global Overview", type="secondary"):
+        global_df = get_all_courses_attendance()
+        
+        if not global_df.empty:
+            st.dataframe(global_df, use_container_width=True)
+            
+            # Show some metrics
+            total_all_courses = global_df["Total Students"].sum()
+            st.metric("Total Attendance Across All Courses", total_all_courses)
+        else:
+            st.info("No attendance data found for any course.")
+
+    # --------------------------------------
+    # CLASSWORK & SEMINAR RECORDS (unchanged)
+    # --------------------------------------
     for file, label in [
         (CLASSWORK_FILE, "Classwork Submissions"),
         (SEMINAR_FILE, "Seminar Submissions")
-]:
+    ]:
         st.divider()
         st.markdown(f"### {label}")
 
@@ -1927,20 +1977,32 @@ def admin_view(course_code):
                         file_name=os.path.basename(file),
                         mime="text/csv",
                         key=f"{label}_download"
-                )
+                    )
 
                 with col2:
                     if st.button(f"🗑️ Delete {label}", key=f"{label}_delete"):
                         os.remove(file)
                         st.warning(f"⚠️ {label} deleted successfully.")
-                        st.experimental_rerun()
+                        st.rerun()
 
             except Exception as e:
                 st.error(f"Failed to read {label}: {e}")
         else:
             st.info(f"No {label.lower()} yet.")
 
-
+    # Debug information
+    with st.expander("🔍 Persistent Storage Debug Info"):
+        st.write("All attendance status in JSON file:")
+        all_status = get_all_attendance_status()
+        if all_status:
+            for key, value in all_status.items():
+                st.write(f"- `{key}`: `{value}`")
+        else:
+            st.write("No attendance status found in JSON file")
+        
+        st.write(f"Current course: `{course_code}`")
+        st.write(f"Current week: `{selected_week}`")
+        st.write(f"Current status: `{current_status}`")
     # -------------------------
     # View & Grade Uploaded Files
     # -------------------------
@@ -2362,134 +2424,7 @@ def admin_view(course_code):
     
 
     
-    # 🕒 Attendance Control (Admin)
-    # -------------------------------
-    st.subheader("🎛 Attendance Control")
-
-    selected_week = st.selectbox(
-        "Select Week", 
-        [f"Week {i}" for i in range(1, 16)], 
-        key=f"{course_code}_week_select"
-    )
-
-    # Get current status from persistent storage
-    current_status = get_attendance_status(course_code, selected_week)
-    is_currently_open = current_status.get("is_open", False)
-
-    # Display current status
-    if is_currently_open:
-        st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
-    else:
-        st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
-
-    # Use buttons for attendance control
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
-            success = set_attendance_status(course_code, selected_week, True, datetime.now())
-            if success:
-                st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
-                st.rerun()
-            else:
-                st.error("❌ Failed to open attendance")
-
-    with col2:
-        if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
-            success = set_attendance_status(course_code, selected_week, False)
-            if success:
-                st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
-                st.rerun()
-            else:
-                st.error("❌ Failed to close attendance")
-
-    # Auto-close functionality
-    if is_currently_open and current_status.get("open_time"):
-        try:
-            open_time = datetime.fromisoformat(current_status["open_time"])
-            elapsed = (datetime.now() - open_time).total_seconds()
-            remaining = max(0, 600 - elapsed)  # 10 minutes
-            
-            if remaining <= 0:
-                set_attendance_status(course_code, selected_week, False)
-                st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
-                st.rerun()
-            else:
-                mins = int(remaining // 60)
-                secs = int(remaining % 60)
-                st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
-        except Exception as e:
-            st.error(f"Error in auto-close: {e}")
-
-    # 🎯 ENHANCED ATTENDANCE VIEWING
-    # -------------------------------
-    st.subheader("📊 Attendance Records")
     
-    # Create tabs for different viewing options
-    tab1, tab2, tab3 = st.tabs([
-        "👥 Student Details", 
-        "📈 Weekly Summary", 
-        "📋 Complete History"
-    ])
-    
-    with tab1:
-        st.subheader("Student Attendance Details")
-        view_week = st.selectbox(
-            "Select Week to View", 
-            [f"Week {i}" for i in range(1, 16)], 
-            key=f"{course_code}_view_week"
-        )
-        view_student_attendance_details(course_code, view_week)
-    
-    with tab2:
-        st.subheader("Weekly Attendance Summary")
-        show_attendance_summary(course_code)
-    
-    with tab3:
-        view_all_students_attendance(course_code)
-
-    # 🌐 GLOBAL OVERVIEW
-    # -------------------------------
-    st.subheader("🌐 Global Attendance Overview")
-
-    if st.button("🔄 Refresh Global Overview", type="secondary"):
-        global_df = get_all_courses_attendance()
-        
-        if not global_df.empty:
-            st.dataframe(global_df, use_container_width=True)
-            
-            # Show some metrics
-            total_all_courses = global_df["Total Students"].sum()
-            st.metric("Total Attendance Across All Courses", total_all_courses)
-        else:
-            st.info("No attendance data found for any course.")
-
-    # Debug information
-    with st.expander("🔍 Persistent Storage Debug Info"):
-        st.write("All attendance status in JSON file:")
-        all_status = get_all_attendance_status()
-        if all_status:
-            for key, value in all_status.items():
-                st.write(f"- `{key}`: `{value}`")
-        else:
-            st.write("No attendance status found in JSON file")
-        
-        st.write(f"Current course: `{course_code}`")
-        st.write(f"Current week: `{selected_week}`")
-        st.write(f"Current status: `{current_status}`")
-    # Debug information
-    with st.expander("🔍 Persistent Storage Debug Info"):
-        st.write("All attendance status in JSON file:")
-        all_status = get_all_attendance_status()
-        if all_status:
-            for key, value in all_status.items():
-                st.write(f"- `{key}`: `{value}`")
-        else:
-            st.write("No attendance status found in JSON file")
-        
-        st.write(f"Current course: `{course_code}`")
-        st.write(f"Current week: `{selected_week}`")
-        st.write(f"Current status: `{current_status}`")
 # 📁 Delete attendance record option
     attendance_folder = os.path.join("data", "attendance")
     os.makedirs(attendance_folder, exist_ok=True)
@@ -2545,6 +2480,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
