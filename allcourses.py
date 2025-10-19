@@ -1728,8 +1728,12 @@ def admin_view(course_code):
 
 # 🕒 Attendance Control (Admin)
 # -------------------------------
+    # Add this at the top of your admin dashboard to clear old keys
+    keys_to_remove = [key for key in st.session_state.keys() if 'att_open' in key]
+    for key in keys_to_remove:
+        del st.session_state[key]
     st.subheader("🎛 Attendance Control")
-
+    
     course_code = st.selectbox(
         "Select Course to Manage", 
         ["MCB221", "BCH201", "BIO203", "BIO113", "BIO306"]
@@ -1861,6 +1865,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
