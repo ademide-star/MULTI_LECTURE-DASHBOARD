@@ -1265,7 +1265,7 @@ def student_view(course_code):
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
         
-      # ===============================================================
+     # ===============================================================
     # 📖 DISPLAY LECTURES WITH PDF DOWNLOADS AND CLASSWORK
     # ===============================================================
     st.header(f"📚 {course_code} Lecture Materials")
@@ -1343,8 +1343,6 @@ def student_view(course_code):
                                     if success:
                                         st.balloons()
                                         st.rerun()  # Refresh to show success message
-                        else:
-                            st.info("📝 Classwork questions will appear here when the lecturer opens them.")
                     else:
                         st.info("No classwork questions available for this week.")
                 else:
@@ -2622,6 +2620,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
