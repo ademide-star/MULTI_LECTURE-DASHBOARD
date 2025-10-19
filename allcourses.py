@@ -833,14 +833,14 @@ def student_view():
             st.warning("Please enter your full name and matric number.")
             st.stop()
 
-    # ✅ FIXED: Ensure week format matches admin exactly
-        attendance_key = f"{course_code}_{week}_attendance_open"
+    # ✅ UPDATED: Use the same key format as admin
+        attendance_key = f"att_open_{course_code}_{week.replace(' ', '_')}"
 
-    # Debug info (you can remove this after testing)
-        st.write(f"Checking attendance key: {attendance_key}")
-        st.write(f"Key exists in session state: {attendance_key in st.session_state}")
+    # Debug info
+        st.write(f"🔍 Checking key: `{attendance_key}`")
+        st.write(f"🔍 Key exists: `{attendance_key in st.session_state}`")
         if attendance_key in st.session_state:
-            st.write(f"Key value: {st.session_state[attendance_key]}")
+            st.write(f"🔍 Key value: `{st.session_state[attendance_key]}`")
 
         if not st.session_state.get(attendance_key, False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
@@ -858,7 +858,6 @@ def student_view():
             st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
-
     # ---------------------------------------------
     # 📘 Lecture Briefs and Classwork
     # ---------------------------------------------
@@ -1729,30 +1728,36 @@ def admin_view(course_code):
 
     selected_week = st.selectbox(
         "Select Week", 
-        [f"Week {i}" for i in range(1, 16)],  # Fixed: Changed 15 to 16 to match student range
+        [f"Week {i}" for i in range(1, 16)], 
         key=f"{course_code}_week_select"
 )
 
-# ✅ FIXED: Use selected_week instead of week in the key
-    attendance_key = f"{course_code}_{selected_week}_attendance_open"
-    timer_key = f"{course_code}_{selected_week}_open_time"
+# ✅ SAFER: Create simpler, validated keys
+    attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '_')}"
+    timer_key = f"timer_{course_code}_{selected_week.replace(' ', '_')}"
+
+# Initialize keys safely
+    if attendance_key not in st.session_state:
+        st.session_state[attendance_key] = False
 
 # Toggle to open attendance
     open_attendance = st.toggle(
         f"🔓 Allow students to mark attendance for {course_code} ({selected_week})", 
-        key=attendance_key,
-        value=st.session_state.get(attendance_key, False)  # Added to maintain state
+        value=st.session_state[attendance_key],
+        key=f"toggle_{attendance_key}"  # Different key for the widget
 )
 
 # Record start time when opened
     if open_attendance:
         if timer_key not in st.session_state:
             st.session_state[timer_key] = datetime.now()
-        st.session_state[attendance_key] = True  # ✅ Explicitly set the key
+    
+    # ✅ SAFE: Use session_state methods
+        st.session_state[attendance_key] = True
         st.success(f"✅ Attendance is OPEN for {course_code} - {selected_week}")
     else:
     # Close manually
-        st.session_state[attendance_key] = False  # ✅ Explicitly set the key
+        st.session_state[attendance_key] = False
         if timer_key in st.session_state:
             del st.session_state[timer_key]
         st.warning(f"🚫 Attendance is CLOSED for {course_code} - {selected_week}")
@@ -1763,7 +1768,7 @@ def admin_view(course_code):
         remaining = max(0, 600 - elapsed)  # 600 seconds = 10 minutes
 
         if remaining <= 0:
-            st.session_state[attendance_key] = False  # ✅ Explicitly close the attendance
+            st.session_state[attendance_key] = False
             if timer_key in st.session_state:
                 del st.session_state[timer_key]
             st.warning(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed.")
@@ -1771,6 +1776,13 @@ def admin_view(course_code):
             mins = int(remaining // 60)
             secs = int(remaining % 60)
             st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+
+# Debug info
+    with st.expander("🔍 Debug Info"):
+        st.write("Current attendance keys in session state:")
+        for key in sorted(st.session_state.keys()):
+            if "att_open" in key or "timer" in key:
+                st.write(f"- `{key}`: {st.session_state[key]}")
 
 # 📁 Delete attendance record option
             attendance_folder = os.path.join("data", "attendance")
@@ -1827,6 +1839,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
