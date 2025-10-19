@@ -1340,29 +1340,28 @@ def student_view(course_code):
                         st.info("📝 Classwork questions will appear here when the lecturer opens them.")
                 else:
                     st.info("No classwork questions available for this week.")
-            else:
-                st.info("No classwork assigned for this week yet.")
+
                 
-            if row["Assignment"] and str(row["Assignment"]).strip():
-                st.markdown(f"**Assignment:** {row['Assignment']}")
+                if row["Assignment"] and str(row["Assignment"]).strip():
+                    st.markdown(f"**Assignment:** {row['Assignment']}")
             
-            with col2:
+                with col2:
                 # 🎯 FIXED: PDF Download for students
-                pdf_file = row["PDF_File"]
-                if pdf_file and os.path.exists(pdf_file):
-                    try:
-                        with open(pdf_file, "rb") as pdf_file_obj:
-                            st.download_button(
-                                label="📥 Download PDF",
-                                data=pdf_file_obj,
-                                file_name=os.path.basename(pdf_file),
-                                mime="application/pdf",
-                                key=f"student_pdf_{row['Week']}"
+                    pdf_file = row["PDF_File"]
+                    if pdf_file and os.path.exists(pdf_file):
+                        try:
+                            with open(pdf_file, "rb") as pdf_file_obj:
+                                st.download_button(
+                                    label="📥 Download PDF",
+                                    data=pdf_file_obj,
+                                    file_name=os.path.basename(pdf_file),
+                                    mime="application/pdf",
+                                    key=f"student_pdf_{row['Week']}"
                             )
-                    except Exception as e:
-                        st.error(f"⚠️ Error loading PDF: {e}")
-                else:
-                    st.info("No PDF available")
+                        except Exception as e:
+                            st.error(f"⚠️ Error loading PDF: {e}")
+                    else:
+                        st.info("No PDF available")
       # ===============================================================
         # 🎓 Student Dashboard — View Scores
         # ===============================================================
@@ -2614,6 +2613,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
