@@ -1543,6 +1543,206 @@ def get_all_courses_attendance():
         })
     
     return pd.DataFrame(all_courses_data)
+
+
+def view_student_attendance_details(course_code, week):
+    """Display detailed student attendance with search and filtering"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = f"attendance_{course_code}_{week_key}.csv"
+        
+        if not os.path.exists(attendance_file):
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        df = pd.read_csv(attendance_file)
+        
+        if df.empty:
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        st.success(f"👥 Student Attendance for {course_code} - {week}")
+        
+        # Display basic stats
+        total_students = len(df)
+        st.info(f"**Total students attended:** {total_students}")
+        
+        # Search and filter functionality
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            search_name = st.text_input("🔍 Search by Name", placeholder="Enter student name...")
+        
+        with col2:
+            search_matric = st.text_input("🔍 Search by Matric", placeholder="Enter matric number...")
+        
+        # Filter dataframe based on search
+        filtered_df = df.copy()
+        
+        if search_name:
+            filtered_df = filtered_df[filtered_df['Name'].str.contains(search_name, case=False, na=False)]
+        
+        if search_matric:
+            filtered_df = filtered_df[filtered_df['Matric'].str.contains(search_matric, case=False, na=False)]
+        
+        # Display the filtered results
+        if not filtered_df.empty:
+            st.write(f"**Showing {len(filtered_df)} students:**")
+            
+            # Display in a nice table format
+            for idx, row in filtered_df.iterrows():
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    with col1:
+                        st.write(f"**{row['Name']}**")
+                    with col2:
+                        st.write(f"`{row['Matric']}`")
+                    with col3:
+                        st.write(f"_{row['Timestamp']}_")
+                    st.divider()
+            
+            # Also show as dataframe for bulk operations
+            with st.expander("📋 View as Data Table"):
+                st.dataframe(filtered_df[['Name', 'Matric', 'Timestamp']], use_container_width=True)
+                
+        else:
+            st.warning("No students found matching your search criteria.")
+        
+        # Download options
+        st.subheader("📥 Download Options")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Download filtered results
+            csv_filtered = filtered_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Filtered Results (CSV)",
+                data=csv_filtered,
+                file_name=f"attendance_{course_code}_{week_key}_filtered.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            # Download all results
+            csv_all = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download All Records (CSV)",
+                data=csv_all,
+                file_name=f"attendance_{course_code}_{week_key}_all.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+    except Exception as e:
+        st.error(f"Error loading student attendance details: {e}")
+
+def view_all_students_attendance(course_code):
+    """View attendance for all students across all weeks"""
+    try:
+        st.subheader(f"📊 Complete Student Attendance - {course_code}")
+        
+        # Collect data from all weeks
+        all_attendance = []
+        
+        for week_num in range(1, 16):
+            week = f"Week {week_num}"
+            week_key = week.replace(" ", "")
+            attendance_file = f"attendance_{course_code}_{week_key}.csv"
+            
+            if os.path.exists(attendance_file):
+                df = pd.read_csv(attendance_file)
+                if not df.empty:
+                    df['Week'] = week
+                    all_attendance.append(df)
+        
+        if not all_attendance:
+            st.info(f"No attendance records found for {course_code}")
+            return
+        
+        # Combine all data
+        combined_df = pd.concat(all_attendance, ignore_index=True)
+        
+        # Search functionality
+        col1, col2 = st.columns(2)
+        with col1:
+            search_student = st.text_input("🔍 Search Student", placeholder="Name or Matric...", key="search_all")
+        
+        with col2:
+            selected_week = st.selectbox(
+                "Filter by Week", 
+                ["All Weeks"] + [f"Week {i}" for i in range(1, 16)],
+                key="filter_week"
+            )
+        
+        # Filter data
+        filtered_combined = combined_df.copy()
+        
+        if search_student:
+            filtered_combined = filtered_combined[
+                filtered_combined['Name'].str.contains(search_student, case=False, na=False) |
+                filtered_combined['Matric'].str.contains(search_student, case=False, na=False)
+            ]
+        
+        if selected_week != "All Weeks":
+            filtered_combined = filtered_combined[filtered_combined['Week'] == selected_week]
+        
+        if filtered_combined.empty:
+            st.warning("No attendance records found matching your criteria.")
+            return
+        
+        # Display summary statistics
+        st.subheader("📈 Summary")
+        total_records = len(filtered_combined)
+        unique_students = filtered_combined['Matric'].nunique()
+        weeks_covered = filtered_combined['Week'].nunique()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Attendance Records", total_records)
+        with col2:
+            st.metric("Unique Students", unique_students)
+        with col3:
+            st.metric("Weeks Covered", weeks_covered)
+        
+        # Student-wise attendance count
+        st.subheader("👥 Student Attendance Summary")
+        student_summary = filtered_combined.groupby(['Name', 'Matric']).size().reset_index(name='Attendance Count')
+        student_summary = student_summary.sort_values('Attendance Count', ascending=False)
+        
+        st.dataframe(student_summary, use_container_width=True)
+        
+        # Detailed records
+        st.subheader("📋 Detailed Records")
+        st.dataframe(filtered_combined[['Name', 'Matric', 'Week', 'Timestamp']], use_container_width=True)
+        
+        # Download options
+        st.subheader("📥 Download Reports")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            csv_detailed = filtered_combined.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Detailed Records",
+                data=csv_detailed,
+                file_name=f"attendance_{course_code}_detailed.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            csv_summary = student_summary.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Student Summary",
+                data=csv_summary,
+                file_name=f"attendance_{course_code}_student_summary.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+    except Exception as e:
+        st.error(f"Error loading complete attendance: {e}")
+        
 def admin_view(course_code):
 
     st.title("👩‍🏫 Admin Dashboard")
@@ -2160,6 +2360,8 @@ def admin_view(course_code):
             st.warning(f"⚠️ Classwork for Week {week_to_control} is now CLOSED!")
 
     
+
+    
     # 🕒 Attendance Control (Admin)
     # -------------------------------
     st.subheader("🎛 Attendance Control")
@@ -2219,25 +2421,34 @@ def admin_view(course_code):
         except Exception as e:
             st.error(f"Error in auto-close: {e}")
 
-    # 🎯 VIEW ATTENDANCE RECORDS
+    # 🎯 ENHANCED ATTENDANCE VIEWING
     # -------------------------------
-    st.subheader("📊 View Attendance Records")
+    st.subheader("📊 Attendance Records")
     
-    # Let admin select which week's attendance to view
-    view_week = st.selectbox(
-        "Select Week to View", 
-        [f"Week {i}" for i in range(1, 16)], 
-        key=f"{course_code}_view_week"
-    )
+    # Create tabs for different viewing options
+    tab1, tab2, tab3 = st.tabs([
+        "👥 Student Details", 
+        "📈 Weekly Summary", 
+        "📋 Complete History"
+    ])
     
-    if st.button("📋 Load Attendance Records", type="secondary"):
-        view_attendance_records(course_code, view_week)
+    with tab1:
+        st.subheader("Student Attendance Details")
+        view_week = st.selectbox(
+            "Select Week to View", 
+            [f"Week {i}" for i in range(1, 16)], 
+            key=f"{course_code}_view_week"
+        )
+        view_student_attendance_details(course_code, view_week)
     
-    # Also show a summary of all weeks
-    st.subheader("📈 Attendance Summary")
-    show_attendance_summary(course_code)
+    with tab2:
+        st.subheader("Weekly Attendance Summary")
+        show_attendance_summary(course_code)
+    
+    with tab3:
+        view_all_students_attendance(course_code)
 
-    # 🌐 GLOBAL OVERVIEW (Optional)
+    # 🌐 GLOBAL OVERVIEW
     # -------------------------------
     st.subheader("🌐 Global Attendance Overview")
 
@@ -2253,6 +2464,19 @@ def admin_view(course_code):
         else:
             st.info("No attendance data found for any course.")
 
+    # Debug information
+    with st.expander("🔍 Persistent Storage Debug Info"):
+        st.write("All attendance status in JSON file:")
+        all_status = get_all_attendance_status()
+        if all_status:
+            for key, value in all_status.items():
+                st.write(f"- `{key}`: `{value}`")
+        else:
+            st.write("No attendance status found in JSON file")
+        
+        st.write(f"Current course: `{course_code}`")
+        st.write(f"Current week: `{selected_week}`")
+        st.write(f"Current status: `{current_status}`")
     # Debug information
     with st.expander("🔍 Persistent Storage Debug Info"):
         st.write("All attendance status in JSON file:")
@@ -2321,6 +2545,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
