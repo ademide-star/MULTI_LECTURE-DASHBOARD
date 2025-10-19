@@ -1295,6 +1295,8 @@ def student_view(course_code):
                 classwork_text = str(row.get("Classwork", "") or "").strip()
                 if classwork_text:
                     st.markdown("### 🧩 Classwork Questions")
+                    student_name_d = st.text_input("Full Name", key=f"{course_code}_d_name")
+                    matric_d = st.text_input("Matric Number", key=f"{course_code}_d_matric")
         
                     # Split questions by semicolon
                     questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
@@ -2620,6 +2622,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
