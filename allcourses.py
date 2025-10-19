@@ -1065,46 +1065,6 @@ def ensure_directories():
         os.makedirs(d, exist_ok=True)
 
 # Classwork status management
-def get_classwork_status(course_code, week):
-    """Get classwork status for a specific course and week"""
-    try:
-        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
-            status_data = json.load(f)
-        
-        week_key = week.replace(" ", "")
-        key = f"classwork_{course_code}_{week_key}"
-        
-        return status_data.get(key, {"is_open": False, "open_time": None})
-    except Exception as e:
-        return {"is_open": False, "open_time": None}
-
-def set_classwork_status(course_code, week, is_open, open_time=None):
-    """Set classwork status for a specific course and week"""
-    try:
-        with open(ATTENDANCE_STATUS_FILE, 'r') as f:
-            status_data = json.load(f)
-        
-        week_key = week.replace(" ", "")
-        key = f"classwork_{course_code}_{week_key}"
-        
-        if is_open:
-            status_data[key] = {
-                "is_open": True,
-                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
-            }
-        else:
-            status_data[key] = {
-                "is_open": False,
-                "open_time": None
-            }
-        
-        with open(ATTENDANCE_STATUS_FILE, 'w') as f:
-            json.dump(status_data, f, indent=2)
-        
-        return True
-    except Exception as e:
-        st.error(f"Error setting classwork status: {e}")
-        return False
 
 def is_classwork_open(course_code, week):
     """Check if classwork is open for submission"""
@@ -1162,6 +1122,7 @@ def save_classwork(name, matric, week, answers):
     except Exception as e:
         st.error(f"❌ Error saving classwork: {e}")
         return False
+        
  def get_classwork_status(course_code, week):
     """Get classwork status for a specific course and week"""
     try:
@@ -2660,6 +2621,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
