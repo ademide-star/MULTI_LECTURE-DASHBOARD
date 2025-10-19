@@ -1334,17 +1334,17 @@ def student_view(course_code):
                                 else:
                         # Save classwork
                                     success = save_classwork(name, matric, week, answers)
-                                if success:
-                                    st.balloons()
-                                else:
-                                    st.info("📝 Classwork questions will appear here when the lecturer opens them.")
+                                    if success:
+                                        st.balloons()
                     else:
-                        st.info("No classwork questions available for this week.")
-            else:
-                st.info("No classwork assigned for this week yet.")
+                        st.info("📝 Classwork questions will appear here when the lecturer opens them.")
+                else:
+                    st.info("No classwork questions available for this week.")
+        else:
+            st.info("No classwork assigned for this week yet.")
                 
-                if row["Assignment"] and str(row["Assignment"]).strip():
-                    st.markdown(f"**Assignment:** {row['Assignment']}")
+            if row["Assignment"] and str(row["Assignment"]).strip():
+                st.markdown(f"**Assignment:** {row['Assignment']}")
             
             with col2:
                 # 🎯 FIXED: PDF Download for students
@@ -2614,6 +2614,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
