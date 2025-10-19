@@ -818,7 +818,7 @@ def student_view():
     with st.form(f"{course_code}_attendance_form"):
         name = st.text_input("Full Name", key=f"{course_code}_student_name")
         matric = st.text_input("Matric Number", key=f"{course_code}_student_matric")
-        week = st.selectbox("Select Lecture Week", [str(i) for i in range(1, 15)], key=f"{course_code}_att_week")
+        week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)]), key=f"{course_code}_att_week")
         submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
 
 # -------------------------------
@@ -830,9 +830,11 @@ def student_view():
             st.stop()
 
     # ✅ Check if attendance is open
-        if not st.session_state.get(f"{course_code}_attendance_open", False):
+        attendance_key = f"{course_code}_{week}_attendance_open"
+        if not st.session_state.get(attendance_key, False):
             st.warning("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
             st.stop()
+
 
     # ✅ Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
@@ -1815,6 +1817,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
