@@ -1812,7 +1812,7 @@ def admin_view(course_code):
     attendance_key = f"att_open_{course_code}_{selected_week.replace(' ', '')}"
     timer_key = f"timer_{course_code}_{selected_week.replace(' ', '')}"
     attendance_key = f"{course_code}_{selected_week}_attendance_open"
-    file_name = f"{selected_course}_{selected_week}.csv"  # no double Week
+    file_name = f"{course_code}_{selected_week}.csv"  # no double Week
 # Initialize the state if it doesn't exist
     if attendance_key not in st.session_state:
         st.session_state[attendance_key] = False
@@ -1929,6 +1929,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
