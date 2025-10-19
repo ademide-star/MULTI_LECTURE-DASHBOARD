@@ -66,6 +66,65 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+ # ===============================================================
+# 🎓 MAIN APP HEADER
+# ===============================================================
+st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
+st.title("📚 Multi-Course Portal")
+st_autorefresh(interval=86_400_000, key="daily_refresh")  # refresh daily
+
+# ===============================================================
+# 📘 COURSE SELECTION
+# ===============================================================
+COURSES = {
+    "MCB 221 – General Microbiology": "MCB221",
+    "BCH 201 – General Biochemistry": "BCH201",
+    "BIO 203 – General Physiology": "BIO203",
+    "BIO 113 – Virus Bacteria Lower Plants": "BIO113",
+    "BIO 306 – Systematic Biology": "BIO306",
+
+}
+course = st.selectbox("Select Course:", list(COURSES.keys()))
+course_code = COURSES[course]
+
+# ===============================================================
+# 📂 DIRECTORY SETUP
+# ===============================================================
+MODULES_DIR = "modules"
+LECTURE_DIR = "lectures"
+UPLOAD_DIR = "student_uploads"
+LOG_DIR = "records"
+
+for folder in [MODULES_DIR, LECTURE_DIR, UPLOAD_DIR, LOG_DIR]:
+    os.makedirs(folder, exist_ok=True)
+
+course_dir = os.path.join(MODULES_DIR, course_code)
+os.makedirs(course_dir, exist_ok=True)
+
+UPLOADS_DIR = os.path.join(UPLOAD_DIR, course_code)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+def load_lectures(course_code):
+    """Load lecture file safely for a given course."""
+    LECTURE_FILE = get_file(course_code, "lectures")
+
+    if not os.path.exists(LECTURE_FILE):
+        # Try to create a blank one so students don't see an error
+        os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+        df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork"])
+        df.to_csv(LECTURE_FILE, index=False)
+        return df
+
+    try:
+        df = pd.read_csv(LECTURE_FILE)
+        required_cols = ["Week", "Topic", "Brief", "Assignment", "Classwork"]
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = ""
+        return df
+    except Exception as e:
+        st.error(f"Error loading lecture file: {e}")
+        return pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork"])
 
 # =========================================================
 # ✅ UNIVERSAL HELPERS — ATTENDANCE, ASSIGNMENTS & SUBMISSIONS
@@ -1609,6 +1668,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
