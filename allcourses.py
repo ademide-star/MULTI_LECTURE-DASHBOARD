@@ -1728,7 +1728,8 @@ def admin_view(course_code):
         key=f"{course_code}_week_select"
 )
 
-    attendance_key = f"{course_code}_{selected_week}_attendance_open"
+    # ✅ The key must match exactly what admin uses
+    attendance_key = f"{course_code}_{week}_attendance_open"
     timer_key = f"{course_code}_{selected_week}_open_time"
 
 # Toggle to open attendance
@@ -1822,6 +1823,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
