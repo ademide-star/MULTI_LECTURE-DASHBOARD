@@ -324,12 +324,13 @@ def admin_view():
     else:
         st.warning("Submission file not found!")
 
-# ===============================================================
-# 📘 LECTURE INITIALIZATION
-# ===============================================================
 def init_lectures(course_code, default_weeks):
     """Create or load lectures CSV for a course. Returns DataFrame."""
     LECTURE_FILE = get_file(course_code, "lectures")
+    
+    # ✅ Ensure directory exists
+    os.makedirs(os.path.dirname(LECTURE_FILE), exist_ok=True)
+    
     if not os.path.exists(LECTURE_FILE):
         lecture_data = {
             "Week": [f"Week {i+1}" for i in range(len(default_weeks))],
@@ -339,6 +340,7 @@ def init_lectures(course_code, default_weeks):
             "Classwork": [""] * len(default_weeks),
         }
         pd.DataFrame(lecture_data).to_csv(LECTURE_FILE, index=False)
+        
     df = pd.read_csv(LECTURE_FILE)
     for col in ["Brief", "Assignment", "Classwork"]:
         if col not in df.columns:
@@ -346,20 +348,6 @@ def init_lectures(course_code, default_weeks):
         df[col] = df[col].fillna("")
     return df
 
-default_topics = [f"Lecture Topic {i+1}" for i in range(12)]
-lectures_df = init_lectures(course_code, default_topics)
-
-# -----------------------------
-# --- Helper Function: View/Download Files ---
-def init_lectures(course_code, topics):
-    """Initialize lecture weeks dataframe."""
-    df_path = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
-    if os.path.exists(df_path):
-        return pd.read_csv(df_path)
-    else:
-        df = pd.DataFrame({"Week": [f"Week {i+1}" for i in range(12)], "Topic": topics})
-        df.to_csv(df_path, index=False)
-        return df
 
 def save_file(course_code, student_name, week, uploaded_file, upload_type):
     """Save uploaded file persistently."""
@@ -2105,6 +2093,7 @@ elif st.session_state["role"] == "Student":
     student_view()
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
