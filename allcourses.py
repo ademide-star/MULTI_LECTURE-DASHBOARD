@@ -1264,13 +1264,14 @@ def student_view(course_code):
         # Prevent duplicate marking
         if has_marked_attendance(course_code, week, name, matric):
             st.info("✅ Attendance already marked for this week.")
-            st.rerun()
+            st.stop()
 
         # Mark attendance
         ok = mark_attendance_entry(course_code, name, matric, week)
         if ok:
             st.session_state["attended_week"] = str(week)
             st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
+            st.rerun()
         else:
             st.error("⚠️ Failed to record attendance. Try again later.")
         
@@ -2629,6 +2630,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
