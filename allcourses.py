@@ -1362,10 +1362,10 @@ def student_view(course_code):
                                     if success:
                                         st.balloons()
                                         st.rerun()  # Refresh to show success message
+                    else:
+                        st.info("No classwork questions available for this week.")
                 else:
-                    st.info("No classwork questions available for this week.")
-             else:
-                st.info("No classwork assigned for this week yet.")
+                    st.info("No classwork assigned for this week yet.")
 
                 # Assignment section
                 if row["Assignment"] and str(row["Assignment"]).strip():
@@ -2639,6 +2639,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
