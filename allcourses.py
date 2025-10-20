@@ -2415,7 +2415,38 @@ def admin_view(course_code):
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error saving changes: {e}")
-
+      # Main save button
+        if st.button("💾 SAVE ALL LECTURE MATERIALS", 
+                    key=f"save_all_{week}", 
+                    type="primary", 
+                    use_container_width=True,
+                    help="Save all text fields and keep current PDF"):
+            try:
+                # Update all fields
+                lectures_df.at[row_idx, "Topic"] = topic
+                lectures_df.at[row_idx, "Brief"] = brief
+                lectures_df.at[row_idx, "Classwork"] = classwork
+                lectures_df.at[row_idx, "Assignment"] = assignment
+                
+                # Save to file
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+                st.session_state["lectures_df"] = lectures_df
+                
+                st.success("🎉 All lecture materials saved successfully!")
+                st.balloons()
+                
+                # Show confirmation
+                with st.expander("📋 Saved Details", expanded=True):
+                    st.write(f"**Week:** {week}")
+                    st.write(f"**Topic:** {topic}")
+                    st.write(f"**Brief:** {brief[:200] + '...' if len(brief) > 200 else brief}")
+                    st.write(f"**Classwork Questions:** {len([q for q in classwork.split(';') if q.strip()]) if classwork.strip() else 0}")
+                    st.write(f"**Assignment:** {'Set' if assignment.strip() else 'Not set'}")
+                
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Error saving: {e}")
     # 🕒 Attendance Control (Admin)
     # -------------------------------
     st.subheader("🎛 Attendance Control")
@@ -3092,6 +3123,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
