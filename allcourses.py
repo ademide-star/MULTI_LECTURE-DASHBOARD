@@ -1581,58 +1581,7 @@ def student_view(course_code):
                 log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
                 st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
 
-            # ===============================================================
-    # 🎥 VIDEO LECTURES SECTION - ADD TO STUDENT DASHBOARD
-    # ===============================================================
-    st.header("🎥 Video Lectures")
-    
-    # Create video directory path (same as admin)
-    base_dir = "data"
-    video_dir = os.path.join(base_dir, course_code, "videos")
-    
-    video_files = []
-    if os.path.exists(video_dir):
-        video_files = sorted([f for f in os.listdir(video_dir) 
-                            if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
-    
-    if video_files:
-        st.success(f"Found {len(video_files)} video lecture(s) available!")
-        
-        for i, video in enumerate(video_files):
-            video_path = os.path.join(video_dir, video)
-            
-            with st.expander(f"🎬 {video}", expanded=False):
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    try:
-                        # Display video
-                        st.video(video_path)
-                        
-                        # Show video info
-                        file_size = os.path.getsize(video_path) / (1024 * 1024)
-                        st.caption(f"File size: {file_size:.2f} MB")
-                        
-                    except Exception as e:
-                        st.error(f"⚠️ Cannot play this video: {str(e)}")
-                        st.info("The video format might not be supported in your browser. Try downloading it instead.")
-                
-                with col2:
-                    # Download button for students
-                    try:
-                        with open(video_path, "rb") as vid_file:
-                            st.download_button(
-                                label="📥 Download Video",
-                                data=vid_file,
-                                file_name=video,
-                                mime="video/mp4",
-                                key=f"student_download_{i}",
-                                use_container_width=True
-                            )
-                    except Exception as e:
-                        st.error("Download unavailable")
-    else:
-        st.info("No video lectures available yet. Check back later for uploaded content.")
+
 
 
 def view_attendance_records(course_code, week):
@@ -2875,6 +2824,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
