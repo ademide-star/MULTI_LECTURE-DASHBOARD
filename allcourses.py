@@ -2290,13 +2290,7 @@ def admin_view(course_code):
     - Restores lectures (PDF), persistent videos, attendance open/close + auto-close,
       classwork open/close, view submissions, grading (manual + CSV + per-file grading).
     """
-    import os
-    import json
-    import pandas as pd
-    import streamlit as st
-    from datetime import datetime, timedelta
-
-    st.set_page_config(layout="wide")
+  
     st.title(f"🎓 Admin Dashboard — {course_code}")
 
     # ----------------------------
@@ -2948,6 +2942,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
