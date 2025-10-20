@@ -1932,47 +1932,54 @@ def admin_view(course_code):
     st.title(f"👩‍🏫 Admin Dashboard - {course_code}")
     
     # -----------------------
-    # Lecture Management
-    # -----------------------
-    st.header("📚 Manage Lectures")
+    # ===============================================================
+# 📚 Lecture Management (Admin)
+# ===============================================================
+    st.header(f"📝 Lecture Management - {course_code}")
 
     ensure_persistent_dirs()
-    
-    LECTURE_FILE = get_persistent_path("lectures", course_code)
-    
-    st.header(f"📝 Lecture Management - {course_code}")
-    
-    # Load existing lectures
+
+# Persistent paths
+    lecture_dir = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code)
+    os.makedirs(lecture_dir, exist_ok=True)
+    LECTURE_FILE = os.path.join(lecture_dir, f"{course_code}_lectures.csv")
+
+# Load existing lectures
     if os.path.exists(LECTURE_FILE):
         lectures_df = pd.read_csv(LECTURE_FILE)
     else:
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
-    
-    # Ensure 15 weeks exist
+
+# Ensure all 15 weeks exist
     for i in range(1, 16):
-        if f"Week {i}" not in lectures_df['Week'].values:
-            lectures_df = lectures_df.append({
-                "Week": f"Week {i}",
+        week_label = f"Week {i}"
+        if week_label not in lectures_df['Week'].values:
+            new_row = pd.DataFrame([{
+                "Week": week_label,
                 "Topic": "",
                 "Brief": "",
                 "Assignment": "",
                 "Classwork": "",
                 "PDF_File": ""
-            }, ignore_index=True)
-    
+            }])
+            lectures_df = pd.concat([lectures_df, new_row], ignore_index=True)
+
     lectures_df = lectures_df.sort_values("Week").reset_index(drop=True)
-    
+
     edited_rows = []
-    
-    # Editable form for each week
+
+# Editable form for each week
     for idx, row in lectures_df.iterrows():
         with st.expander(f"{row['Week']} - {row.get('Topic','No Topic')}"):
             topic = st.text_input("Topic", value=row.get("Topic",""), key=f"topic_{idx}")
             brief = st.text_area("Lecture Brief", value=row.get("Brief",""), height=150, key=f"brief_{idx}")
             assignment = st.text_area("Assignment", value=row.get("Assignment",""), height=100, key=f"assignment_{idx}")
-            classwork = st.text_area("Classwork Questions (separate with semicolon ;)", value=row.get("Classwork",""), height=100, key=f"classwork_{idx}")
-            
-            # Optional PDF upload
+            classwork = st.text_area(
+                "Classwork Questions (separate with semicolon ;)",
+                value=row.get("Classwork",""), height=100, key=f"classwork_{idx}"
+        )
+
+        # Optional PDF upload
             pdf_file = st.file_uploader("Upload PDF (Optional)", type=["pdf"], key=f"pdf_{idx}")
             pdf_path = row.get("PDF_File","")
             if pdf_file:
@@ -1983,7 +1990,7 @@ def admin_view(course_code):
                 with open(pdf_path, "wb") as f:
                     f.write(pdf_file.getbuffer())
                 st.success(f"✅ PDF saved for {row['Week']}")
-            
+
             edited_rows.append({
                 "Week": row["Week"],
                 "Topic": topic,
@@ -1991,41 +1998,42 @@ def admin_view(course_code):
                 "Assignment": assignment,
                 "Classwork": classwork,
                 "PDF_File": pdf_path
-            })
-    
+        })
+
+# Save all lectures
     if st.button("💾 Save All Lectures"):
         updated_df = pd.DataFrame(edited_rows)
         updated_df.to_csv(LECTURE_FILE, index=False)
         st.success("✅ All lecture details saved successfully!")
 
+# ===============================================================
+# 📤 Upload Lecture CSV
+# ===============================================================
     st.subheader("Upload Lecture CSV / PDF / Materials")
     with st.form("upload_lecture_form"):
         lecture_file = st.file_uploader("Upload Lecture CSV", type=["csv"], key="lecture_csv")
         submit_lecture = st.form_submit_button("📤 Upload Lecture")
         if submit_lecture:
             if lecture_file:
-                lecture_dir = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code)
-                os.makedirs(lecture_dir, exist_ok=True)
                 lecture_path = os.path.join(lecture_dir, lecture_file.name)
                 with open(lecture_path, "wb") as f:
                     f.write(lecture_file.getbuffer())
                 st.success(f"✅ Lecture CSV uploaded: {lecture_file.name}")
             else:
                 st.error("❌ Select a CSV file to upload.")
-    
-    # View uploaded lectures
-    lectures_df = pd.DataFrame()
-    if os.path.exists(LECTURE_PATH):
-        if os.path.isdir(LECTURE_PATH):
-            csv_files = [f for f in os.listdir(LECTURE_PATH) if f.lower().endswith(".csv")]
-            if csv_files:
-                lectures_df = pd.read_csv(os.path.join(LECTURE_PATH, csv_files[0]))
-        elif os.path.isfile(LECTURE_PATH):
-            lectures_df = pd.read_csv(LECTURE_PATH)
-    if not lectures_df.empty:
+
+# ===============================================================
+# 📖 View Uploaded Lectures
+# ===============================================================
+    uploaded_lectures = pd.DataFrame()
+    csv_files = [f for f in os.listdir(lecture_dir) if f.lower().endswith(".csv")]
+    if csv_files:
+        uploaded_lectures = pd.read_csv(os.path.join(lecture_dir, csv_files[0]))
+
+    if not uploaded_lectures.empty:
         st.subheader("Uploaded Lectures")
-        st.dataframe(lectures_df, use_container_width=True)
-    
+        st.dataframe(uploaded_lectures, use_container_width=True)
+
     # -----------------------
     # Scores Management
     # -----------------------
@@ -2257,6 +2265,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
