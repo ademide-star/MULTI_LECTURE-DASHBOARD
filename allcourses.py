@@ -2279,12 +2279,7 @@ def admin_view(course_code):
     # -------------------------
     ensure_persistent_dirs()
     
-    # Use persistent file paths
-   def admin_view(course_code):
-    # ===============================================================
-    # 🧩 Ensure valid course code and define persistent paths
-    # ===============================================================
-    import os
+
     os.makedirs("data", exist_ok=True)
 
     if not course_code:
@@ -3105,6 +3100,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
