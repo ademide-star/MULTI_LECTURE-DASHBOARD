@@ -2257,7 +2257,21 @@ def view_all_students_attendance(course_code):
         
     except Exception as e:
         st.error(f"Error loading complete attendance: {e}")
-        
+def get_persistent_path(folder_type, course_code, filename=None):
+    base_dir = "persistent_storage"
+    os.makedirs(base_dir, exist_ok=True)
+
+    if not course_code:
+        # Defensive handling
+        return None
+
+    folder_path = os.path.join(base_dir, folder_type, course_code)
+    os.makedirs(folder_path, exist_ok=True)
+
+    if filename:
+        return os.path.join(folder_path, filename)
+    return folder_path
+    
 def admin_view(course_code):
     st.title("👩‍🏫 Admin Dashboard")
 
@@ -2277,20 +2291,6 @@ def admin_view(course_code):
     # -------------------------
     # PERSISTENT STORAGE SETUP
     # -------------------------
-def get_persistent_path(folder_type, course_code, filename=None):
-    base_dir = "persistent_storage"
-    os.makedirs(base_dir, exist_ok=True)
-
-    if not course_code:
-        # Defensive handling
-        return None
-
-    folder_path = os.path.join(base_dir, folder_type, course_code)
-    os.makedirs(folder_path, exist_ok=True)
-
-    if filename:
-        return os.path.join(folder_path, filename)
-    return folder_path
 
     ensure_persistent_dirs()
 
@@ -3119,6 +3119,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
