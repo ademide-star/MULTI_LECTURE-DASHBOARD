@@ -139,44 +139,7 @@ def ensure_persistent_dirs():
 # Initialize persistent directories
 ensure_persistent_dirs()
 
-    # Debug information for file system
-    with st.expander("🔍 File System Debug Info"):
-        st.write("**Lecture System Debug:**")
-        st.write(f"LECTURE_FILE: `{LECTURE_FILE}`")
-        st.write(f"LECTURE_FILE type: `{type(LECTURE_FILE)}`")
-        st.write(f"LECTURE_FILE is string: `{isinstance(LECTURE_FILE, str)}`")
-        
-        if LECTURE_FILE and isinstance(LECTURE_FILE, str):
-            try:
-                exists = os.path.exists(LECTURE_FILE)
-                st.write(f"LECTURE_FILE exists: `{exists}`")
-                if exists:
-                    st.write(f"File size: `{os.path.getsize(LECTURE_FILE)} bytes`")
-                else:
-                    # Check if directory exists
-                    dir_path = os.path.dirname(LECTURE_FILE)
-                    st.write(f"Directory exists: `{os.path.exists(dir_path)}`")
-                    st.write(f"Directory: `{dir_path}`")
-            except Exception as e:
-                st.write(f"Error checking LECTURE_FILE: `{e}`")
-        
-        st.write("**All persistent paths:**")
-        paths_info = {
-            "Lectures": LECTURE_FILE,
-            "Classwork": CLASSWORK_FILE,
-            "Seminar": SEMINAR_FILE,
-            "Attendance Status": ATTENDANCE_STATUS_FILE
-        }
-        
-        for name, path in paths_info.items():
-            st.write(f"- **{name}:** `{path}`")
-            if path and isinstance(path, str):
-                try:
-                    exists = os.path.exists(path)
-                    st.write(f"  - Exists: `{exists}`")
-                except:
-                    st.write(f"  - Exists: `Error checking`")
-
+    
 def load_lectures(course_code):
     """Load lecture file safely for a given course."""
     LECTURE_FILE = get_file(course_code, "lectures")
@@ -2559,6 +2522,44 @@ def admin_view(course_code):
                 st.session_state["lectures_df"] = lectures_df
                 st.success("✅ All fields cleared!")
                 st.rerun()
+       
+    # Debug information for file system
+        with st.expander("🔍 File System Debug Info"):
+            st.write("**Lecture System Debug:**")
+            st.write(f"LECTURE_FILE: `{LECTURE_FILE}`")
+            st.write(f"LECTURE_FILE type: `{type(LECTURE_FILE)}`")
+            st.write(f"LECTURE_FILE is string: `{isinstance(LECTURE_FILE, str)}`")
+        
+            if LECTURE_FILE and isinstance(LECTURE_FILE, str):
+                try:
+                    exists = os.path.exists(LECTURE_FILE)
+                    st.write(f"LECTURE_FILE exists: `{exists}`")
+                    if exists:
+                        st.write(f"File size: `{os.path.getsize(LECTURE_FILE)} bytes`")
+                    else:
+                    # Check if directory exists
+                        dir_path = os.path.dirname(LECTURE_FILE)
+                        st.write(f"Directory exists: `{os.path.exists(dir_path)}`")
+                        st.write(f"Directory: `{dir_path}`")
+                except Exception as e:
+                    st.write(f"Error checking LECTURE_FILE: `{e}`")
+        
+            st.write("**All persistent paths:**")
+            paths_info = {
+                "Lectures": LECTURE_FILE,
+                "Classwork": CLASSWORK_FILE,
+                "Seminar": SEMINAR_FILE,
+                "Attendance Status": ATTENDANCE_STATUS_FILE
+        }
+        
+            for name, path in paths_info.items():
+                st.write(f"- **{name}:** `{path}`")
+                if path and isinstance(path, str):
+                    try:
+                        exists = os.path.exists(path)
+                        st.write(f"  - Exists: `{exists}`")
+                    except:
+                        st.write(f"  - Exists: `Error checking`")
 
     # Continue with the rest of your admin dashboard...
     # [The rest of your admin dashboard code remains the same]
@@ -3238,6 +3239,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
