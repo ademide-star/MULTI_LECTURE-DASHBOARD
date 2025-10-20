@@ -1038,7 +1038,32 @@ def get_file(course_code, file_type):
     else:
         return os.path.join(data_dir, f"{course_code}_{file_type}.csv")
 
+def get_video_files(course_code):
+    """Get list of video files for a course"""
+    base_dir = "data"
+    video_dir = os.path.join(base_dir, course_code, "videos")
+    
+    if not os.path.exists(video_dir):
+        return []
+    
+    video_files = sorted([f for f in os.listdir(video_dir) 
+                         if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
+    return video_files
 
+def delete_video(course_code, video_name):
+    """Delete a video file"""
+    try:
+        base_dir = "data"
+        video_dir = os.path.join(base_dir, course_code, "videos")
+        video_path = os.path.join(video_dir, video_name)
+        
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Error deleting video: {e}")
+        return False
 
 import os
 import pandas as pd
@@ -1489,25 +1514,58 @@ def student_view(course_code):
                 log_submission(course_code, matric_s, student_name_s, selected_week_s, uploaded_seminar.name, "Seminar")
                 st.success(f"✅ {student_name_s} ({matric_s}) — Seminar uploaded successfully!")
 
-        # 🎬 Lecture Videos
-    st.divider()
-    st.subheader("🎬 Watch Lecture Videos")
-
-    video_dir = os.path.join("video_lectures", course_code)
+            # ===============================================================
+    # 🎥 VIDEO LECTURES SECTION - ADD TO STUDENT DASHBOARD
+    # ===============================================================
+    st.header("🎥 Video Lectures")
+    
+    # Create video directory path (same as admin)
+    base_dir = "data"
+    video_dir = os.path.join(base_dir, course_code, "videos")
+    
+    video_files = []
     if os.path.exists(video_dir):
-        video_files = sorted(os.listdir(video_dir))
-        if video_files:
-            selected_video = st.selectbox("Select a lecture to watch:", video_files, key=f"{course_code}_video_select")
-            st.video(os.path.join(video_dir, selected_video))
-        else:
-            st.info("No lecture videos uploaded yet.")
+        video_files = sorted([f for f in os.listdir(video_dir) 
+                            if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
+    
+    if video_files:
+        st.success(f"Found {len(video_files)} video lecture(s) available!")
+        
+        for i, video in enumerate(video_files):
+            video_path = os.path.join(video_dir, video)
+            
+            with st.expander(f"🎬 {video}", expanded=False):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    try:
+                        # Display video
+                        st.video(video_path)
+                        
+                        # Show video info
+                        file_size = os.path.getsize(video_path) / (1024 * 1024)
+                        st.caption(f"File size: {file_size:.2f} MB")
+                        
+                    except Exception as e:
+                        st.error(f"⚠️ Cannot play this video: {str(e)}")
+                        st.info("The video format might not be supported in your browser. Try downloading it instead.")
+                
+                with col2:
+                    # Download button for students
+                    try:
+                        with open(video_path, "rb") as vid_file:
+                            st.download_button(
+                                label="📥 Download Video",
+                                data=vid_file,
+                                file_name=video,
+                                mime="video/mp4",
+                                key=f"student_download_{i}",
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.error("Download unavailable")
     else:
-        st.warning("📁 No video directory found for this course.")
-
-    # Ensure base directory exists
-    base_dir = "uploads"
-    os.makedirs(base_dir, exist_ok=True)
-
+        st.info("No video lectures available yet. Check back later for uploaded content.")
 
 
 def view_attendance_records(course_code, week):
@@ -2481,48 +2539,122 @@ def admin_view(course_code):
         except Exception as e:
             st.error(f"Failed to reset scores: {e}")
 
-    # -------------------------
-    # Video upload & management
+        # -------------------------
+    # Video upload & management - FIXED VERSION
     # -------------------------
     st.divider()
     st.subheader("🎥 Upload & Manage Video Lectures")
 
+    # Create video directory with proper structure
+    base_dir = "data"
     video_dir = os.path.join(base_dir, course_code, "videos")
     os.makedirs(video_dir, exist_ok=True)
 
-    uploaded_video = st.file_uploader("Upload Lecture Video (MP4 only)", type=["mp4"], key=f"{course_code}_video_upload")
-    if uploaded_video:
-        try:
-            save_path = os.path.join(video_dir, uploaded_video.name)
-            base_name, ext = os.path.splitext(uploaded_video.name)
-            counter = 1
-            while os.path.exists(save_path):
-                save_path = os.path.join(video_dir, f"{base_name}_{counter}{ext}")
-                counter += 1
-            with open(save_path, "wb") as f:
-                f.write(uploaded_video.read())
-            st.success(f"✅ Video uploaded successfully: {os.path.basename(save_path)}")
-        except Exception as e:
-            st.error(f"Failed to save uploaded video: {e}")
-
-    video_files = sorted(os.listdir(video_dir)) if os.path.exists(video_dir) else []
-    if video_files:
-        st.markdown("### 📚 Uploaded Lecture Videos")
-        for video in video_files:
-            video_path = os.path.join(video_dir, video)
+    # Video upload section
+    st.markdown("### 📤 Upload New Video")
+    uploaded_video = st.file_uploader(
+        "Upload Lecture Video (MP4, MOV, AVI, MKV)", 
+        type=["mp4", "mov", "avi", "mkv"], 
+        key=f"{course_code}_video_upload"
+    )
+    
+    if uploaded_video is not None:
+        # Display video info
+        file_size = uploaded_video.size / (1024 * 1024)  # Convert to MB
+        st.write(f"**File:** {uploaded_video.name}")
+        st.write(f"**Size:** {file_size:.2f} MB")
+        st.write(f"**Type:** {uploaded_video.type}")
+        
+        # Check file size (Streamlit has ~200MB limit by default)
+        if file_size > 500:  # 500MB limit
+            st.error("❌ File too large! Please upload videos under 500MB.")
+        else:
             try:
-                st.video(video_path)
-                with open(video_path, "rb") as vid_file:
-                    st.download_button(
-                        label=f"⬇️ Download {video}",
-                        data=vid_file.read(),
-                        file_name=video,
-                        mime="video/mp4"
-                    )
-            except Exception:
-                st.info(f"Cannot preview or download {video}.")
+                # Generate safe filename
+                original_name = uploaded_video.name
+                safe_name = "".join(c for c in original_name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+                safe_name = safe_name.replace(' ', '_')
+                
+                save_path = os.path.join(video_dir, safe_name)
+                
+                # Handle duplicate files
+                base_name, ext = os.path.splitext(safe_name)
+                counter = 1
+                while os.path.exists(save_path):
+                    save_path = os.path.join(video_dir, f"{base_name}_{counter}{ext}")
+                    counter += 1
+                
+                # Save the file with progress
+                with st.spinner(f"Uploading {safe_name}... This may take a moment for large files."):
+                    with open(save_path, "wb") as f:
+                        f.write(uploaded_video.getbuffer())
+                
+                st.success(f"✅ Video uploaded successfully: {os.path.basename(save_path)}")
+                
+                # Clear the uploader after successful upload
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Failed to save video: {str(e)}")
+                st.info("💡 **Troubleshooting tips:**")
+                st.info("- Try compressing the video file")
+                st.info("- Check available disk space")
+                st.info("- Try a different video format")
+
+    # Display existing videos
+    st.markdown("### 📚 Existing Lecture Videos")
+    
+    video_files = []
+    if os.path.exists(video_dir):
+        video_files = sorted([f for f in os.listdir(video_dir) 
+                            if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
+    
+    if video_files:
+        st.write(f"Found {len(video_files)} video(s)")
+        
+        for i, video in enumerate(video_files):
+            video_path = os.path.join(video_dir, video)
+            
+            with st.expander(f"🎬 {video}", expanded=False):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    try:
+                        # Display video with controls
+                        st.video(video_path)
+                        
+                        # Show video info
+                        file_size = os.path.getsize(video_path) / (1024 * 1024)
+                        st.caption(f"Size: {file_size:.2f} MB")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Cannot preview video: {str(e)}")
+                        st.info("The video file might be corrupted or in an unsupported format.")
+                
+                with col2:
+                    # Download button
+                    try:
+                        with open(video_path, "rb") as vid_file:
+                            st.download_button(
+                                label="📥 Download",
+                                data=vid_file,
+                                file_name=video,
+                                mime="video/mp4",
+                                key=f"download_{i}"
+                            )
+                    except Exception as e:
+                        st.error(f"Download unavailable: {str(e)}")
+                    
+                    # Delete button
+                    if st.button("🗑️ Delete", key=f"delete_{i}"):
+                        try:
+                            os.remove(video_path)
+                            st.success(f"✅ Video deleted: {video}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Failed to delete: {str(e)}")
     else:
-        st.info("No videos uploaded yet.")
+        st.info("No videos uploaded yet. Use the uploader above to add lecture videos.")
 
     # -------------------------------------
 # ✅ Attendance Columns Check
@@ -2651,6 +2783,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
