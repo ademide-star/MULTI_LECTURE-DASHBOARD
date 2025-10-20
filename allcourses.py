@@ -2019,11 +2019,29 @@ def admin_view(course_code):
     else:
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
 
-# Ensure 15 weeks exist
+# ===============================================================
+# 📚 Admin Lecture Management
+# ===============================================================
+    st.header(f"📚 Manage Lectures - {course_code}")
+
+    ensure_persistent_dirs()
+
+    LECTURE_DIR = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code)
+    os.makedirs(LECTURE_DIR, exist_ok=True)
+    LECTURE_FILE = os.path.join(LECTURE_DIR, f"{course_code}_lectures.csv")
+
+# Load existing lectures or create empty DataFrame
+    try:
+        lectures_df = pd.read_csv(LECTURE_FILE)
+    except Exception:
+        lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
+
+# Ensure weeks exist (1-15)
     for i in range(1, 16):
-        if f"Week {i}" not in lectures_df['Week'].values:
+        week_name = f"Week {i}"
+        if week_name not in lectures_df['Week'].values:
             lectures_df = pd.concat([lectures_df, pd.DataFrame([{
-                "Week": f"Week {i}",
+                "Week": week_name,
                 "Topic": "",
                 "Brief": "",
                 "Assignment": "",
@@ -2033,18 +2051,20 @@ def admin_view(course_code):
 
     lectures_df = lectures_df.sort_values("Week").reset_index(drop=True)
 
-# Editable form for each week
+# ---------------------------
+# Editable form per week
+# ---------------------------
     for idx, row in lectures_df.iterrows():
-        with st.expander(f"{row['Week']} - {row.get('Topic','No Topic')}"):
+        with st.expander(f"📖 {row['Week']} - {row.get('Topic','No Topic')}"):
             topic = st.text_input("Topic", value=str(row.get("Topic","")), key=f"topic_{idx}")
             brief = st.text_area("Lecture Brief", value=str(row.get("Brief","")), height=150, key=f"brief_{idx}")
             assignment = st.text_area("Assignment", value=str(row.get("Assignment","")), height=100, key=f"assignment_{idx}")
             classwork = st.text_area("Classwork (separate by ;)", value=str(row.get("Classwork","")), height=100, key=f"classwork_{idx}")
-        
+
+        # PDF upload
             pdf_file = st.file_uploader("Upload PDF (Optional)", type=["pdf"], key=f"pdf_{idx}")
             pdf_path = str(row.get("PDF_File",""))
-        
-        # Save PDF if uploaded
+
             if pdf_file:
                 pdf_dir = os.path.join(PERSISTENT_DATA_DIR, "lectures_pdf", course_code)
                 os.makedirs(pdf_dir, exist_ok=True)
@@ -2054,43 +2074,43 @@ def admin_view(course_code):
                     f.write(pdf_file.getbuffer())
                 st.success(f"✅ PDF saved for {row['Week']}")
 
-        # Save this week's lecture immediately
+        # Save this week's lecture individually
             if st.button(f"💾 Save {row['Week']}", key=f"save_{idx}"):
-            # Update row in dataframe
                 lectures_df.at[idx, "Topic"] = topic
                 lectures_df.at[idx, "Brief"] = brief
                 lectures_df.at[idx, "Assignment"] = assignment
                 lectures_df.at[idx, "Classwork"] = classwork
                 lectures_df.at[idx, "PDF_File"] = pdf_path
 
-            # Save updated dataframe
                 lectures_df.to_csv(LECTURE_FILE, index=False)
                 st.success(f"✅ Lecture for {row['Week']} saved successfully!")
 
-
-# ===============================================================
-# 📤 Upload Lecture CSV
-# ===============================================================
-    st.subheader("Upload Lecture CSV / PDF / Materials")
+# ---------------------------
+# Optional: CSV upload
+# ---------------------------
+    st.subheader("Upload Lecture CSV / Materials")
     with st.form("upload_lecture_form"):
         lecture_file = st.file_uploader("Upload Lecture CSV", type=["csv"], key="lecture_csv")
         submit_lecture = st.form_submit_button("📤 Upload Lecture")
         if submit_lecture:
             if lecture_file:
-                lecture_path = os.path.join(lecture_dir, lecture_file.name)
+                lecture_path = os.path.join(LECTURE_DIR, lecture_file.name)
                 with open(lecture_path, "wb") as f:
                     f.write(lecture_file.getbuffer())
                 st.success(f"✅ Lecture CSV uploaded: {lecture_file.name}")
             else:
                 st.error("❌ Select a CSV file to upload.")
 
-# ===============================================================
-# 📖 View Uploaded Lectures
-# ===============================================================
+# ---------------------------
+# View uploaded lectures
+# ---------------------------
     uploaded_lectures = pd.DataFrame()
-    csv_files = [f for f in os.listdir(lecture_dir) if f.lower().endswith(".csv")]
+    csv_files = [f for f in os.listdir(LECTURE_DIR) if f.lower().endswith(".csv")]
     if csv_files:
-        uploaded_lectures = pd.read_csv(os.path.join(lecture_dir, csv_files[0]))
+        try:
+            uploaded_lectures = pd.read_csv(os.path.join(LECTURE_DIR, csv_files[0]))
+        except Exception:
+            uploaded_lectures = pd.DataFrame()
 
     if not uploaded_lectures.empty:
         st.subheader("Uploaded Lectures")
@@ -2327,6 +2347,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
