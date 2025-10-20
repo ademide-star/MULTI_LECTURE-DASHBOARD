@@ -1378,39 +1378,43 @@ def student_view(course_code):
             if pd.isna(row["Week"]) or row["Week"] == "":
                 continue
         
-            with st.expander(f"📖 {row['Week']} - {row.get('Topic','No Topic')}"):
-            # Lecture brief
-                if row.get("Brief","").strip():
-                    st.markdown(f"**Description:** {row['Brief']}")
-            
-            # Assignment
-                if row.get("Assignment","").strip():
-                    st.markdown(f"**Assignment:** {row['Assignment']}")
-            
-            # Classwork questions
-                classwork_text = str(row.get("Classwork","")).strip()
+           with st.expander(f"📖 {row.get('Week', 'No Week')} - {row.get('Topic','No Topic')}"):
+
+    # Lecture brief
+                brief_text = str(row.get("Brief", "") or "")
+                if brief_text.strip():
+                    st.markdown(f"**Description:** {brief_text}")
+
+    # Assignment
+                assignment_text = str(row.get("Assignment", "") or "")
+                if assignment_text.strip():
+                    st.markdown(f"**Assignment:** {assignment_text}")
+
+    # Classwork questions
+                classwork_text = str(row.get("Classwork", "") or "").strip()
                 if classwork_text:
                     st.markdown("**Classwork Questions:**")
                     questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
                     for i, question in enumerate(questions):
                         st.write(f"Q{i+1}: {question}")
-            
-            # PDF download
-                pdf_file = row.get("PDF_File","").strip()
+
+    # PDF download
+                pdf_file = str(row.get("PDF_File", "") or "").strip()
                 if pdf_file and os.path.exists(pdf_file):
                     try:
                         with open(pdf_file, "rb") as pdf_file_obj:
-                            file_size = os.path.getsize(pdf_file) / (1024*1024)
-                            st.download_button(
-                                label=f"📥 Download PDF ({file_size:.1f}MB)",
-                                data=pdf_file_obj,
-                                file_name=os.path.basename(pdf_file),
-                                mime="application/pdf"
-                        )
+                            file_size = os.path.getsize(pdf_file) / (1024 * 1024)
+                                st.download_button(
+                                    label=f"📥 Download PDF ({file_size:.1f}MB)",
+                                    data=pdf_file_obj,
+                                    file_name=os.path.basename(pdf_file),
+                                    mime="application/pdf"
+                )
                     except Exception as e:
                         st.error(f"⚠️ Cannot load PDF: {e}")
                 else:
                     st.info("No PDF available for this lecture.")
+
 
     # -----------------------
     # Scores & Grades
@@ -2323,6 +2327,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
