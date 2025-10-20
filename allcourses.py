@@ -139,27 +139,43 @@ def ensure_persistent_dirs():
 # Initialize persistent directories
 ensure_persistent_dirs()
 
-# Update all file paths to use persistent storage
-def get_persistent_path(file_type, course_code="", filename=""):
-    """Get persistent file paths that survive reboots"""
-    base_dir = PERSISTENT_DATA_DIR
-    
-    if file_type == "pdf":
-        return os.path.join(base_dir, "pdfs", course_code, filename) if filename else os.path.join(base_dir, "pdfs", course_code)
-    elif file_type == "video":
-        return os.path.join(base_dir, "videos", course_code, filename) if filename else os.path.join(base_dir, "videos", course_code)
-    elif file_type == "attendance":
-        return os.path.join(base_dir, "attendance", filename) if filename else os.path.join(base_dir, "attendance")
-    elif file_type == "classwork":
-        return os.path.join(base_dir, "classwork", f"{course_code}_classwork.csv")
-    elif file_type == "seminar":
-        return os.path.join(base_dir, "seminar", f"{course_code}_seminar.csv")
-    elif file_type == "lectures":
-        return os.path.join(base_dir, "lectures", f"{course_code}_lectures.csv")
-    elif file_type == "attendance_status":
-        return os.path.join(base_dir, "data", "attendance_status.json")
-    else:
-        return os.path.join(base_dir, "data", filename)
+    # Debug information for file system
+    with st.expander("🔍 File System Debug Info"):
+        st.write("**Lecture System Debug:**")
+        st.write(f"LECTURE_FILE: `{LECTURE_FILE}`")
+        st.write(f"LECTURE_FILE type: `{type(LECTURE_FILE)}`")
+        st.write(f"LECTURE_FILE is string: `{isinstance(LECTURE_FILE, str)}`")
+        
+        if LECTURE_FILE and isinstance(LECTURE_FILE, str):
+            try:
+                exists = os.path.exists(LECTURE_FILE)
+                st.write(f"LECTURE_FILE exists: `{exists}`")
+                if exists:
+                    st.write(f"File size: `{os.path.getsize(LECTURE_FILE)} bytes`")
+                else:
+                    # Check if directory exists
+                    dir_path = os.path.dirname(LECTURE_FILE)
+                    st.write(f"Directory exists: `{os.path.exists(dir_path)}`")
+                    st.write(f"Directory: `{dir_path}`")
+            except Exception as e:
+                st.write(f"Error checking LECTURE_FILE: `{e}`")
+        
+        st.write("**All persistent paths:**")
+        paths_info = {
+            "Lectures": LECTURE_FILE,
+            "Classwork": CLASSWORK_FILE,
+            "Seminar": SEMINAR_FILE,
+            "Attendance Status": ATTENDANCE_STATUS_FILE
+        }
+        
+        for name, path in paths_info.items():
+            st.write(f"- **{name}:** `{path}`")
+            if path and isinstance(path, str):
+                try:
+                    exists = os.path.exists(path)
+                    st.write(f"  - Exists: `{exists}`")
+                except:
+                    st.write(f"  - Exists: `Error checking`")
 
 def load_lectures(course_code):
     """Load lecture file safely for a given course."""
@@ -1293,6 +1309,36 @@ def set_classwork_status(course_code, week, is_open, open_time=None):
         st.error(f"Error setting classwork status: {e}")
         return False
 
+
+def get_persistent_path(file_type, course_code="", filename=""):
+    """Get persistent file paths that survive reboots"""
+    try:
+        base_dir = PERSISTENT_DATA_DIR
+        
+        if file_type == "pdf":
+            return os.path.join(base_dir, "pdfs", course_code, filename) if filename else os.path.join(base_dir, "pdfs", course_code)
+        elif file_type == "video":
+            return os.path.join(base_dir, "videos", course_code, filename) if filename else os.path.join(base_dir, "videos", course_code)
+        elif file_type == "attendance":
+            return os.path.join(base_dir, "attendance", filename) if filename else os.path.join(base_dir, "attendance")
+        elif file_type == "classwork":
+            return os.path.join(base_dir, "classwork", f"{course_code}_classwork.csv")
+        elif file_type == "seminar":
+            return os.path.join(base_dir, "seminar", f"{course_code}_seminar.csv")
+        elif file_type == "lectures":
+            return os.path.join(base_dir, "lectures", f"{course_code}_lectures.csv")
+        elif file_type == "attendance_status":
+            return os.path.join(base_dir, "data", "attendance_status.json")
+        elif file_type == "scores":
+            return os.path.join(base_dir, "scores", f"{course_code.lower()}_scores.csv")
+        else:
+            return os.path.join(base_dir, "data", filename)
+    except Exception as e:
+        print(f"Error getting persistent path: {e}")
+        # Return a safe fallback path
+        return os.path.join(PERSISTENT_DATA_DIR, "data", "fallback.csv")
+
+
 def get_persistent_path(file_type, course_code="", filename=""):
     """Get persistent file paths that survive reboots"""
     base_dir = PERSISTENT_DATA_DIR
@@ -2279,7 +2325,7 @@ def admin_view(course_code):
     # -------------------------
     ensure_persistent_dirs()
     
-    # Use persistent file paths
+    # Use persistent file paths with safe initialization
     LECTURE_FILE = get_persistent_path("lectures", course_code)
     CLASSWORK_FILE = get_persistent_path("classwork", course_code)
     SEMINAR_FILE = get_persistent_path("seminar", course_code)
@@ -2292,30 +2338,55 @@ def admin_view(course_code):
     os.makedirs(scores_dir, exist_ok=True)
 
     # -------------------------
-    # Lecture Management
+    # Lecture Management - FIXED VERSION
     # -------------------------
     st.header("📚 Lecture Management")
 
-    # Load lectures CSV safely from persistent storage
-    if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
-        lectures_df.columns = lectures_df.columns.str.strip()
-    else:
+    # 🎯 FIXED: Safe lecture file loading with error handling
+    try:
+        # Check if lecture file exists safely
+        lecture_file_exists = False
+        if LECTURE_FILE and isinstance(LECTURE_FILE, str) and LECTURE_FILE.strip():
+            try:
+                lecture_file_exists = os.path.exists(LECTURE_FILE)
+            except (TypeError, OSError) as e:
+                st.warning(f"⚠️ Error checking lecture file: {e}")
+                lecture_file_exists = False
+
+        if lecture_file_exists:
+            lectures_df = pd.read_csv(LECTURE_FILE)
+            # Clean column names
+            lectures_df.columns = lectures_df.columns.str.strip()
+        else:
+            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File"])
+
+        # Ensure all required columns exist
+        for col in ["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File"]:
+            if col not in lectures_df.columns:
+                lectures_df[col] = ""
+
+        # Clean PDF_File column to prevent path errors
+        if "PDF_File" in lectures_df.columns:
+            lectures_df["PDF_File"] = lectures_df["PDF_File"].apply(
+                lambda x: x if isinstance(x, str) and x.strip() else ""
+            )
+
+        # Store in session state
+        st.session_state["lectures_df"] = lectures_df
+
+    except Exception as e:
+        st.error(f"❌ Error initializing lecture system: {e}")
+        # Create empty dataframe as fallback
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File"])
+        st.session_state["lectures_df"] = lectures_df
 
-    # Ensure all required columns exist
-    for col in ["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File"]:
-        if col not in lectures_df.columns:
-            lectures_df[col] = ""
-
-    # Store in session state
-    st.session_state["lectures_df"] = lectures_df
-
+    # Continue with the rest of your admin dashboard code...
     # Add / Edit Lecture, Classwork & Assignment
     with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
         week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
         lectures_df = st.session_state["lectures_df"]
 
+        # Find or create row for this week
         if week in lectures_df["Week"].values:
             row_idx = lectures_df[lectures_df["Week"] == week].index[0]
         else:
@@ -2324,30 +2395,33 @@ def admin_view(course_code):
             row_idx = lectures_df[lectures_df["Week"] == week].index[0]
             st.session_state["lectures_df"] = lectures_df
 
-        # Existing text fields
+        # Text input fields
         topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
         brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
         classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
         assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
 
-        # 🎯 PERSISTENT PDF Upload
+        # PDF Upload section
         st.markdown("**Upload PDF Files (Permanent Storage)**")
-        
-        # Use persistent PDF directory
         pdf_dir = get_persistent_path("pdf", course_code)
         os.makedirs(pdf_dir, exist_ok=True)
         
-        # PDF Upload
         lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
         
-        # Get current PDF path safely
+        # 🎯 FIXED: Safe PDF path handling
         current_pdf = lectures_df.at[row_idx, "PDF_File"]
-        if not isinstance(current_pdf, str):
-            current_pdf = str(current_pdf) if current_pdf is not None else ""
+        current_pdf = str(current_pdf) if current_pdf is not None else ""
         current_pdf = current_pdf.strip()
         
-        # Display current PDF if exists in persistent storage
-        if current_pdf and os.path.exists(current_pdf):
+        # Display current PDF if exists
+        pdf_exists = False
+        if current_pdf:
+            try:
+                pdf_exists = os.path.exists(current_pdf)
+            except (TypeError, OSError):
+                pdf_exists = False
+        
+        if pdf_exists:
             st.success(f"📎 Current PDF: {os.path.basename(current_pdf)}")
             
             try:
@@ -2363,25 +2437,24 @@ def admin_view(course_code):
             except Exception as e:
                 st.error(f"❌ Error reading PDF: {e}")
             
-            # Option to remove PDF
             if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
                 try:
                     if os.path.exists(current_pdf):
                         os.remove(current_pdf)
                     lectures_df.at[row_idx, "PDF_File"] = ""
                     st.session_state["lectures_df"] = lectures_df
+                    # Save immediately when removing PDF
                     lectures_df.to_csv(LECTURE_FILE, index=False)
                     st.success("✅ PDF removed successfully!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error removing PDF: {e}")
 
-        # Handle new PDF upload to PERSISTENT storage
+        # Handle new PDF upload
         if lecture_pdf is not None:
             safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
             safe_name = safe_name.replace(' ', '_')
             
-            # Use persistent path
             pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
             pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
             
@@ -2394,28 +2467,28 @@ def admin_view(course_code):
                 st.session_state["lectures_df"] = lectures_df
                 lectures_df.to_csv(LECTURE_FILE, index=False)
                 
-                st.success(f"✅ PDF saved permanently: {lecture_pdf.name}")
+                st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Error saving PDF: {e}")
 
-        # Update text fields
-        lectures_df.at[row_idx, "Topic"] = topic
-        lectures_df.at[row_idx, "Brief"] = brief
-        lectures_df.at[row_idx, "Classwork"] = classwork
-        lectures_df.at[row_idx, "Assignment"] = assignment
+        # 🎯 SAVE BUTTON SECTION
+        st.markdown("---")
+        st.subheader("💾 Save Changes")
+        
+        # Preview of changes
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Current Values:**")
+            st.write(f"**Topic:** {topic if topic else 'Empty'}")
+            st.write(f"**Brief:** {'✓ Set' if brief.strip() else '✗ Empty'}")
+        with col2:
+            st.write(f"**Classwork:** {'✓ Set' if classwork.strip() else '✗ Empty'}")
+            st.write(f"**Assignment:** {'✓ Set' if assignment.strip() else '✗ Empty'}")
+            st.write(f"**PDF:** {'✓ Uploaded' if pdf_exists else '✗ Not uploaded'}")
 
-        # Save button
-        if st.button("💾 Save Changes", key=f"save_{week}"):
-            try:
-                lectures_df.to_csv(LECTURE_FILE, index=False)
-                st.session_state["lectures_df"] = lectures_df
-                st.success("✅ All changes saved to permanent storage!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error saving changes: {e}")
-      # Main save button
+        # Main save button
         if st.button("💾 SAVE ALL LECTURE MATERIALS", 
                     key=f"save_all_{week}", 
                     type="primary", 
@@ -2428,25 +2501,67 @@ def admin_view(course_code):
                 lectures_df.at[row_idx, "Classwork"] = classwork
                 lectures_df.at[row_idx, "Assignment"] = assignment
                 
-                # Save to file
-                lectures_df.to_csv(LECTURE_FILE, index=False)
-                st.session_state["lectures_df"] = lectures_df
-                
-                st.success("🎉 All lecture materials saved successfully!")
-                st.balloons()
-                
-                # Show confirmation
-                with st.expander("📋 Saved Details", expanded=True):
-                    st.write(f"**Week:** {week}")
-                    st.write(f"**Topic:** {topic}")
-                    st.write(f"**Brief:** {brief[:200] + '...' if len(brief) > 200 else brief}")
-                    st.write(f"**Classwork Questions:** {len([q for q in classwork.split(';') if q.strip()]) if classwork.strip() else 0}")
-                    st.write(f"**Assignment:** {'Set' if assignment.strip() else 'Not set'}")
-                
-                st.rerun()
+                # 🎯 FIXED: Safe file saving
+                try:
+                    lectures_df.to_csv(LECTURE_FILE, index=False)
+                    st.session_state["lectures_df"] = lectures_df
+                    st.success("🎉 All lecture materials saved successfully!")
+                    st.balloons()
+                    
+                    # Show confirmation
+                    with st.expander("📋 Saved Details", expanded=True):
+                        st.write(f"**Week:** {week}")
+                        st.write(f"**Topic:** {topic}")
+                        st.write(f"**Brief:** {brief[:200] + '...' if len(brief) > 200 else brief}")
+                        st.write(f"**Classwork Questions:** {len([q for q in classwork.split(';') if q.strip()]) if classwork.strip() else 0}")
+                        st.write(f"**Assignment:** {'Set' if assignment.strip() else 'Not set'}")
+                    
+                    st.rerun()
+                    
+                except Exception as save_error:
+                    st.error(f"❌ Error saving to file: {save_error}")
+                    # Try to show the file path for debugging
+                    st.info(f"Trying to save to: {LECTURE_FILE}")
                 
             except Exception as e:
-                st.error(f"❌ Error saving: {e}")
+                st.error(f"❌ Error updating data: {e}")
+
+        # Quick actions row
+        st.markdown("### ⚡ Quick Actions")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🔄 Refresh", key=f"refresh_{week}", use_container_width=True):
+                st.rerun()
+        
+        with col2:
+            if st.button("📋 Save Text Only", key=f"save_text_{week}", use_container_width=True):
+                try:
+                    lectures_df.at[row_idx, "Topic"] = topic
+                    lectures_df.at[row_idx, "Brief"] = brief
+                    lectures_df.at[row_idx, "Classwork"] = classwork
+                    lectures_df.at[row_idx, "Assignment"] = assignment
+                    
+                    lectures_df.to_csv(LECTURE_FILE, index=False)
+                    st.session_state["lectures_df"] = lectures_df
+                    st.success("✅ Text content saved!")
+                except Exception as e:
+                    st.error(f"❌ Error saving text: {e}")
+        
+        with col3:
+            if st.button("🗑️ Clear All", key=f"clear_all_{week}", use_container_width=True):
+                lectures_df.at[row_idx, "Topic"] = ""
+                lectures_df.at[row_idx, "Brief"] = ""
+                lectures_df.at[row_idx, "Classwork"] = ""
+                lectures_df.at[row_idx, "Assignment"] = ""
+                
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+                st.session_state["lectures_df"] = lectures_df
+                st.success("✅ All fields cleared!")
+                st.rerun()
+
+    # Continue with the rest of your admin dashboard...
+    # [The rest of your admin dashboard code remains the same]
     # 🕒 Attendance Control (Admin)
     # -------------------------------
     st.subheader("🎛 Attendance Control")
@@ -3123,6 +3238,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
