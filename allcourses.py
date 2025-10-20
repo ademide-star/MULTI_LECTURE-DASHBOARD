@@ -1378,7 +1378,7 @@ def student_view(course_code):
             if pd.isna(row["Week"]) or row["Week"] == "":
                 continue
         
-           with st.expander(f"📖 {row.get('Week', 'No Week')} - {row.get('Topic','No Topic')}"):
+            with st.expander(f"📖 {row.get('Week', 'No Week')} - {row.get('Topic','No Topic')}"):
 
     # Lecture brief
                 brief_text = str(row.get("Brief", "") or "")
@@ -2327,6 +2327,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
