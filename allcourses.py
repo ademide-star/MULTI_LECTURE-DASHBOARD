@@ -2004,20 +2004,6 @@ def admin_view(course_code):
     
     st.title(f"👩‍🏫 Admin Dashboard - {course_code}")
     
-    # -----------------------
-    # ===============================================================
-# 📚 Lecture Management (Admin)
-# ===============================================================
-    st.header(f"📝 Lecture Management - {course_code}")
-    ensure_persistent_dirs()
-
-    LECTURE_FILE = get_persistent_path("lectures", course_code)
-
-# Load existing lectures
-    if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
-    else:
-        lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
 
 # ===============================================================
 # 📚 Admin Lecture Management
@@ -2347,6 +2333,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
