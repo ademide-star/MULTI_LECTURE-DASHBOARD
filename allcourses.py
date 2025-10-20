@@ -2005,13 +2005,9 @@ def admin_view(course_code):
 # 📚 Lecture Management (Admin)
 # ===============================================================
     st.header(f"📝 Lecture Management - {course_code}")
-
     ensure_persistent_dirs()
 
-# Persistent paths
-    lecture_dir = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code)
-    os.makedirs(lecture_dir, exist_ok=True)
-    LECTURE_FILE = os.path.join(lecture_dir, f"{course_code}_lectures.csv")
+    LECTURE_FILE = get_persistent_path("lectures", course_code)
 
 # Load existing lectures
     if os.path.exists(LECTURE_FILE):
@@ -2019,38 +2015,32 @@ def admin_view(course_code):
     else:
         lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
 
-# Ensure all 15 weeks exist
+# Ensure 15 weeks exist
     for i in range(1, 16):
-        week_label = f"Week {i}"
-        if week_label not in lectures_df['Week'].values:
-            new_row = pd.DataFrame([{
-                "Week": week_label,
+        if f"Week {i}" not in lectures_df['Week'].values:
+            lectures_df = pd.concat([lectures_df, pd.DataFrame([{
+                "Week": f"Week {i}",
                 "Topic": "",
                 "Brief": "",
                 "Assignment": "",
                 "Classwork": "",
                 "PDF_File": ""
-            }])
-            lectures_df = pd.concat([lectures_df, new_row], ignore_index=True)
+            }])], ignore_index=True)
 
     lectures_df = lectures_df.sort_values("Week").reset_index(drop=True)
-
-    edited_rows = []
 
 # Editable form for each week
     for idx, row in lectures_df.iterrows():
         with st.expander(f"{row['Week']} - {row.get('Topic','No Topic')}"):
-            topic = st.text_input("Topic", value=row.get("Topic",""), key=f"topic_{idx}")
-            brief = st.text_area("Lecture Brief", value=row.get("Brief",""), height=150, key=f"brief_{idx}")
-            assignment = st.text_area("Assignment", value=row.get("Assignment",""), height=100, key=f"assignment_{idx}")
-            classwork = st.text_area(
-                "Classwork Questions (separate with semicolon ;)",
-                value=row.get("Classwork",""), height=100, key=f"classwork_{idx}"
-        )
-
-        # Optional PDF upload
+            topic = st.text_input("Topic", value=str(row.get("Topic","")), key=f"topic_{idx}")
+            brief = st.text_area("Lecture Brief", value=str(row.get("Brief","")), height=150, key=f"brief_{idx}")
+            assignment = st.text_area("Assignment", value=str(row.get("Assignment","")), height=100, key=f"assignment_{idx}")
+            classwork = st.text_area("Classwork (separate by ;)", value=str(row.get("Classwork","")), height=100, key=f"classwork_{idx}")
+        
             pdf_file = st.file_uploader("Upload PDF (Optional)", type=["pdf"], key=f"pdf_{idx}")
-            pdf_path = row.get("PDF_File","")
+            pdf_path = str(row.get("PDF_File",""))
+        
+        # Save PDF if uploaded
             if pdf_file:
                 pdf_dir = os.path.join(PERSISTENT_DATA_DIR, "lectures_pdf", course_code)
                 os.makedirs(pdf_dir, exist_ok=True)
@@ -2060,20 +2050,19 @@ def admin_view(course_code):
                     f.write(pdf_file.getbuffer())
                 st.success(f"✅ PDF saved for {row['Week']}")
 
-            edited_rows.append({
-                "Week": row["Week"],
-                "Topic": topic,
-                "Brief": brief,
-                "Assignment": assignment,
-                "Classwork": classwork,
-                "PDF_File": pdf_path
-        })
+        # Save this week's lecture immediately
+            if st.button(f"💾 Save {row['Week']}", key=f"save_{idx}"):
+            # Update row in dataframe
+                lectures_df.at[idx, "Topic"] = topic
+                lectures_df.at[idx, "Brief"] = brief
+                lectures_df.at[idx, "Assignment"] = assignment
+                lectures_df.at[idx, "Classwork"] = classwork
+                lectures_df.at[idx, "PDF_File"] = pdf_path
 
-# Save all lectures
-    if st.button("💾 Save All Lectures"):
-        updated_df = pd.DataFrame(edited_rows)
-        updated_df.to_csv(LECTURE_FILE, index=False)
-        st.success("✅ All lecture details saved successfully!")
+            # Save updated dataframe
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+                st.success(f"✅ Lecture for {row['Week']} saved successfully!")
+
 
 # ===============================================================
 # 📤 Upload Lecture CSV
@@ -2334,6 +2323,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
