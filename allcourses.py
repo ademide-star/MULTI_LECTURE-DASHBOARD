@@ -2280,10 +2280,23 @@ def admin_view(course_code):
     ensure_persistent_dirs()
     
     # Use persistent file paths
-    LECTURE_FILE = get_persistent_path("lectures", course_code)
-    CLASSWORK_FILE = get_persistent_path("classwork", course_code)
-    SEMINAR_FILE = get_persistent_path("seminar", course_code)
-    ATTENDANCE_STATUS_FILE = get_persistent_path("attendance_status")
+   def admin_view(course_code):
+    # ===============================================================
+    # 🧩 Ensure valid course code and define persistent paths
+    # ===============================================================
+    import os
+    os.makedirs("data", exist_ok=True)
+
+    if not course_code:
+        st.error("⚠️ No course selected. Please select a course to manage.")
+        st.stop()
+
+    # ✅ Define all persistent files safely
+    LECTURE_FILE = f"data/{course_code}_lecture.csv"
+    CLASSWORK_FILE = f"data/{course_code}_classwork.csv"
+    ATTENDANCE_FILE = f"data/{course_code}_attendance.csv"
+    STUDENT_LIST_FILE = f"data/{course_code}_students.csv"
+
     
     # Base directories for student uploads
     base_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads")
@@ -3092,6 +3105,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
