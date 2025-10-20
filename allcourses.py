@@ -1343,6 +1343,75 @@ def student_view(course_code):
     else:
         st.warning("⚠️ Set your identity to view your scores and submit work.")
 
+
+    # ===============================================================
+# 📚 Student Lecture View
+# ===============================================================
+    st.header(f"📖 {course_code} Lecture Materials")
+
+# Ensure persistent directories exist
+    ensure_persistent_dirs()
+
+# Path to the lecture CSV (must match admin path)
+    LECTURE_FILE = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code, f"{course_code}_lectures.csv")
+
+# Load lectures
+    try:
+        if os.path.exists(LECTURE_FILE):
+            lectures_df = pd.read_csv(LECTURE_FILE)
+        else:
+            lectures_df = pd.DataFrame(columns=["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"])
+    
+    # Ensure all columns exist
+        for col in ["Week", "Topic", "Brief", "Assignment", "Classwork", "PDF_File"]:
+            if col not in lectures_df.columns:
+                lectures_df[col] = ""
+
+    except Exception as e:
+        st.error(f"⚠️ Error loading lecture file: {e}")
+        lectures_df = pd.DataFrame()
+
+    if lectures_df.empty or lectures_df["Week"].isna().all():
+        st.info("No lecture materials available yet. Check back later!")
+    else:
+        for _, row in lectures_df.iterrows():
+            if pd.isna(row["Week"]) or row["Week"] == "":
+                continue
+        
+            with st.expander(f"📖 {row['Week']} - {row.get('Topic','No Topic')}"):
+            # Lecture brief
+                if row.get("Brief","").strip():
+                    st.markdown(f"**Description:** {row['Brief']}")
+            
+            # Assignment
+                if row.get("Assignment","").strip():
+                    st.markdown(f"**Assignment:** {row['Assignment']}")
+            
+            # Classwork questions
+                classwork_text = str(row.get("Classwork","")).strip()
+                if classwork_text:
+                    st.markdown("**Classwork Questions:**")
+                    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+                    for i, question in enumerate(questions):
+                        st.write(f"Q{i+1}: {question}")
+            
+            # PDF download
+                pdf_file = row.get("PDF_File","").strip()
+                if pdf_file and os.path.exists(pdf_file):
+                    try:
+                        with open(pdf_file, "rb") as pdf_file_obj:
+                            file_size = os.path.getsize(pdf_file) / (1024*1024)
+                            st.download_button(
+                                label=f"📥 Download PDF ({file_size:.1f}MB)",
+                                data=pdf_file_obj,
+                                file_name=os.path.basename(pdf_file),
+                                mime="application/pdf"
+                        )
+                    except Exception as e:
+                        st.error(f"⚠️ Cannot load PDF: {e}")
+                else:
+                    st.info("No PDF available for this lecture.")
+
     # -----------------------
     # Scores & Grades
     # -----------------------
@@ -2265,6 +2334,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
