@@ -1409,9 +1409,17 @@ def student_view(course_code):
                     st.markdown(f"**Assignment:** {row['Assignment']}")
             
             with col2:
-                # PDF Download for students
+                # 🎯 FIXED: PDF Download for students with safe existence check
                 pdf_file = row.get("PDF_File", "")
-                if pdf_file and os.path.exists(pdf_file):
+                pdf_file_exists = False
+                
+                if pdf_file and isinstance(pdf_file, str) and pdf_file.strip():
+                    try:
+                        pdf_file_exists = os.path.exists(pdf_file)
+                    except (TypeError, OSError):
+                        pdf_file_exists = False
+                
+                if pdf_file_exists:
                     try:
                         with open(pdf_file, "rb") as pdf_file_obj:
                             st.download_button(
@@ -1943,7 +1951,7 @@ def admin_view(course_code):
     # Store in session state
     st.session_state["lectures_df"] = lectures_df
 
-    # Add / Edit Lecture, Classwork & Assignment
+        # Add / Edit Lecture, Classwork & Assignment
     with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
         week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
         lectures_df = st.session_state["lectures_df"]
@@ -1962,7 +1970,7 @@ def admin_view(course_code):
         classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
         assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
 
-        # 🎯 FIXED: PDF Upload with persistent storage
+        # 🎯 FIXED: PDF Upload with proper error handling
         st.markdown("**Upload PDF Files (Optional)**")
         
         # Create PDF directory for this course
@@ -1972,29 +1980,49 @@ def admin_view(course_code):
         # PDF Upload
         lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
         
-        # Display current PDF if exists
+        # 🎯 FIXED: Safe PDF existence check
         current_pdf = lectures_df.at[row_idx, "PDF_File"]
-        if current_pdf and os.path.exists(current_pdf):
-            st.info(f"📎 Current PDF: {os.path.basename(current_pdf)}")
+        
+        # Check if current_pdf exists and is a valid string path
+        pdf_exists = False
+        pdf_path_to_use = ""
+        
+        if current_pdf and isinstance(current_pdf, str) and current_pdf.strip():
+            pdf_path_to_use = current_pdf
+            try:
+                pdf_exists = os.path.exists(current_pdf)
+            except (TypeError, OSError) as e:
+                st.warning(f"⚠️ Error checking PDF path: {e}")
+                pdf_exists = False
+        
+        # Display current PDF if it exists
+        if pdf_exists:
+            st.info(f"📎 Current PDF: {os.path.basename(pdf_path_to_use)}")
             
             # Show PDF download button
-            with open(current_pdf, "rb") as pdf_file:
-                st.download_button(
-                    label="📥 Download Current PDF",
-                    data=pdf_file,
-                    file_name=os.path.basename(current_pdf),
-                    mime="application/pdf",
-                    key=f"download_{week}"
-                )
+            try:
+                with open(pdf_path_to_use, "rb") as pdf_file:
+                    st.download_button(
+                        label="📥 Download Current PDF",
+                        data=pdf_file,
+                        file_name=os.path.basename(pdf_path_to_use),
+                        mime="application/pdf",
+                        key=f"download_{week}"
+                    )
+            except Exception as e:
+                st.error(f"❌ Error reading PDF file: {e}")
             
             # Option to remove PDF
             if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
                 try:
-                    os.remove(current_pdf)
+                    if os.path.exists(pdf_path_to_use):
+                        os.remove(pdf_path_to_use)
                     lectures_df.at[row_idx, "PDF_File"] = ""
-                    st.success("PDF removed successfully!")
+                    st.session_state["lectures_df"] = lectures_df
+                    st.success("✅ PDF removed successfully!")
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Error removing PDF: {e}")
+                    st.error(f"❌ Error removing PDF: {e}")
 
         # Handle new PDF upload
         if lecture_pdf is not None:
@@ -2008,7 +2036,9 @@ def admin_view(course_code):
                 
                 # Update DataFrame with PDF path
                 lectures_df.at[row_idx, "PDF_File"] = pdf_path
+                st.session_state["lectures_df"] = lectures_df
                 st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
+                st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Error saving PDF: {e}")
@@ -2026,6 +2056,7 @@ def admin_view(course_code):
                 lectures_df.to_csv(LECTURE_FILE, index=False)
                 st.session_state["lectures_df"] = lectures_df
                 st.success("✅ All changes saved successfully!")
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error saving changes: {e}")
             
@@ -2778,6 +2809,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
