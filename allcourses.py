@@ -2769,7 +2769,9 @@ def admin_view(course_code):
     # 📝 Classwork Submissions Viewing
     # -------------------------------
     st.header("📝 Classwork Submissions")
-    
+    # ✅ Ensure file path exists
+    CLASSWORK_FILE = f"data/{course_code}_classwork.csv"
+    os.makedirs("data", exist_ok=True)
     if os.path.exists(CLASSWORK_FILE):
         try:
             classwork_df = pd.read_csv(CLASSWORK_FILE)
@@ -3281,6 +3283,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
