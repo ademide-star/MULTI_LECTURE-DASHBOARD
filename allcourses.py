@@ -1305,6 +1305,88 @@ def student_view(course_code):
     """Student dashboard with persistent storage, scores, classwork, attendance, and uploads."""
     # Initialize persistent directories
     ensure_persistent_dirs()
+
+    # ------------------------
+    # Lecture display
+    # ------------------------
+    LECTURE_FILE = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code, f"{course_code}_lectures.csv")
+    if os.path.exists(LECTURE_FILE):
+        lectures_df = pd.read_csv(LECTURE_FILE)
+        for idx, row in lectures_df.iterrows():
+            with st.expander(f"📖 {row['Week']} - {row.get('Topic','No Topic')}"):
+                if str(row.get("Brief","")).strip():
+                    st.markdown(f"**Description:** {row['Brief']}")
+                if str(row.get("Assignment","")).strip():
+                    st.markdown(f"**Assignment:** {row['Assignment']}")
+                classwork_text = str(row.get("Classwork","")).strip()
+                if classwork_text:
+                    st.markdown("**Classwork Questions:**")
+                    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
+                    for i, question in enumerate(questions):
+                        st.write(f"Q{i+1}: {question}")
+                pdf_file = str(row.get("PDF_File","")).strip()
+                if pdf_file and os.path.exists(pdf_file):
+                    with open(pdf_file, "rb") as pdf_file_obj:
+                        st.download_button(
+                            label=f"📥 Download PDF",
+                            data=pdf_file_obj,
+                            file_name=os.path.basename(pdf_file),
+                            mime="application/pdf"
+                        )
+    else:
+        st.info("No lectures uploaded yet.")
+
+    # ------------------------
+    # Classwork display with countdown
+    # ------------------------
+    CLASSWORK_FILE = os.path.join(PERSISTENT_DATA_DIR, "classwork", course_code, f"{course_code}_classwork.csv")
+    if os.path.exists(CLASSWORK_FILE):
+        cw_df = pd.read_csv(CLASSWORK_FILE)
+        for idx, row in cw_df.iterrows():
+            with st.expander(f"🧩 Classwork - {row['Week']}"):
+                if row['Open_Status']:
+                    st.info(f"⏱ Time limit: {row['Time_Limit']} minutes")
+                    
+                    # Create a session state for timing
+                    key_start = f"start_time_{row['Week']}"
+                    if key_start not in st.session_state:
+                        st.session_state[key_start] = datetime.now()
+
+                    start_time = st.session_state[key_start]
+                    end_time = start_time + timedelta(minutes=int(row['Time_Limit']))
+                    remaining = end_time - datetime.now()
+
+                    if remaining.total_seconds() > 0:
+                        # Countdown display
+                        mins, secs = divmod(int(remaining.total_seconds()), 60)
+                        st.warning(f"⏳ Time remaining: {mins:02d}:{secs:02d}")
+
+                        # Classwork questions input
+                        answers = st.text_area("Your Answers (separate by ;)", height=200, key=f"answers_{row['Week']}")
+                        if st.button("📤 Submit Classwork", key=f"submit_{row['Week']}"):
+                            # Save answers
+                            SUBMISSION_DIR = os.path.join(PERSISTENT_DATA_DIR, "submissions", course_code)
+                            os.makedirs(SUBMISSION_DIR, exist_ok=True)
+                            submission_file = os.path.join(SUBMISSION_DIR, f"{row['Week']}_submissions.csv")
+
+                            if os.path.exists(submission_file):
+                                sub_df = pd.read_csv(submission_file)
+                            else:
+                                sub_df = pd.DataFrame(columns=["Student", "Answers", "Submitted_At"])
+
+                            sub_df = pd.concat([sub_df, pd.DataFrame([{
+                                "Student": st.session_state.get("student_name","Anonymous"),
+                                "Answers": answers,
+                                "Submitted_At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }])], ignore_index=True)
+                            sub_df.to_csv(submission_file, index=False)
+                            st.success("✅ Classwork submitted successfully!")
+                    else:
+                        st.error("❌ Classwork time has ended. You can no longer submit.")
+                else:
+                    st.info("Classwork is not open yet.")
+    else:
+        st.info("No classwork available yet.")
     
     # Paths
     LECTURE_PATH = get_persistent_path("lectures", course_code)
@@ -2087,6 +2169,46 @@ def admin_view(course_code):
             else:
                 st.error("❌ Select a CSV file to upload.")
 
+   # ===============================================================
+    # Classwork Management
+    # ===============================================================
+    st.subheader("🧩 Manage Classwork")
+    with st.form("classwork_form"):
+        week = st.selectbox("Week", [f"Week {i}" for i in range(1,16)])
+        questions = st.text_area("Classwork Questions (separate by ;)", height=200)
+        open_status = st.checkbox("Open classwork for students?", value=False)
+        time_limit = st.number_input("Time limit (minutes)", min_value=1, max_value=180, value=20)
+        submit_cw = st.form_submit_button("📤 Save Classwork")
+        if submit_cw:
+            # Load existing classwork CSV
+            if os.path.exists(CLASSWORK_FILE):
+                cw_df = pd.read_csv(CLASSWORK_FILE)
+            else:
+                cw_df = pd.DataFrame(columns=["Week","Questions","Open_Status","Time_Limit"])
+            
+            # Update or append
+            if week in cw_df['Week'].values:
+                cw_df.loc[cw_df['Week']==week, ['Questions','Open_Status','Time_Limit']] = [questions, open_status, time_limit]
+            else:
+                cw_df = pd.concat([cw_df, pd.DataFrame([{
+                    "Week": week,
+                    "Questions": questions,
+                    "Open_Status": open_status,
+                    "Time_Limit": time_limit
+                }])], ignore_index=True)
+            cw_df.to_csv(CLASSWORK_FILE, index=False)
+            st.success(f"✅ Classwork saved for {week} (Open: {open_status}, Time: {time_limit} min)")
+
+    # View current classwork
+    st.subheader("Current Classwork")
+    if os.path.exists(CLASSWORK_FILE):
+        cw_df = pd.read_csv(CLASSWORK_FILE)
+        if not cw_df.empty:
+            st.dataframe(cw_df, use_container_width=True)
+        else:
+            st.info("No classwork uploaded yet.")
+    else:
+        st.info("No classwork uploaded yet.") 
 # ---------------------------
 # View uploaded lectures
 # ---------------------------
@@ -2102,6 +2224,7 @@ def admin_view(course_code):
         st.subheader("Uploaded Lectures")
         st.dataframe(uploaded_lectures, use_container_width=True)
 
+    
     # -----------------------
     # Scores Management
     # -----------------------
@@ -2130,31 +2253,7 @@ def admin_view(course_code):
             st.dataframe(scores_df, use_container_width=True)
         except Exception as e:
             st.error(f"❌ Error loading scores CSV: {e}")
-    
-    # -----------------------
-    # Classwork Management
-    # -----------------------
-    st.header("🧩 Manage Classwork")
-    st.subheader("Add/Edit Classwork Questions")
-    with st.form("classwork_form"):
-        week = st.selectbox("Week", [f"Week {i}" for i in range(1,16)])
-        questions = st.text_area("Classwork Questions (separate by semicolon ;)", height=200)
-        open_status = st.checkbox("Open classwork for students?", value=True)
-        submit_cw = st.form_submit_button("📤 Save Classwork")
-        if submit_cw:
-            save_classwork_questions(course_code, week, questions, open_status)
-            st.success(f"✅ Classwork saved for {week} (Open: {open_status})")
-    
-    # View classwork
-    st.subheader("Current Classwork")
-    try:
-        cw_df = pd.read_csv(CLASSWORK_FILE) if os.path.exists(CLASSWORK_FILE) else pd.DataFrame()
-        if not cw_df.empty:
-            st.dataframe(cw_df, use_container_width=True)
-        else:
-            st.info("No classwork uploaded yet.")
-    except:
-        st.info("No classwork uploaded yet.")
+
     
     # -----------------------
     # Video Upload
@@ -2333,6 +2432,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
