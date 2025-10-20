@@ -1064,7 +1064,54 @@ def delete_video(course_code, video_name):
     except Exception as e:
         st.error(f"Error deleting video: {e}")
         return False
+def get_pdf_directory(course_code):
+    """Get the PDF directory for a course"""
+    pdf_dir = os.path.join("pdfs", course_code)
+    os.makedirs(pdf_dir, exist_ok=True)
+    return pdf_dir
 
+def safe_pdf_path_check(pdf_path):
+    """Safely check if a PDF path exists and is valid"""
+    if not pdf_path or not isinstance(pdf_path, str):
+        return False, "Invalid path type"
+    
+    pdf_path = pdf_path.strip()
+    if not pdf_path:
+        return False, "Empty path"
+    
+    try:
+        exists = os.path.exists(pdf_path)
+        if exists:
+            # Check if it's actually a file and readable
+            if os.path.isfile(pdf_path):
+                return True, "Valid PDF file"
+            else:
+                return False, "Path exists but is not a file"
+        else:
+            return False, "File not found at path"
+    except Exception as e:
+        return False, f"Error checking path: {e}"
+
+def fix_pdf_paths(lectures_df, course_code):
+    """Fix PDF paths in the dataframe"""
+    pdf_dir = get_pdf_directory(course_code)
+    
+    for idx, row in lectures_df.iterrows():
+        pdf_path = row.get("PDF_File", "")
+        if pdf_path and isinstance(pdf_path, str) and pdf_path.strip():
+            # Check if path needs fixing
+            pdf_path = pdf_path.strip()
+            
+            # If it's a relative path, try to make it absolute
+            if not os.path.isabs(pdf_path):
+                # Try to find the file in the PDF directory
+                filename = os.path.basename(pdf_path)
+                possible_path = os.path.join(pdf_dir, filename)
+                if os.path.exists(possible_path):
+                    lectures_df.at[idx, "PDF_File"] = os.path.abspath(possible_path)
+                    st.info(f"Fixed path for {row['Week']}: {filename}")
+    return lectures_df
+    
 import os
 import pandas as pd
 from datetime import datetime, timedelta
@@ -1409,28 +1456,40 @@ def student_view(course_code):
                     st.markdown(f"**Assignment:** {row['Assignment']}")
             
             with col2:
-                # 🎯 FIXED: PDF Download for students with safe existence check
+                # 🎯 ENHANCED PDF Download with more debugging
                 pdf_file = row.get("PDF_File", "")
-                pdf_file_exists = False
                 
-                if pdf_file and isinstance(pdf_file, str) and pdf_file.strip():
-                    try:
-                        pdf_file_exists = os.path.exists(pdf_file)
-                    except (TypeError, OSError):
-                        pdf_file_exists = False
+                # Convert to string and clean
+                if not isinstance(pdf_file, str):
+                    pdf_file = str(pdf_file) if pdf_file is not None else ""
                 
-                if pdf_file_exists:
+                pdf_file = pdf_file.strip()
+                
+                if pdf_file:
+                    st.write(f"**PDF Status:**")
+                    
                     try:
-                        with open(pdf_file, "rb") as pdf_file_obj:
-                            st.download_button(
-                                label="📥 Download PDF",
-                                data=pdf_file_obj,
-                                file_name=os.path.basename(pdf_file),
-                                mime="application/pdf",
-                                key=f"student_pdf_{row['Week'].replace(' ', '_')}"
-                            )
+                        if os.path.exists(pdf_file):
+                            try:
+                                with open(pdf_file, "rb") as pdf_file_obj:
+                                    file_size = os.path.getsize(pdf_file) / (1024 * 1024)  # MB
+                                    
+                                    st.download_button(
+                                        label=f"📥 Download PDF ({file_size:.1f}MB)",
+                                        data=pdf_file_obj,
+                                        file_name=os.path.basename(pdf_file),
+                                        mime="application/pdf",
+                                        key=f"student_pdf_{row['Week'].replace(' ', '_')}"
+                                    )
+                                    st.success("✅ PDF available")
+                            except Exception as e:
+                                st.error(f"❌ Error reading PDF: {e}")
+                        else:
+                            st.warning("⚠️ PDF file not found")
+                            st.info(f"Expected at: `{pdf_file}`")
+                            
                     except Exception as e:
-                        st.error(f"⚠️ Error loading PDF: {e}")
+                        st.error(f"❌ Error checking PDF: {e}")
                 else:
                     st.info("No PDF available")
       # ===============================================================
@@ -1970,95 +2029,102 @@ def admin_view(course_code):
         classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
         assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
 
-        # 🎯 FIXED: PDF Upload with proper error handling
+            # 🎯 FIXED: PDF Upload with absolute path saving
         st.markdown("**Upload PDF Files (Optional)**")
-        
-        # Create PDF directory for this course
+    
+    # Create PDF directory for this course
         pdf_dir = os.path.join("pdfs", course_code)
         os.makedirs(pdf_dir, exist_ok=True)
-        
-        # PDF Upload
+    
+    # PDF Upload
         lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
-        
-        # 🎯 FIXED: Safe PDF existence check
+    
+    # Get current PDF path
         current_pdf = lectures_df.at[row_idx, "PDF_File"]
+    
+    # Convert to string if needed
+        if not isinstance(current_pdf, str):
+            current_pdf = str(current_pdf) if current_pdf is not None else ""
+        current_pdf = current_pdf.strip()
+    
+    # Display current PDF if exists
+        if current_pdf and os.path.exists(current_pdf):
+            st.info(f"📎 Current PDF: {os.path.basename(current_pdf)}")
         
-        # Check if current_pdf exists and is a valid string path
-        pdf_exists = False
-        pdf_path_to_use = ""
-        
-        if current_pdf and isinstance(current_pdf, str) and current_pdf.strip():
-            pdf_path_to_use = current_pdf
+        # Show PDF download button
             try:
-                pdf_exists = os.path.exists(current_pdf)
-            except (TypeError, OSError) as e:
-                st.warning(f"⚠️ Error checking PDF path: {e}")
-                pdf_exists = False
-        
-        # Display current PDF if it exists
-        if pdf_exists:
-            st.info(f"📎 Current PDF: {os.path.basename(pdf_path_to_use)}")
-            
-            # Show PDF download button
-            try:
-                with open(pdf_path_to_use, "rb") as pdf_file:
+                with open(current_pdf, "rb") as pdf_file:
+                    file_size = os.path.getsize(current_pdf) / (1024 * 1024)
                     st.download_button(
-                        label="📥 Download Current PDF",
+                        label=f"📥 Download Current PDF ({file_size:.1f}MB)",
                         data=pdf_file,
-                        file_name=os.path.basename(pdf_path_to_use),
+                        file_name=os.path.basename(current_pdf),
                         mime="application/pdf",
                         key=f"download_{week}"
-                    )
+                )
             except Exception as e:
-                st.error(f"❌ Error reading PDF file: {e}")
-            
-            # Option to remove PDF
+                st.error(f"❌ Error reading PDF: {e}")
+        
+        # Option to remove PDF
             if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
                 try:
-                    if os.path.exists(pdf_path_to_use):
-                        os.remove(pdf_path_to_use)
+                    if os.path.exists(current_pdf):
+                        os.remove(current_pdf)
                     lectures_df.at[row_idx, "PDF_File"] = ""
                     st.session_state["lectures_df"] = lectures_df
+                # Save immediately
+                    lectures_df.to_csv(LECTURE_FILE, index=False)
                     st.success("✅ PDF removed successfully!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error removing PDF: {e}")
 
-        # Handle new PDF upload
+    # Handle new PDF upload
         if lecture_pdf is not None:
-            # Save PDF to file system
-            pdf_filename = f"{course_code}_{week.replace(' ', '')}_{lecture_pdf.name}"
-            pdf_path = os.path.join(pdf_dir, pdf_filename)
-            
+        # Generate safe filename
+            original_name = lecture_pdf.name
+            safe_name = "".join(c for c in original_name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+            safe_name = safe_name.replace(' ', '_')
+        
+        # Create absolute path
+            pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
+            pdf_path = os.path.abspath(os.path.join(pdf_dir, pdf_filename))
+        
             try:
-                with open(pdf_path, "wb") as f:
-                    f.write(lecture_pdf.getbuffer())
-                
-                # Update DataFrame with PDF path
+                with st.spinner("Uploading PDF..."):
+                    with open(pdf_path, "wb") as f:
+                        f.write(lecture_pdf.getbuffer())
+            
+            # Update DataFrame with absolute PDF path
                 lectures_df.at[row_idx, "PDF_File"] = pdf_path
                 st.session_state["lectures_df"] = lectures_df
+            
+            # Save immediately
+                lectures_df.to_csv(LECTURE_FILE, index=False)
+            
                 st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
+                st.info(f"Saved to: `{pdf_path}`")
                 st.rerun()
-                
+            
             except Exception as e:
                 st.error(f"❌ Error saving PDF: {e}")
 
         # Update the DataFrame with text fields
-        lectures_df.at[row_idx, "Topic"] = topic
-        lectures_df.at[row_idx, "Brief"] = brief
-        lectures_df.at[row_idx, "Classwork"] = classwork
-        lectures_df.at[row_idx, "Assignment"] = assignment
+            lectures_df.at[row_idx, "Topic"] = topic
+            lectures_df.at[row_idx, "Brief"] = brief
+            lectures_df.at[row_idx, "Classwork"] = classwork
+            lectures_df.at[row_idx, "Assignment"] = assignment
 
         # Save button for all changes
-        if st.button("💾 Save Changes", key=f"save_{week}"):
-            try:
+            if st.button("💾 Save Changes", key=f"save_{week}"):
+                try:
                 # Save to CSV
-                lectures_df.to_csv(LECTURE_FILE, index=False)
-                st.session_state["lectures_df"] = lectures_df
-                st.success("✅ All changes saved successfully!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error saving changes: {e}")
+                    lectures_df.to_csv(LECTURE_FILE, index=False)
+                    st.session_state["lectures_df"] = lectures_df
+                    st.success("✅ All changes saved successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error saving changes: {e}")
             
     
     # 🕒 Attendance Control (Admin)
@@ -2809,6 +2875,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
