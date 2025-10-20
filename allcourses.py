@@ -1307,36 +1307,6 @@ def student_view(course_code):
     ensure_persistent_dirs()
 
     # ------------------------
-    # Lecture display
-    # ------------------------
-    LECTURE_FILE = os.path.join(PERSISTENT_DATA_DIR, "lectures", course_code, f"{course_code}_lectures.csv")
-    if os.path.exists(LECTURE_FILE):
-        lectures_df = pd.read_csv(LECTURE_FILE)
-        for idx, row in lectures_df.iterrows():
-            with st.expander(f"📖 {row['Week']} - {row.get('Topic','No Topic')}"):
-                if str(row.get("Brief","")).strip():
-                    st.markdown(f"**Description:** {row['Brief']}")
-                if str(row.get("Assignment","")).strip():
-                    st.markdown(f"**Assignment:** {row['Assignment']}")
-                classwork_text = str(row.get("Classwork","")).strip()
-                if classwork_text:
-                    st.markdown("**Classwork Questions:**")
-                    questions = [q.strip() for q in classwork_text.split(";") if q.strip()]
-                    for i, question in enumerate(questions):
-                        st.write(f"Q{i+1}: {question}")
-                pdf_file = str(row.get("PDF_File","")).strip()
-                if pdf_file and os.path.exists(pdf_file):
-                    with open(pdf_file, "rb") as pdf_file_obj:
-                        st.download_button(
-                            label=f"📥 Download PDF",
-                            data=pdf_file_obj,
-                            file_name=os.path.basename(pdf_file),
-                            mime="application/pdf"
-                        )
-    else:
-        st.info("No lectures uploaded yet.")
-
-    # ------------------------
     # Classwork display with countdown
     # ------------------------
     CLASSWORK_FILE = os.path.join(PERSISTENT_DATA_DIR, "classwork", course_code, f"{course_code}_classwork.csv")
@@ -2432,6 +2402,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
