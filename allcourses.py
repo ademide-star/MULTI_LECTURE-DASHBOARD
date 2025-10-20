@@ -1590,7 +1590,16 @@ def student_view(course_code):
     # 📖 LECTURE MATERIALS WITH PERSISTENT STORAGE
     # ===============================================================
     st.header(f"📚 {course_code} Lecture Materials")
-    
+    # ✅ Ensure data directory exists
+    os.makedirs("data", exist_ok=True)
+
+# ✅ Define file path safely
+    if course_code:
+        LECTURE_FILE = f"data/{course_code}_lecture.csv"
+    else:
+        st.error("⚠️ Course code not defined — cannot load lecture materials.")
+        st.stop()
+
     # Load lectures from persistent storage
     try:
         if os.path.exists(LECTURE_FILE):
@@ -3283,6 +3292,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
