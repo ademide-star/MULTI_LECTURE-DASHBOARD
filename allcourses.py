@@ -2029,11 +2029,6 @@ def admin_view(course_code):
             except Exception as e:
                 st.error(f"❌ Error saving changes: {e}")
             
-            modules_dir = "modules"
-            os.makedirs(modules_dir, exist_ok=True)
-            
-
-            st.dataframe(lectures_df, use_container_width=True)
     
     # 🕒 Attendance Control (Admin)
     # -------------------------------
@@ -2783,6 +2778,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
