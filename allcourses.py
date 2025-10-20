@@ -1404,11 +1404,11 @@ def student_view(course_code):
                     try:
                         with open(pdf_file, "rb") as pdf_file_obj:
                             file_size = os.path.getsize(pdf_file) / (1024 * 1024)
-                                st.download_button(
-                                    label=f"📥 Download PDF ({file_size:.1f}MB)",
-                                    data=pdf_file_obj,
-                                    file_name=os.path.basename(pdf_file),
-                                    mime="application/pdf"
+                            st.download_button(
+                                label=f"📥 Download PDF ({file_size:.1f}MB)",
+                                data=pdf_file_obj,
+                                file_name=os.path.basename(pdf_file),
+                                mime="application/pdf"
                 )
                     except Exception as e:
                         st.error(f"⚠️ Cannot load PDF: {e}")
@@ -2327,6 +2327,7 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
 
