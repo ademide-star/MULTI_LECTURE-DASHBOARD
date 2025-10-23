@@ -619,6 +619,471 @@ def get_global_submissions_summary():
     return pd.DataFrame(summary_data)
 
 # ===============================================================
+# 📊 ATTENDANCE VIEWING FUNCTIONS
+# ===============================================================
+
+def view_attendance_records(course_code, week):
+    """Display attendance records for a specific course and week"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
+        
+        if not os.path.exists(attendance_file):
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        df = pd.read_csv(attendance_file)
+        
+        if df.empty:
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        st.success(f"📊 Attendance Records for {course_code} - {week}")
+        
+        # Display the dataframe
+        st.dataframe(df, use_container_width=True)
+        
+        # Show statistics
+        total_students = len(df)
+        st.info(f"**Total students attended:** {total_students}")
+        
+        # Provide download option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download CSV",
+            data=csv,
+            file_name=f"attendance_{course_code}_{week_key}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error loading attendance records: {e}")
+
+def show_attendance_summary(course_code):
+    """Show summary of attendance across all weeks"""
+    try:
+        summary_data = []
+        
+        for week_num in range(1, 16):
+            week = f"Week {week_num}"
+            week_key = week.replace(" ", "")
+            attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
+            
+            if os.path.exists(attendance_file):
+                df = pd.read_csv(attendance_file)
+                student_count = len(df)
+                
+                # Get attendance status
+                status_data = get_attendance_status(course_code, week)
+                is_open = status_data.get("is_open", False)
+                status = "🟢 OPEN" if is_open else "🔴 CLOSED"
+                
+                summary_data.append({
+                    "Week": week,
+                    "Students Attended": student_count,
+                    "Status": status
+                })
+            else:
+                status_data = get_attendance_status(course_code, week)
+                is_open = status_data.get("is_open", False)
+                status = "🟢 OPEN" if is_open else "🔴 CLOSED"
+                
+                summary_data.append({
+                    "Week": week,
+                    "Students Attended": 0,
+                    "Status": status
+                })
+        
+        if summary_data:
+            summary_df = pd.DataFrame(summary_data)
+            st.dataframe(summary_df, use_container_width=True)
+            
+            # Calculate totals
+            total_students = summary_df["Students Attended"].sum()
+            weeks_with_attendance = len(summary_df[summary_df["Students Attended"] > 0])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Attendance Records", total_students)
+            with col2:
+                st.metric("Weeks with Attendance", weeks_with_attendance)
+        else:
+            st.info("No attendance records found for any week.")
+            
+    except Exception as e:
+        st.error(f"Error generating attendance summary: {e}")
+
+def view_student_attendance_details(course_code, week):
+    """Display detailed student attendance with search and filtering"""
+    try:
+        week_key = week.replace(" ", "")
+        attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
+        
+        if not os.path.exists(attendance_file):
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        df = pd.read_csv(attendance_file)
+        
+        if df.empty:
+            st.warning(f"No attendance records found for {course_code} - {week}")
+            return
+        
+        st.success(f"👥 Student Attendance for {course_code} - {week}")
+        
+        # Display basic stats
+        total_students = len(df)
+        st.info(f"**Total students attended:** {total_students}")
+        
+        # Search and filter functionality
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            search_name = st.text_input("🔍 Search by Name", placeholder="Enter student name...")
+        
+        with col2:
+            search_matric = st.text_input("🔍 Search by Matric", placeholder="Enter matric number...")
+        
+        # Filter dataframe based on search
+        filtered_df = df.copy()
+        
+        if search_name:
+            filtered_df = filtered_df[filtered_df['Name'].str.contains(search_name, case=False, na=False)]
+        
+        if search_matric:
+            filtered_df = filtered_df[filtered_df['Matric'].str.contains(search_matric, case=False, na=False)]
+        
+        # Display the filtered results
+        if not filtered_df.empty:
+            st.write(f"**Showing {len(filtered_df)} students:**")
+            
+            # Display in a nice table format
+            for idx, row in filtered_df.iterrows():
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    with col1:
+                        st.write(f"**{row['Name']}**")
+                    with col2:
+                        st.write(f"`{row['Matric']}`")
+                    with col3:
+                        st.write(f"_{row['Timestamp']}_")
+                    st.divider()
+            
+            # Also show as dataframe for bulk operations
+            with st.expander("📋 View as Data Table"):
+                st.dataframe(filtered_df[['Name', 'Matric', 'Timestamp']], use_container_width=True)
+                
+        else:
+            st.warning("No students found matching your search criteria.")
+        
+        # Download options
+        st.subheader("📥 Download Options")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Download filtered results
+            csv_filtered = filtered_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Filtered Results (CSV)",
+                data=csv_filtered,
+                file_name=f"attendance_{course_code}_{week_key}_filtered.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            # Download all results
+            csv_all = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download All Records (CSV)",
+                data=csv_all,
+                file_name=f"attendance_{course_code}_{week_key}_all.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+    except Exception as e:
+        st.error(f"Error loading student attendance details: {e}")
+
+def view_all_students_attendance(course_code):
+    """View attendance for all students across all weeks"""
+    try:
+        st.subheader(f"📊 Complete Student Attendance - {course_code}")
+        
+        # Collect data from all weeks
+        all_attendance = []
+        
+        for week_num in range(1, 16):
+            week = f"Week {week_num}"
+            week_key = week.replace(" ", "")
+            attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
+            
+            if os.path.exists(attendance_file):
+                df = pd.read_csv(attendance_file)
+                if not df.empty:
+                    df['Week'] = week
+                    all_attendance.append(df)
+        
+        if not all_attendance:
+            st.info(f"No attendance records found for {course_code}")
+            return
+        
+        # Combine all data
+        combined_df = pd.concat(all_attendance, ignore_index=True)
+        
+        # Search functionality
+        col1, col2 = st.columns(2)
+        with col1:
+            search_student = st.text_input("🔍 Search Student", placeholder="Name or Matric...", key="search_all")
+        
+        with col2:
+            selected_week = st.selectbox(
+                "Filter by Week", 
+                ["All Weeks"] + [f"Week {i}" for i in range(1, 16)],
+                key="filter_week"
+            )
+        
+        # Filter data
+        filtered_combined = combined_df.copy()
+        
+        if search_student:
+            filtered_combined = filtered_combined[
+                filtered_combined['Name'].str.contains(search_student, case=False, na=False) |
+                filtered_combined['Matric'].str.contains(search_student, case=False, na=False)
+            ]
+        
+        if selected_week != "All Weeks":
+            filtered_combined = filtered_combined[filtered_combined['Week'] == selected_week]
+        
+        if filtered_combined.empty:
+            st.warning("No attendance records found matching your criteria.")
+            return
+        
+        # Display summary statistics
+        st.subheader("📈 Summary")
+        total_records = len(filtered_combined)
+        unique_students = filtered_combined['Matric'].nunique()
+        weeks_covered = filtered_combined['Week'].nunique()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Attendance Records", total_records)
+        with col2:
+            st.metric("Unique Students", unique_students)
+        with col3:
+            st.metric("Weeks Covered", weeks_covered)
+        
+        # Student-wise attendance count
+        st.subheader("👥 Student Attendance Summary")
+        student_summary = filtered_combined.groupby(['Name', 'Matric']).size().reset_index(name='Attendance Count')
+        student_summary = student_summary.sort_values('Attendance Count', ascending=False)
+        
+        st.dataframe(student_summary, use_container_width=True)
+        
+        # Detailed records
+        st.subheader("📋 Detailed Records")
+        st.dataframe(filtered_combined[['Name', 'Matric', 'Week', 'Timestamp']], use_container_width=True)
+        
+        # Download options
+        st.subheader("📥 Download Reports")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            csv_detailed = filtered_combined.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Detailed Records",
+                data=csv_detailed,
+                file_name=f"attendance_{course_code}_detailed.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            csv_summary = student_summary.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Student Summary",
+                data=csv_summary,
+                file_name=f"attendance_{course_code}_student_summary.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+    except Exception as e:
+        st.error(f"Error loading complete attendance: {e}")
+
+# ===============================================================
+# 🧩 CLASSWORK VIEWING FUNCTIONS
+# ===============================================================
+
+def view_classwork_submissions(course_code, week):
+    """View classwork submissions for a specific week"""
+    try:
+        classwork_file = get_file(course_code, "classwork")
+        
+        if not os.path.exists(classwork_file):
+            st.warning(f"No classwork submissions found for {course_code} - {week}")
+            return
+        
+        df = pd.read_csv(classwork_file)
+        
+        if df.empty:
+            st.warning(f"No classwork submissions found for {course_code} - {week}")
+            return
+        
+        # Filter by week
+        week_submissions = df[df['Week'] == week]
+        
+        if week_submissions.empty:
+            st.warning(f"No classwork submissions found for {course_code} - {week}")
+            return
+        
+        st.success(f"📝 Classwork Submissions for {course_code} - {week}")
+        
+        # Display submissions
+        for idx, row in week_submissions.iterrows():
+            with st.expander(f"🧩 {row['Name']} ({row['Matric']}) - {row['Timestamp']}", expanded=False):
+                st.write(f"**Student:** {row['Name']} ({row['Matric']})")
+                st.write(f"**Submitted:** {row['Timestamp']}")
+                
+                # Parse and display answers
+                try:
+                    answers = json.loads(row['Answers'])
+                    st.write("**Answers:**")
+                    for i, answer in enumerate(answers):
+                        if answer.strip():  # Only show non-empty answers
+                            st.write(f"**Q{i+1}:** {answer}")
+                            st.divider()
+                except:
+                    st.write("**Answers:** Unable to parse answers")
+        
+        # Download option
+        csv_data = week_submissions.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Classwork Submissions",
+            data=csv_data,
+            file_name=f"classwork_{course_code}_{week.replace(' ', '')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error loading classwork submissions: {e}")
+
+def view_all_classwork_submissions(course_code):
+    """View all classwork submissions with filtering options"""
+    try:
+        classwork_file = get_file(course_code, "classwork")
+        
+        if not os.path.exists(classwork_file):
+            st.info("No classwork submissions found yet.")
+            return
+        
+        df = pd.read_csv(classwork_file)
+        
+        if df.empty:
+            st.info("No classwork submissions found yet.")
+            return
+        
+        st.subheader(f"📚 All Classwork Submissions - {course_code}")
+        
+        # Filter options
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_week = st.selectbox(
+                "Filter by Week",
+                ["All Weeks"] + sorted(df['Week'].unique()),
+                key="classwork_week_filter"
+            )
+        
+        with col2:
+            search_student = st.text_input("🔍 Search Student", placeholder="Name or Matric...", key="classwork_search")
+        
+        # Filter data
+        filtered_df = df.copy()
+        
+        if selected_week != "All Weeks":
+            filtered_df = filtered_df[filtered_df['Week'] == selected_week]
+        
+        if search_student:
+            filtered_df = filtered_df[
+                filtered_df['Name'].str.contains(search_student, case=False, na=False) |
+                filtered_df['Matric'].str.contains(search_student, case=False, na=False)
+            ]
+        
+        if filtered_df.empty:
+            st.warning("No classwork submissions found matching your criteria.")
+            return
+        
+        # Display summary
+        st.subheader("📊 Summary")
+        total_submissions = len(filtered_df)
+        unique_students = filtered_df['Matric'].nunique()
+        weeks_covered = filtered_df['Week'].nunique()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Submissions", total_submissions)
+        with col2:
+            st.metric("Unique Students", unique_students)
+        with col3:
+            st.metric("Weeks Covered", weeks_covered)
+        
+        # Student submission count
+        st.subheader("👥 Student Submission Summary")
+        student_summary = filtered_df.groupby(['Name', 'Matric']).size().reset_index(name='Submissions Count')
+        student_summary = student_summary.sort_values('Submissions Count', ascending=False)
+        
+        st.dataframe(student_summary, use_container_width=True)
+        
+        # Detailed view
+        st.subheader("📋 Detailed Submissions")
+        
+        for week in sorted(filtered_df['Week'].unique()):
+            week_data = filtered_df[filtered_df['Week'] == week]
+            with st.expander(f"📅 {week} - {len(week_data)} submissions", expanded=False):
+                for idx, row in week_data.iterrows():
+                    with st.container():
+                        st.write(f"**{row['Name']} ({row['Matric']})** - {row['Timestamp']}")
+                        
+                        try:
+                            answers = json.loads(row['Answers'])
+                            for i, answer in enumerate(answers):
+                                if answer.strip():
+                                    st.write(f"Q{i+1}: {answer}")
+                            st.divider()
+                        except:
+                            st.write("Unable to display answers")
+                            st.divider()
+        
+        # Download options
+        st.subheader("📥 Download Options")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            csv_detailed = filtered_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Detailed Records",
+                data=csv_detailed,
+                file_name=f"classwork_{course_code}_detailed.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            csv_summary = student_summary.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Student Summary",
+                data=csv_summary,
+                file_name=f"classwork_{course_code}_student_summary.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+    except Exception as e:
+        st.error(f"Error loading classwork submissions: {e}")
+
+# ===============================================================
 # 🎓 STUDENT VIEW
 # ===============================================================
 
@@ -999,527 +1464,585 @@ def admin_view(course_code):
         
         st.title("👩‍🏫 Admin Dashboard")
         
-        # ===============================================================
-        # 🌐 GLOBAL ACTIVITY OVERVIEW
-        # ===============================================================
-        st.header("🌐 Global Activity Overview")
+        # Create tabs for better organization
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+            "📚 Lecture Management", 
+            "🎥 Video Management", 
+            "🕒 Attendance Control",
+            "📊 Attendance Records",
+            "🧩 Classwork Control", 
+            "📝 Classwork Submissions",
+            "📝 Grading System",
+            "📂 Student Submissions"
+        ])
         
-        if st.button("🔄 Refresh Global Overview", type="secondary"):
-            # Attendance Summary
-            st.subheader("📊 Global Attendance Summary")
-            attendance_summary = get_global_attendance_summary()
-            if not attendance_summary.empty:
-                st.dataframe(attendance_summary, use_container_width=True)
-                
-                # Show some metrics
-                total_all_courses = attendance_summary["Total Attendance Records"].sum()
-                st.metric("Total Attendance Across All Courses", total_all_courses)
-            else:
-                st.info("No attendance data found for any course.")
+        with tab1:
+            # ===============================================================
+            # 📚 LECTURE MANAGEMENT
+            # ===============================================================
+            st.header("📚 Lecture Management")
             
-            # Submissions Summary
-            st.subheader("📁 Global Submissions Summary")
-            submissions_summary = get_global_submissions_summary()
-            if not submissions_summary.empty:
-                st.dataframe(submissions_summary, use_container_width=True)
-                
-                total_files = submissions_summary["Total Files"].sum()
-                st.metric("Total Files Submitted", total_files)
-            else:
-                st.info("No submission data found for any course.")
-
-        # ===============================================================
-        # 📚 LECTURE MANAGEMENT
-        # ===============================================================
-        st.header("📚 Lecture Management")
-        
-        # Load lectures
-        lectures_df = load_lectures(course_code)
-        st.session_state["lectures_df"] = lectures_df
-        
-        # Add/Edit Lecture Section
-        with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
-            week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
+            # Load lectures
+            lectures_df = load_lectures(course_code)
+            st.session_state["lectures_df"] = lectures_df
             
-            # Find or create row for this week
-            if week in lectures_df["Week"].values:
-                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-            else:
-                new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": "", "PDF_File": ""}
-                lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
-                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-                st.session_state["lectures_df"] = lectures_df
-
-            # Text input fields
-            topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
-            brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
-            classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
-            assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
-
-            # PDF Upload section
-            st.markdown("**Upload PDF Files (Permanent Storage)**")
-            pdf_dir = get_persistent_path("pdf", course_code)
-            os.makedirs(pdf_dir, exist_ok=True)
-
-            lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
-
-            # Handle current PDF
-            current_pdf = lectures_df.at[row_idx, "PDF_File"]
-            current_pdf = str(current_pdf) if current_pdf is not None else ""
-            current_pdf = current_pdf.strip()
-            
-            if current_pdf and os.path.exists(current_pdf):
-                st.success(f"📎 Current PDF: {os.path.basename(current_pdf)}")
+            # Add/Edit Lecture Section
+            with st.expander("📘 Add / Edit Lecture, Classwork & Assignment", expanded=True):
+                week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
                 
-                with open(current_pdf, "rb") as pdf_file:
-                    file_size = os.path.getsize(current_pdf) / (1024 * 1024)
-                    st.download_button(
-                        label=f"📥 Download Current PDF ({file_size:.1f}MB)",
-                        data=pdf_file,
-                        file_name=os.path.basename(current_pdf),
-                        mime="application/pdf",
-                        key=f"download_{week}"
-                    )
+                # Find or create row for this week
+                if week in lectures_df["Week"].values:
+                    row_idx = lectures_df[lectures_df["Week"] == week].index[0]
+                else:
+                    new_row = {"Week": week, "Topic": "", "Brief": "", "Classwork": "", "Assignment": "", "PDF_File": ""}
+                    lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
+                    row_idx = lectures_df[lectures_df["Week"] == week].index[0]
+                    st.session_state["lectures_df"] = lectures_df
+
+                # Text input fields
+                topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
+                brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
+                classwork = st.text_area("Classwork", value=lectures_df.at[row_idx, "Classwork"], key=f"classwork_{week}")
+                assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
+
+                # PDF Upload section
+                st.markdown("**Upload PDF Files (Permanent Storage)**")
+                pdf_dir = get_persistent_path("pdf", course_code)
+                os.makedirs(pdf_dir, exist_ok=True)
+
+                lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
+
+                # Handle current PDF
+                current_pdf = lectures_df.at[row_idx, "PDF_File"]
+                current_pdf = str(current_pdf) if current_pdf is not None else ""
+                current_pdf = current_pdf.strip()
                 
-                if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
+                if current_pdf and os.path.exists(current_pdf):
+                    st.success(f"📎 Current PDF: {os.path.basename(current_pdf)}")
+                    
+                    with open(current_pdf, "rb") as pdf_file:
+                        file_size = os.path.getsize(current_pdf) / (1024 * 1024)
+                        st.download_button(
+                            label=f"📥 Download Current PDF ({file_size:.1f}MB)",
+                            data=pdf_file,
+                            file_name=os.path.basename(current_pdf),
+                            mime="application/pdf",
+                            key=f"download_{week}"
+                        )
+                    
+                    if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
+                        try:
+                            if os.path.exists(current_pdf):
+                                os.remove(current_pdf)
+                            lectures_df.at[row_idx, "PDF_File"] = ""
+                            st.session_state["lectures_df"] = lectures_df
+                            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+                            st.success("✅ PDF removed successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error removing PDF: {e}")
+
+                # Handle new PDF upload
+                if lecture_pdf is not None:
+                    safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+                    safe_name = safe_name.replace(' ', '_')
+                    
+                    pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
+                    pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
+                    
                     try:
-                        if os.path.exists(current_pdf):
-                            os.remove(current_pdf)
-                        lectures_df.at[row_idx, "PDF_File"] = ""
+                        with st.spinner("Uploading PDF to permanent storage..."):
+                            with open(pdf_path, "wb") as f:
+                                f.write(lecture_pdf.getbuffer())
+                        
+                        lectures_df.at[row_idx, "PDF_File"] = pdf_path
                         st.session_state["lectures_df"] = lectures_df
                         lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                        st.success("✅ PDF removed successfully!")
+                        
+                        st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error saving PDF: {str(e)}")
+
+                # Save button
+                st.markdown("---")
+                if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
+                    try:
+                        lectures_df.at[row_idx, "Topic"] = topic
+                        lectures_df.at[row_idx, "Brief"] = brief
+                        lectures_df.at[row_idx, "Classwork"] = classwork
+                        lectures_df.at[row_idx, "Assignment"] = assignment
+                        
+                        lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+                        st.session_state["lectures_df"] = lectures_df
+                        st.success("🎉 All lecture materials saved successfully!")
+                        st.balloons()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error removing PDF: {e}")
+                        st.error(f"❌ Error saving to file: {e}")
 
-            # Handle new PDF upload
-            if lecture_pdf is not None:
-                safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
-                safe_name = safe_name.replace(' ', '_')
-                
-                pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
-                pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
-                
-                try:
-                    with st.spinner("Uploading PDF to permanent storage..."):
-                        with open(pdf_path, "wb") as f:
-                            f.write(lecture_pdf.getbuffer())
-                    
-                    lectures_df.at[row_idx, "PDF_File"] = pdf_path
-                    st.session_state["lectures_df"] = lectures_df
-                    lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                    
-                    st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"❌ Error saving PDF: {str(e)}")
-
-            # Save button
-            st.markdown("---")
-            if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
-                try:
-                    lectures_df.at[row_idx, "Topic"] = topic
-                    lectures_df.at[row_idx, "Brief"] = brief
-                    lectures_df.at[row_idx, "Classwork"] = classwork
-                    lectures_df.at[row_idx, "Assignment"] = assignment
-                    
-                    lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                    st.session_state["lectures_df"] = lectures_df
-                    st.success("🎉 All lecture materials saved successfully!")
-                    st.balloons()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error saving to file: {e}")
-
-        # ===============================================================
-        # 🎥 VIDEO MANAGEMENT
-        # ===============================================================
-        st.header("🎥 Video Lecture Management")
-        
-        # Video upload section
-        st.subheader("📤 Upload New Video")
-        uploaded_video = st.file_uploader(
-            "Upload Lecture Video (MP4 recommended, max 200MB)", 
-            type=["mp4", "mov", "avi", "mkv"], 
-            key=f"{course_code}_video_upload"
-        )
-        
-        if uploaded_video is not None:
-            file_size = uploaded_video.size / (1024 * 1024)
-            st.write(f"**File:** {uploaded_video.name}")
-            st.write(f"**Size:** {file_size:.2f} MB")
+        with tab2:
+            # ===============================================================
+            # 🎥 VIDEO MANAGEMENT
+            # ===============================================================
+            st.header("🎥 Video Lecture Management")
             
-            MAX_FILE_SIZE = 200
-            if file_size > MAX_FILE_SIZE:
-                st.error(f"❌ File too large! Please upload videos under {MAX_FILE_SIZE}MB.")
-            else:
-                success, message = upload_video(course_code, uploaded_video)
-                if success:
-                    st.success(message)
-                    st.rerun()
+            # Video upload section
+            st.subheader("📤 Upload New Video")
+            uploaded_video = st.file_uploader(
+                "Upload Lecture Video (MP4 recommended, max 200MB)", 
+                type=["mp4", "mov", "avi", "mkv"], 
+                key=f"{course_code}_video_upload"
+            )
+            
+            if uploaded_video is not None:
+                file_size = uploaded_video.size / (1024 * 1024)
+                st.write(f"**File:** {uploaded_video.name}")
+                st.write(f"**Size:** {file_size:.2f} MB")
+                
+                MAX_FILE_SIZE = 200
+                if file_size > MAX_FILE_SIZE:
+                    st.error(f"❌ File too large! Please upload videos under {MAX_FILE_SIZE}MB.")
                 else:
-                    st.error(message)
+                    success, message = upload_video(course_code, uploaded_video)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
 
-        # Display existing videos
-        st.subheader("📚 Video Library")
-        video_files = get_video_files(course_code)
-        
-        if video_files:
-            st.success(f"✅ Found {len(video_files)} permanently stored videos")
+            # Display existing videos
+            st.subheader("📚 Video Library")
+            video_files = get_video_files(course_code)
             
-            for i, video in enumerate(video_files):
-                video_path = get_persistent_path("video", course_code, video)
+            if video_files:
+                st.success(f"✅ Found {len(video_files)} permanently stored videos")
                 
-                with st.expander(f"🎬 {video}", expanded=False):
-                    col1, col2 = st.columns([3, 1])
+                for i, video in enumerate(video_files):
+                    video_path = get_persistent_path("video", course_code, video)
                     
-                    with col1:
-                        try:
-                            st.video(video_path, start_time=0)
-                            file_size = os.path.getsize(video_path) / (1024 * 1024)
-                            st.caption(f"Size: {file_size:.2f} MB (Permanently Stored)")
-                        except Exception as e:
-                            st.error(f"❌ Cannot preview video: {str(e)}")
-                    
-                    with col2:
-                        try:
-                            with open(video_path, "rb") as vid_file:
-                                st.download_button(
-                                    label="📥 Download",
-                                    data=vid_file,
-                                    file_name=video,
-                                    mime="video/mp4",
-                                    key=f"download_{i}"
-                                )
-                        except Exception as e:
-                            st.error(f"Download unavailable: {str(e)}")
+                    with st.expander(f"🎬 {video}", expanded=False):
+                        col1, col2 = st.columns([3, 1])
                         
-                        if st.button("🗑️ Delete", key=f"delete_{i}"):
+                        with col1:
                             try:
-                                os.remove(video_path)
-                                st.success(f"✅ Video deleted: {video}")
-                                st.rerun()
+                                st.video(video_path, start_time=0)
+                                file_size = os.path.getsize(video_path) / (1024 * 1024)
+                                st.caption(f"Size: {file_size:.2f} MB (Permanently Stored)")
                             except Exception as e:
-                                st.error(f"❌ Failed to delete: {str(e)}")
-        else:
-            st.info("No videos in permanent storage yet. Upload videos above.")
+                                st.error(f"❌ Cannot preview video: {str(e)}")
+                        
+                        with col2:
+                            try:
+                                with open(video_path, "rb") as vid_file:
+                                    st.download_button(
+                                        label="📥 Download",
+                                        data=vid_file,
+                                        file_name=video,
+                                        mime="video/mp4",
+                                        key=f"download_{i}"
+                                    )
+                            except Exception as e:
+                                st.error(f"Download unavailable: {str(e)}")
+                            
+                            if st.button("🗑️ Delete", key=f"delete_{i}"):
+                                try:
+                                    os.remove(video_path)
+                                    st.success(f"✅ Video deleted: {video}")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Failed to delete: {str(e)}")
+            else:
+                st.info("No videos in permanent storage yet. Upload videos above.")
 
-        # ===============================================================
-        # 🕒 ATTENDANCE CONTROL
-        # ===============================================================
-        st.header("🎛 Attendance Control")
-        
-        selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_week_select")
-        
-        # Get current status
-        current_status = get_attendance_status(course_code, selected_week)
-        is_currently_open = current_status.get("is_open", False)
-        
-        # Display current status
-        if is_currently_open:
-            st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
-        else:
-            st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
-        
-        # Attendance control buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
-                success = set_attendance_status(course_code, selected_week, True, datetime.now())
-                if success:
-                    st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
-                    st.rerun()
-        with col2:
-            if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
-                success = set_attendance_status(course_code, selected_week, False)
-                if success:
-                    st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
-                    st.rerun()
-        
-        # Auto-close functionality
-        if is_currently_open and current_status.get("open_time"):
-            try:
-                open_time = datetime.fromisoformat(current_status["open_time"])
-                elapsed = (datetime.now() - open_time).total_seconds()
-                remaining = max(0, 600 - elapsed)  # 10 minutes
-                
-                if remaining <= 0:
-                    set_attendance_status(course_code, selected_week, False)
-                    st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
-                    st.rerun()
-                else:
-                    mins = int(remaining // 60)
-                    secs = int(remaining % 60)
-                    st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
-            except Exception as e:
-                st.error(f"Error in auto-close: {e}")
-
-        # ===============================================================
-        # 🧩 CLASSWORK CONTROL
-        # ===============================================================
-        st.header("🎛 Classwork Control")
-        
-        classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_week")
-        
-        # Get current classwork status
-        current_classwork_status = get_classwork_status(course_code, classwork_week)
-        is_classwork_open = current_classwork_status.get("is_open", False)
-        
-        # Display current status
-        if is_classwork_open:
-            st.success(f"✅ Classwork is CURRENTLY OPEN for {course_code} - {classwork_week}")
-        else:
-            st.warning(f"🚫 Classwork is CURRENTLY CLOSED for {course_code} - {classwork_week}")
-        
-        # Classwork control buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary"):
-                success = set_classwork_status(course_code, classwork_week, True, datetime.now())
-                if success:
-                    st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
-                    st.rerun()
-        with col2:
-            if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary"):
-                success = set_classwork_status(course_code, classwork_week, False)
-                if success:
-                    st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
-                    st.rerun()
-        
-        # Auto-close functionality for classwork
-        if is_classwork_open and current_classwork_status.get("open_time"):
-            try:
-                open_time = datetime.fromisoformat(current_classwork_status["open_time"])
-                elapsed = (datetime.now() - open_time).total_seconds()
-                remaining = max(0, 1200 - elapsed)  # 20 minutes
-                
-                if remaining <= 0:
-                    set_classwork_status(course_code, classwork_week, False)
-                    st.error(f"⏰ Classwork for {course_code} - {classwork_week} has automatically closed after 20 minutes.")
-                    st.rerun()
-                else:
-                    mins = int(remaining // 60)
-                    secs = int(remaining % 60)
-                    st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
-            except Exception as e:
-                st.error(f"Error in classwork auto-close: {e}")
-
-        # ===============================================================
-        # 📊 GRADING SYSTEM
-        # ===============================================================
-        st.header("📝 Grading System")
-        
-        # Ensure scores file exists with proper structure
-        scores_df = ensure_scores_file(course_code)
-        scores_file = get_file(course_code, "scores")
-        
-        # Option 1: Manual Grade Entry
-        st.subheader("📋 Manual Grade Entry")
-        with st.form("manual_grading_form"):
+        with tab3:
+            # ===============================================================
+            # 🕒 ATTENDANCE CONTROL
+            # ===============================================================
+            st.header("🎛 Attendance Control")
+            
+            selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_week_select")
+            
+            # Get current status
+            current_status = get_attendance_status(course_code, selected_week)
+            is_currently_open = current_status.get("is_open", False)
+            
+            # Display current status
+            if is_currently_open:
+                st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
+            else:
+                st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
+            
+            # Attendance control buttons
             col1, col2 = st.columns(2)
             with col1:
-                student_name = st.text_input("Student Name", key="grade_name")
-                week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)], key="grade_week")
-                assignment_score = st.number_input("Assignment Score (0-100)", min_value=0, max_value=100, value=0)
-                test_score = st.number_input("Test Score (0-100)", min_value=0, max_value=100, value=0)
+                if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
+                    success = set_attendance_status(course_code, selected_week, True, datetime.now())
+                    if success:
+                        st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
+                        st.rerun()
             with col2:
-                student_matric = st.text_input("Matric Number", key="grade_matric")
-                practical_score = st.number_input("Practical Score (0-100)", min_value=0, max_value=100, value=0)
-                exam_score = st.number_input("Exam Score (0-100)", min_value=0, max_value=100, value=0)
+                if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
+                    success = set_attendance_status(course_code, selected_week, False)
+                    if success:
+                        st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
+                        st.rerun()
             
-            submit_grade = st.form_submit_button("💾 Save Grade", use_container_width=True)
-            
-            if submit_grade:
-                if not student_name or not student_matric:
-                    st.error("Please enter student name and matric number.")
-                else:
-                    # Calculate total and grade
-                    total_score = round(
-                        assignment_score * 0.20 + 
-                        test_score * 0.20 + 
-                        practical_score * 0.10 + 
-                        exam_score * 0.50, 
-                        1
-                    )
-                    grade = compute_grade(total_score)
+            # Auto-close functionality
+            if is_currently_open and current_status.get("open_time"):
+                try:
+                    open_time = datetime.fromisoformat(current_status["open_time"])
+                    elapsed = (datetime.now() - open_time).total_seconds()
+                    remaining = max(0, 600 - elapsed)  # 10 minutes
                     
-                    # Load current scores
-                    scores_df = pd.read_csv(scores_file)
-                    
-                    # Check if entry exists
-                    mask = (
-                        (scores_df["StudentName"].astype(str).str.lower() == student_name.lower()) &
-                        (scores_df["MatricNo"].astype(str).str.lower() == student_matric.lower()) &
-                        (scores_df["Week"].astype(str).str.lower() == week.lower())
-                    )
-                    
-                    if mask.any():
-                        # Update existing entry
-                        scores_df.loc[mask, [
-                            "Assignment", "Test", "Practical", "Exam", "Total", "Grade"
-                        ]] = [assignment_score, test_score, practical_score, exam_score, total_score, grade]
+                    if remaining <= 0:
+                        set_attendance_status(course_code, selected_week, False)
+                        st.error(f"⏰ Attendance for {course_code} - {selected_week} has automatically closed after 10 minutes.")
+                        st.rerun()
                     else:
-                        # Add new entry
-                        new_row = {
-                            "StudentName": student_name.title(),
-                            "MatricNo": student_matric.upper(),
-                            "Week": week,
-                            "Assignment": assignment_score,
-                            "Test": test_score,
-                            "Practical": practical_score,
-                            "Exam": exam_score,
-                            "Total": total_score,
-                            "Grade": grade
-                        }
-                        scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
-                    
-                    scores_df.to_csv(scores_file, index=False)
-                    st.success(f"✅ Grade saved for {student_name} ({student_matric}) - {week}")
+                        mins = int(remaining // 60)
+                        secs = int(remaining % 60)
+                        st.info(f"⏳ Attendance will auto-close in {mins:02d}:{secs:02d}")
+                except Exception as e:
+                    st.error(f"Error in auto-close: {e}")
 
-        # Option 2: CSV Upload for Bulk Grading
-        st.subheader("📁 Bulk Grade Upload (CSV)")
-        uploaded_csv = st.file_uploader(
-            "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam", 
-            type=["csv"],
-            key="grade_csv"
-        )
-        
-        if uploaded_csv is not None:
-            try:
-                uploaded_df = pd.read_csv(uploaded_csv)
+        with tab4:
+            # ===============================================================
+            # 📊 ATTENDANCE RECORDS
+            # ===============================================================
+            st.header("📊 Attendance Records")
+            
+            # Create tabs for different viewing options
+            att_tab1, att_tab2, att_tab3 = st.tabs([
+                "👥 Student Details", 
+                "📈 Weekly Summary", 
+                "📋 Complete History"
+            ])
+            
+            with att_tab1:
+                st.subheader("Student Attendance Details")
+                view_week = st.selectbox(
+                    "Select Week to View", 
+                    [f"Week {i}" for i in range(1, 16)], 
+                    key=f"{course_code}_view_week"
+                )
+                view_student_attendance_details(course_code, view_week)
+            
+            with att_tab2:
+                st.subheader("Weekly Attendance Summary")
+                show_attendance_summary(course_code)
+            
+            with att_tab3:
+                view_all_students_attendance(course_code)
+
+            # 🌐 GLOBAL OVERVIEW
+            st.header("🌐 Global Attendance Overview")
+
+            if st.button("🔄 Refresh Global Overview", type="secondary"):
+                global_df = get_global_attendance_summary()
                 
-                # Validate required columns
-                required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam"]
-                if all(col in uploaded_df.columns for col in required_cols):
-                    # Calculate totals and grades
-                    uploaded_df["Total"] = (
-                        uploaded_df["Assignment"].fillna(0).astype(float) * 0.20 +
-                        uploaded_df["Test"].fillna(0).astype(float) * 0.20 +
-                        uploaded_df["Practical"].fillna(0).astype(float) * 0.10 +
-                        uploaded_df["Exam"].fillna(0).astype(float) * 0.50
-                    ).round(1)
-                    uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade)
+                if not global_df.empty:
+                    st.dataframe(global_df, use_container_width=True)
                     
-                    # Load current scores
-                    if os.path.exists(scores_file):
-                        existing_df = pd.read_csv(scores_file)
+                    # Show some metrics
+                    total_all_courses = global_df["Total Attendance Records"].sum()
+                    st.metric("Total Attendance Across All Courses", total_all_courses)
+                else:
+                    st.info("No attendance data found for any course.")
+
+        with tab5:
+            # ===============================================================
+            # 🧩 CLASSWORK CONTROL
+            # ===============================================================
+            st.header("🎛 Classwork Control")
+            
+            classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_week")
+            
+            # Get current classwork status
+            current_classwork_status = get_classwork_status(course_code, classwork_week)
+            is_classwork_open = current_classwork_status.get("is_open", False)
+            
+            # Display current status
+            if is_classwork_open:
+                st.success(f"✅ Classwork is CURRENTLY OPEN for {course_code} - {classwork_week}")
+            else:
+                st.warning(f"🚫 Classwork is CURRENTLY CLOSED for {course_code} - {classwork_week}")
+            
+            # Classwork control buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary"):
+                    success = set_classwork_status(course_code, classwork_week, True, datetime.now())
+                    if success:
+                        st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
+                        st.rerun()
+            with col2:
+                if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary"):
+                    success = set_classwork_status(course_code, classwork_week, False)
+                    if success:
+                        st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
+                        st.rerun()
+            
+            # Auto-close functionality for classwork
+            if is_classwork_open and current_classwork_status.get("open_time"):
+                try:
+                    open_time = datetime.fromisoformat(current_classwork_status["open_time"])
+                    elapsed = (datetime.now() - open_time).total_seconds()
+                    remaining = max(0, 1200 - elapsed)  # 20 minutes
+                    
+                    if remaining <= 0:
+                        set_classwork_status(course_code, classwork_week, False)
+                        st.error(f"⏰ Classwork for {course_code} - {classwork_week} has automatically closed after 20 minutes.")
+                        st.rerun()
                     else:
-                        existing_df = pd.DataFrame(columns=required_cols + ["Total", "Grade"])
-                    
-                    # Update or add each row
-                    for _, row in uploaded_df.iterrows():
-                        mask = (
-                            (existing_df["StudentName"].astype(str).str.lower() == str(row["StudentName"]).lower()) &
-                            (existing_df["MatricNo"].astype(str).str.lower() == str(row["MatricNo"]).lower()) &
-                            (existing_df["Week"].astype(str).str.lower() == str(row["Week"]).lower())
+                        mins = int(remaining // 60)
+                        secs = int(remaining % 60)
+                        st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
+                except Exception as e:
+                    st.error(f"Error in classwork auto-close: {e}")
+
+        with tab6:
+            # ===============================================================
+            # 📝 CLASSWORK SUBMISSIONS
+            # ===============================================================
+            st.header("📝 Classwork Submissions")
+            
+            # Create tabs for different viewing options
+            cw_tab1, cw_tab2 = st.tabs([
+                "📅 Weekly Submissions", 
+                "📚 All Submissions"
+            ])
+            
+            with cw_tab1:
+                st.subheader("Weekly Classwork Submissions")
+                cw_week = st.selectbox(
+                    "Select Week to View", 
+                    [f"Week {i}" for i in range(1, 16)], 
+                    key=f"{course_code}_cw_week"
+                )
+                view_classwork_submissions(course_code, cw_week)
+            
+            with cw_tab2:
+                st.subheader("All Classwork Submissions")
+                view_all_classwork_submissions(course_code)
+
+        with tab7:
+            # ===============================================================
+            # 📊 GRADING SYSTEM
+            # ===============================================================
+            st.header("📝 Grading System")
+            
+            # Ensure scores file exists with proper structure
+            scores_df = ensure_scores_file(course_code)
+            scores_file = get_file(course_code, "scores")
+            
+            # Option 1: Manual Grade Entry
+            st.subheader("📋 Manual Grade Entry")
+            with st.form("manual_grading_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    student_name = st.text_input("Student Name", key="grade_name")
+                    week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)], key="grade_week")
+                    assignment_score = st.number_input("Assignment Score (0-100)", min_value=0, max_value=100, value=0)
+                    test_score = st.number_input("Test Score (0-100)", min_value=0, max_value=100, value=0)
+                with col2:
+                    student_matric = st.text_input("Matric Number", key="grade_matric")
+                    practical_score = st.number_input("Practical Score (0-100)", min_value=0, max_value=100, value=0)
+                    exam_score = st.number_input("Exam Score (0-100)", min_value=0, max_value=100, value=0)
+                
+                submit_grade = st.form_submit_button("💾 Save Grade", use_container_width=True)
+                
+                if submit_grade:
+                    if not student_name or not student_matric:
+                        st.error("Please enter student name and matric number.")
+                    else:
+                        # Calculate total and grade
+                        total_score = round(
+                            assignment_score * 0.20 + 
+                            test_score * 0.20 + 
+                            practical_score * 0.10 + 
+                            exam_score * 0.50, 
+                            1
                         )
+                        grade = compute_grade(total_score)
+                        
+                        # Load current scores
+                        scores_df = pd.read_csv(scores_file)
+                        
+                        # Check if entry exists
+                        mask = (
+                            (scores_df["StudentName"].astype(str).str.lower() == student_name.lower()) &
+                            (scores_df["MatricNo"].astype(str).str.lower() == student_matric.lower()) &
+                            (scores_df["Week"].astype(str).str.lower() == week.lower())
+                        )
+                        
                         if mask.any():
-                            existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Total", "Grade"]] = [
-                                row["Assignment"], row["Test"], row["Practical"], row["Exam"], row["Total"], row["Grade"]
-                            ]
+                            # Update existing entry
+                            scores_df.loc[mask, [
+                                "Assignment", "Test", "Practical", "Exam", "Total", "Grade"
+                            ]] = [assignment_score, test_score, practical_score, exam_score, total_score, grade]
                         else:
+                            # Add new entry
                             new_row = {
-                                "StudentName": row["StudentName"],
-                                "MatricNo": row["MatricNo"],
-                                "Week": row["Week"],
-                                "Assignment": row["Assignment"],
-                                "Test": row["Test"],
-                                "Practical": row["Practical"],
-                                "Exam": row["Exam"],
-                                "Total": row["Total"],
-                                "Grade": row["Grade"]
+                                "StudentName": student_name.title(),
+                                "MatricNo": student_matric.upper(),
+                                "Week": week,
+                                "Assignment": assignment_score,
+                                "Test": test_score,
+                                "Practical": practical_score,
+                                "Exam": exam_score,
+                                "Total": total_score,
+                                "Grade": grade
                             }
-                            existing_df = pd.concat([existing_df, pd.DataFrame([new_row])], ignore_index=True)
-                    
-                    existing_df.to_csv(scores_file, index=False)
-                    st.success(f"✅ Successfully processed {len(uploaded_df)} grade records!")
-                    st.dataframe(existing_df, use_container_width=True)
-                else:
-                    st.error("❌ CSV must contain columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam")
-                    
-            except Exception as e:
-                st.error(f"❌ Error processing CSV: {e}")
+                            scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
+                        
+                        scores_df.to_csv(scores_file, index=False)
+                        st.success(f"✅ Grade saved for {student_name} ({student_matric}) - {week}")
 
-        # Display current grades
-        st.subheader("📊 Current Grades")
-        if os.path.exists(scores_file):
-            try:
-                scores_df = pd.read_csv(scores_file)
-                if not scores_df.empty:
-                    st.dataframe(scores_df, use_container_width=True)
+            # Option 2: CSV Upload for Bulk Grading
+            st.subheader("📁 Bulk Grade Upload (CSV)")
+            uploaded_csv = st.file_uploader(
+                "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam", 
+                type=["csv"],
+                key="grade_csv"
+            )
+            
+            if uploaded_csv is not None:
+                try:
+                    uploaded_df = pd.read_csv(uploaded_csv)
                     
-                    # Download option
-                    csv_data = scores_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Grades CSV",
-                        data=csv_data,
-                        file_name=f"{course_code}_grades.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                else:
-                    st.info("No grades recorded yet.")
-            except Exception as e:
-                st.error(f"Error loading grades: {e}")
-        else:
-            st.info("No grades file found yet.")
+                    # Validate required columns
+                    required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam"]
+                    if all(col in uploaded_df.columns for col in required_cols):
+                        # Calculate totals and grades
+                        uploaded_df["Total"] = (
+                            uploaded_df["Assignment"].fillna(0).astype(float) * 0.20 +
+                            uploaded_df["Test"].fillna(0).astype(float) * 0.20 +
+                            uploaded_df["Practical"].fillna(0).astype(float) * 0.10 +
+                            uploaded_df["Exam"].fillna(0).astype(float) * 0.50
+                        ).round(1)
+                        uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade)
+                        
+                        # Load current scores
+                        if os.path.exists(scores_file):
+                            existing_df = pd.read_csv(scores_file)
+                        else:
+                            existing_df = pd.DataFrame(columns=required_cols + ["Total", "Grade"])
+                        
+                        # Update or add each row
+                        for _, row in uploaded_df.iterrows():
+                            mask = (
+                                (existing_df["StudentName"].astype(str).str.lower() == str(row["StudentName"]).lower()) &
+                                (existing_df["MatricNo"].astype(str).str.lower() == str(row["MatricNo"]).lower()) &
+                                (existing_df["Week"].astype(str).str.lower() == str(row["Week"]).lower())
+                            )
+                            if mask.any():
+                                existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Total", "Grade"]] = [
+                                    row["Assignment"], row["Test"], row["Practical"], row["Exam"], row["Total"], row["Grade"]
+                                ]
+                            else:
+                                new_row = {
+                                    "StudentName": row["StudentName"],
+                                    "MatricNo": row["MatricNo"],
+                                    "Week": row["Week"],
+                                    "Assignment": row["Assignment"],
+                                    "Test": row["Test"],
+                                    "Practical": row["Practical"],
+                                    "Exam": row["Exam"],
+                                    "Total": row["Total"],
+                                    "Grade": row["Grade"]
+                                }
+                                existing_df = pd.concat([existing_df, pd.DataFrame([new_row])], ignore_index=True)
+                        
+                        existing_df.to_csv(scores_file, index=False)
+                        st.success(f"✅ Successfully processed {len(uploaded_df)} grade records!")
+                        st.dataframe(existing_df, use_container_width=True)
+                    else:
+                        st.error("❌ CSV must contain columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error processing CSV: {e}")
 
-        # ===============================================================
-        # 📂 VIEW STUDENT SUBMISSIONS
-        # ===============================================================
-        st.header("📂 View Student Submissions")
-        
-        upload_types = ["assignment", "drawing", "seminar"]
-        for upload_type in upload_types:
-            st.subheader(f"📄 {upload_type.capitalize()} Submissions")
-            upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, upload_type)
+            # Display current grades
+            st.subheader("📊 Current Grades")
+            if os.path.exists(scores_file):
+                try:
+                    scores_df = pd.read_csv(scores_file)
+                    if not scores_df.empty:
+                        st.dataframe(scores_df, use_container_width=True)
+                        
+                        # Download option
+                        csv_data = scores_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Grades CSV",
+                            data=csv_data,
+                            file_name=f"{course_code}_grades.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("No grades recorded yet.")
+                except Exception as e:
+                    st.error(f"Error loading grades: {e}")
+            else:
+                st.info("No grades file found yet.")
+
+        with tab8:
+            # ===============================================================
+            # 📂 VIEW STUDENT SUBMISSIONS
+            # ===============================================================
+            st.header("📂 View Student Submissions")
             
-            if not os.path.exists(upload_dir):
-                st.info(f"No {upload_type} submissions yet.")
-                continue
-            
-            files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
-            if not files:
-                st.info(f"No {upload_type} submissions yet.")
-                continue
-            
-            for file in files:
-                file_path = os.path.join(upload_dir, file)
-                unique_key = f"{course_code}_{upload_type}_{file}"
+            upload_types = ["assignment", "drawing", "seminar"]
+            for upload_type in upload_types:
+                st.subheader(f"📄 {upload_type.capitalize()} Submissions")
+                upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, upload_type)
                 
-                with st.expander(f"📎 {file}", expanded=False):
-                    col1, col2 = st.columns([3, 1])
+                if not os.path.exists(upload_dir):
+                    st.info(f"No {upload_type} submissions yet.")
+                    continue
+                
+                files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
+                if not files:
+                    st.info(f"No {upload_type} submissions yet.")
+                    continue
+                
+                for file in files:
+                    file_path = os.path.join(upload_dir, file)
+                    unique_key = f"{course_code}_{upload_type}_{file}"
                     
-                    with col1:
-                        st.write(f"**File:** {file}")
-                        try:
-                            file_size = os.path.getsize(file_path) / (1024 * 1024)
-                            st.write(f"**Size:** {file_size:.2f} MB")
-                            
-                            # Extract student info from filename
-                            parts = file.split('_')
-                            if len(parts) >= 2:
-                                st.write(f"**Student:** {parts[0]} ({parts[1]})")
-                            if len(parts) >= 3:
-                                st.write(f"**Week:** {parts[2]}")
+                    with st.expander(f"📎 {file}", expanded=False):
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            st.write(f"**File:** {file}")
+                            try:
+                                file_size = os.path.getsize(file_path) / (1024 * 1024)
+                                st.write(f"**Size:** {file_size:.2f} MB")
                                 
-                        except:
-                            st.write("**Size:** Unknown")
-                    
-                    with col2:
-                        try:
-                            with open(file_path, "rb") as fh:
-                                st.download_button(
-                                    label="⬇️ Download",
-                                    data=fh,
-                                    file_name=file,
-                                    mime="application/octet-stream",
-                                    key=f"{unique_key}_download"
-                                )
-                        except Exception:
-                            st.warning("⚠️ Cannot open file for download.")
+                                # Extract student info from filename
+                                parts = file.split('_')
+                                if len(parts) >= 2:
+                                    st.write(f"**Student:** {parts[0]} ({parts[1]})")
+                                if len(parts) >= 3:
+                                    st.write(f"**Week:** {parts[2]}")
+                                    
+                            except:
+                                st.write("**Size:** Unknown")
+                        
+                        with col2:
+                            try:
+                                with open(file_path, "rb") as fh:
+                                    st.download_button(
+                                        label="⬇️ Download",
+                                        data=fh,
+                                        file_name=file,
+                                        mime="application/octet-stream",
+                                        key=f"{unique_key}_download"
+                                    )
+                            except Exception:
+                                st.warning("⚠️ Cannot open file for download.")
 
         st.markdown("---")
         st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
