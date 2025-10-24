@@ -1931,15 +1931,15 @@ def student_view(course_code):
                                 success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
                                 if success:
                         # Update classwork score in main scores file
-                                update_classwork_score(course_code, student_name, student_matric, week, score)
+                                    update_classwork_score(course_code, student_name, student_matric, week, score)
                         
-                                st.balloons()
-                                st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
-                                st.rerun()
+                                    st.balloons()
+                                    st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
+                                    st.rerun()
+                                else:
+                                    st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
                             else:
-                                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
-                        else:
-                            st.info("No automated classwork assigned for this week yet.")
+                                st.info("No automated classwork assigned for this week yet.")
         
         # ===============================================================
         # 🎥 VIDEO LECTURES SECTION
@@ -2945,6 +2945,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
