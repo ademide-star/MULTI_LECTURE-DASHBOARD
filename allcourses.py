@@ -103,6 +103,142 @@ def ensure_directories():
 
 # Initialize directories
 ensure_directories()
+import streamlit as st
+import sqlite3
+import pandas as pd
+from datetime import datetime
+
+# Page configuration
+st.set_page_config(
+    page_title="Course Manager Pro",
+    page_icon="📚",
+    layout="wide"
+)
+
+# Hide Streamlit elements
+hide_style = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_style, unsafe_allow_html=True)
+
+# Database setup
+def init_db():
+    conn = sqlite3.connect('courses.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS weekly_courses
+        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+         week_name TEXT NOT NULL,
+         course_name TEXT NOT NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    ''')
+    conn.commit()
+    conn.close()
+
+def add_course_to_db(week_name, course_name):
+    conn = sqlite3.connect('courses.db')
+    c = conn.cursor()
+    c.execute('INSERT INTO weekly_courses (week_name, course_name) VALUES (?, ?)', 
+              (week_name, course_name))
+    conn.commit()
+    conn.close()
+
+def get_weeks_from_db():
+    conn = sqlite3.connect('courses.db')
+    c = conn.cursor()
+    c.execute('SELECT DISTINCT week_name FROM weekly_courses')
+    weeks = [row[0] for row in c.fetchall()]
+    conn.close()
+    return weeks
+
+def get_courses_by_week(week_name):
+    conn = sqlite3.connect('courses.db')
+    c = conn.cursor()
+    c.execute('SELECT course_name FROM weekly_courses WHERE week_name = ?', (week_name,))
+    courses = [row[0] for row in c.fetchall()]
+    conn.close()
+    return courses
+
+def main():
+    # Initialize database
+    init_db()
+    
+    st.title("📚 Persistent Course Manager")
+    
+    # Navigation
+    st.sidebar.title("Menu")
+    option = st.sidebar.selectbox("Choose Action", 
+                                 ["Add New Week", "View Courses", "Manage Data"])
+    
+    if option == "Add New Week":
+        add_new_week()
+    elif option == "View Courses":
+        view_courses()
+    elif option == "Manage Data":
+        manage_data()
+
+def add_new_week():
+    st.header("Add Courses for New Week")
+    
+    week_name = st.text_input("Week Identifier:")
+    courses_text = st.text_area("Courses (one per line):")
+    
+    if st.button("Save to Database"):
+        if week_name and courses_text:
+            courses_list = [course.strip() for course in courses_text.split('\n') if course.strip()]
+            
+            for course in courses_list:
+                add_course_to_db(week_name, course)
+            
+            st.success(f"Added {len(courses_list)} courses for {week_name}!")
+        else:
+            st.error("Please fill in both fields.")
+
+def view_courses():
+    st.header("Your Courses")
+    
+    weeks = get_weeks_from_db()
+    if not weeks:
+        st.info("No courses found. Add some courses first!")
+        return
+    
+    selected_week = st.selectbox("Select Week:", weeks)
+    
+    if selected_week:
+        courses = get_courses_by_week(selected_week)
+        st.subheader(f"Courses for {selected_week}")
+        
+        for i, course in enumerate(courses, 1):
+            st.write(f"✅ {course}")
+
+def manage_data():
+    st.header("Data Management")
+    
+    st.info("Your data is automatically saved in a local database.")
+    
+    # Show all data
+    conn = sqlite3.connect('courses.db')
+    df = pd.read_sql_query('SELECT week_name, course_name FROM weekly_courses', conn)
+    conn.close()
+    
+    if not df.empty:
+        st.subheader("All Courses Data")
+        st.dataframe(df)
+        
+        # Export option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="Download CSV",
+            data=csv,
+            file_name="courses_backup.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("No data available.")
 
 # ===============================================================
 # 🔧 HELPER FUNCTIONS
@@ -2147,5 +2283,6 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
 
