@@ -2289,7 +2289,7 @@ def admin_view(course_code):
                                 option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
                                 option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
                 
-                            correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D"], key=f"correct_answer_{week}")
+                            correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
                             options = {
                                 "A": option_a,
                                 "B": option_b, 
@@ -3120,6 +3120,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
