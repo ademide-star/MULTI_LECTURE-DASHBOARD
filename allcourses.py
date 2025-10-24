@@ -1936,10 +1936,10 @@ def student_view(course_code):
                                     st.balloons()
                                     st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
                                     st.rerun()
-                                else:
-                                    st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
-                            else:
-                                st.info("No automated classwork assigned for this week yet.")
+            else:
+                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
+        else:
+            st.info("No automated classwork assigned for this week yet.")
         
         # ===============================================================
         # 🎥 VIDEO LECTURES SECTION
@@ -2945,6 +2945,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
