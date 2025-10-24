@@ -1979,7 +1979,7 @@ def student_view(course_code):
     
                 if os.path.exists(classwork_file):
                     df = pd.read_csv(classwork_file)
-                        existing = df[
+                    existing = df[
                         (df['Name'] == student_name) & 
                         (df['Matric'] == student_matric) & 
                         (df['Week'] == week) &
@@ -3036,6 +3036,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
