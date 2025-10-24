@@ -2582,7 +2582,10 @@ def admin_view(course_code):
                         st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
                 except Exception as e:
                     st.error(f"Error in classwork auto-close: {e}")
-
+                    
+        with tab6:  # Classwork Control tab
+            show_classwork_control(course_code)
+            
         with tab7:
             # ===============================================================
             # 📝 AUTOMATED MCQ MANAGEMENT
@@ -3120,6 +3123,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
