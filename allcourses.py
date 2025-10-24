@@ -113,9 +113,25 @@ ensure_directories()
 # ===============================================================
 
 def init_course_db():
-    """Initialize SQLite database for course storage"""
+    """Initialize SQLite database for course storage with proper migration"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
+    
+    # Check if table exists and get its structure
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_courses'")
+    table_exists = c.fetchone() is not None
+    
+    if table_exists:
+        # Check if course_code column exists
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' not in columns:
+            # Add the missing course_code column
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
+            st.info("📊 Database updated: Added course_code column to existing table")
+    
+    # Create table with all required columns
     c.execute('''
         CREATE TABLE IF NOT EXISTS weekly_courses
         (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -163,11 +179,58 @@ def delete_week_from_db(week_name):
     conn.close()
 
 def get_all_courses_from_db():
-    """Get all courses from database"""
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    df = pd.read_sql_query('SELECT week_name, course_name, course_code, created_at FROM weekly_courses ORDER BY created_at', conn)
-    conn.close()
-    return df
+    """Get all courses from database with proper error handling"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        
+        # Check if course_code column exists
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' in columns:
+            df = pd.read_sql_query('SELECT week_name, course_name, course_code, created_at FROM weekly_courses ORDER BY created_at', conn)
+        else:
+            # Fallback for older database structure
+            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
+            df['course_code'] = 'UNKNOWN'  # Add placeholder column
+        
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+def migrate_old_database():
+    """Migrate old database structure to new one if needed"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        c = conn.cursor()
+        
+        # Check if we need to migrate
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' not in columns:
+            st.info("🔄 Migrating database to new structure...")
+            
+            # Add the new column
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
+            
+            # Update existing records with course codes
+            for course_name, course_code in COURSES.items():
+                c.execute('UPDATE weekly_courses SET course_code = ? WHERE course_name = ?', (course_code, course_name))
+            
+            # Set unknown for any remaining
+            c.execute("UPDATE weekly_courses SET course_code = 'UNKNOWN' WHERE course_code IS NULL")
+            
+            conn.commit()
+            st.success("✅ Database migration completed!")
+        
+        conn.close()
+    except Exception as e:
+        st.error(f"Migration error: {e}")
+
 
 # ===============================================================
 # 🔧 HELPER FUNCTIONS
@@ -572,8 +635,9 @@ def show_course_manager():
     """Course management integrated into admin view"""
     st.header("📚 Course Manager")
     
-    # Initialize database
+    # Initialize and migrate database
     init_course_db()
+    migrate_old_database()
     
     # Create tabs for course management
     cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Courses", "📋 View Courses", "⚙️ Manage Data"])
@@ -594,14 +658,22 @@ def show_course_manager():
             if st.button("💾 Save Courses to Database", type="primary", key="save_courses_btn"):
                 if week_name and course_input:
                     courses_list = [course.strip() for course in course_input.split('\n') if course.strip()]
+                    saved_count = 0
                     
                     # Add each course to database
                     for course in courses_list:
                         course_code = COURSES.get(course, "UNKNOWN")
-                        add_course_to_db(week_name, course, course_code)
+                        try:
+                            add_course_to_db(week_name, course, course_code)
+                            saved_count += 1
+                        except Exception as e:
+                            st.error(f"Error saving {course}: {e}")
                     
-                    st.success(f"✅ Successfully added {len(courses_list)} courses for {week_name}!")
-                    st.balloons()
+                    if saved_count > 0:
+                        st.success(f"✅ Successfully added {saved_count} courses for {week_name}!")
+                        st.balloons()
+                    else:
+                        st.error("❌ No courses were saved. Please check the course names.")
                 else:
                     st.error("❌ Please provide both week name and courses.")
         
@@ -671,7 +743,7 @@ def show_course_manager():
                 
         except Exception as e:
             st.error(f"❌ Error accessing database: {e}")
-
+            
 # ===============================================================
 # 📊 SCORES MANAGEMENT
 # ===============================================================
@@ -2386,4 +2458,5 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
