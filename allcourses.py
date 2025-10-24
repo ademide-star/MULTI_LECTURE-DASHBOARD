@@ -2266,107 +2266,107 @@ def admin_view(course_code):
                             st.error(f"❌ Error saving PDF: {str(e)}")
 
     # Automated MCQ Section for this week
-                st.markdown("---")
-                st.subheader("🧩 Automated MCQ Questions")
+                    st.markdown("---")
+                    st.subheader("🧩 Automated MCQ Questions")
     
     # Load existing MCQ questions for this week
-                existing_questions = load_mcq_questions(course_code, week)
+                    existing_questions = load_mcq_questions(course_code, week)
     
-                with st.expander("Create Automated MCQ/Gap-Filling Questions", expanded=False):
-                    st.write("**Add New Question:**")
+                    with st.expander("Create Automated MCQ/Gap-Filling Questions", expanded=False):
+                        st.write("**Add New Question:**")
         
-                    with st.form(f"mcq_creation_form_{week}"):
-                        question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key=f"question_type_{week}")
-                        question_text = st.text_area("Question Text", placeholder="Enter your question here...", key=f"question_text_{week}")
+                        with st.form(f"mcq_creation_form_{week}"):
+                            question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key=f"question_type_{week}")
+                            question_text = st.text_area("Question Text", placeholder="Enter your question here...", key=f"question_text_{week}")
             
-                        if question_type == "Multiple Choice (MCQ)":
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
-                                option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
-                                option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
-                            with col2:
-                                option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
-                                option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
+                            if question_type == "Multiple Choice (MCQ)":
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
+                                    option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
+                                    option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
+                                with col2:
+                                    option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
+                                    option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
                 
-                            correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
-                            options = {
-                                "A": option_a,
-                                "B": option_b, 
-                                "C": option_c,
-                                "D": option_d,
-                                "E": option_e
+                                correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
+                                options = {
+                                    "A": option_a,
+                                    "B": option_b, 
+                                    "C": option_c,
+                                    "D": option_d,
+                                    "E": option_e
                 }
                 
-                        else:  # Gap Filling
-                            correct_answer = st.text_input("Correct Answer(s)", 
-                                placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
-                                key=f"gap_answer_{week}")
-                            st.caption("💡 Use | to separate multiple acceptable answers")
-                            options = {}
+                            else:  # Gap Filling
+                                correct_answer = st.text_input("Correct Answer(s)", 
+                                                placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
+                                                key=f"gap_answer_{week}")
+                                st.caption("💡 Use | to separate multiple acceptable answers")
+                                options = {}
             
-                        add_question = st.form_submit_button("➕ Add Question")
+                            add_question = st.form_submit_button("➕ Add Question")
             
-                        if add_question and question_text:
-                            new_question = {
-                                "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
-                                "question": question_text,
-                                "options": options,
-                                "correct_answer": correct_answer
+                            if add_question and question_text:
+                                new_question = {
+                                    "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
+                                    "question": question_text,
+                                    "options": options,
+                                    "correct_answer": correct_answer
                 }
                 
-                            existing_questions.append(new_question)
-                            if save_mcq_questions(course_code, week, existing_questions):
-                                st.success("✅ Question added successfully!")
-                                st.rerun()
+                                existing_questions.append(new_question)
+                                if save_mcq_questions(course_code, week, existing_questions):
+                                    st.success("✅ Question added successfully!")
+                                    st.rerun()
     
     # Display existing MCQ questions for this week
-                if existing_questions:
-                    st.write(f"**Existing Questions for {week}:**")
-                    for i, question in enumerate(existing_questions):
-                        with st.expander(f"Question {i+1}: {question['question'][:50]}...", expanded=False):
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
-                                st.write(f"**Type:** {question['type'].replace('_', ' ').title()}")
-                                st.write(f"**Question:** {question['question']}")
+                    if existing_questions:
+                        st.write(f"**Existing Questions for {week}:**")
+                        for i, question in enumerate(existing_questions):
+                            with st.expander(f"Question {i+1}: {question['question'][:50]}...", expanded=False):
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    st.write(f"**Type:** {question['type'].replace('_', ' ').title()}")
+                                    st.write(f"**Question:** {question['question']}")
                     
-                                if question['type'] == 'mcq':
-                                    st.write("**Options:**")
-                                    for opt, text in question['options'].items():
-                                        st.write(f"{opt}: {text}")
+                                    if question['type'] == 'mcq':
+                                        st.write("**Options:**")
+                                        for opt, text in question['options'].items():
+                                            st.write(f"{opt}: {text}")
                     
-                                        st.write(f"**Correct Answer:** {question['correct_answer']}")
+                                            st.write(f"**Correct Answer:** {question['correct_answer']}")
                 
-                            with col2:
-                                if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                                    existing_questions.pop(i)
-                                    save_mcq_questions(course_code, week, existing_questions)
-                                    st.success("✅ Question deleted!")
-                                    st.rerun()
+                                with col2:
+                                    if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
+                                        existing_questions.pop(i)
+                                        save_mcq_questions(course_code, week, existing_questions)
+                                        st.success("✅ Question deleted!")
+                                        st.rerun()
         
         # Clear all questions for this week
-                    if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-                        if save_mcq_questions(course_code, week, []):
-                            st.success("✅ All questions cleared!")
-                            st.rerun()
-                else:
-                    st.info("No MCQ questions added for this week yet.")
+                        if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
+                            if save_mcq_questions(course_code, week, []):
+                                st.success("✅ All questions cleared!")
+                                st.rerun()
+                    else:
+                        st.info("No MCQ questions added for this week yet.")
 
     # Save button for lecture materials
-                st.markdown("---")
-                if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
-                    try:
-                        lectures_df.at[row_idx, "Topic"] = topic
-                        lectures_df.at[row_idx, "Brief"] = brief
-                        lectures_df.at[row_idx, "Assignment"] = assignment
+                    st.markdown("---")
+                    if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
+                        try:
+                            lectures_df.at[row_idx, "Topic"] = topic
+                            lectures_df.at[row_idx, "Brief"] = brief
+                            lectures_df.at[row_idx, "Assignment"] = assignment
             
-                        lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                        st.session_state["lectures_df"] = lectures_df
-                        st.success("🎉 All lecture materials saved successfully!")
-                        st.balloons()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Error saving to file: {e}")
+                            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+                            st.session_state["lectures_df"] = lectures_df
+                            st.success("🎉 All lecture materials saved successfully!")
+                            st.balloons()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error saving to file: {e}")
         with tab3:
             # ===============================================================
             # 🎥 VIDEO MANAGEMENT
@@ -3123,6 +3123,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
