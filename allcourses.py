@@ -2294,7 +2294,7 @@ def admin_view(course_code):
                                 "A": option_a,
                                 "B": option_b, 
                                 "C": option_c,
-                                "D": option_d
+                                "D": option_d,
                                 "E": option_e
                 }
                 
@@ -3120,6 +3120,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
