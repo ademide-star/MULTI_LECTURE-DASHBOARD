@@ -107,6 +107,144 @@ def ensure_directories():
 
 # Initialize directories
 ensure_directories()
+# ===============================================================
+# 🎯 AUTOMATED MCQ & GAP-FILLING SYSTEM
+# ===============================================================
+
+def get_mcq_file(course_code, week):
+    """Get the MCQ questions file path for a specific course and week"""
+    safe_week = week.replace(" ", "_").replace(":", "")
+    return os.path.join(PERSISTENT_DATA_DIR, "mcq_questions", f"{course_code}_{safe_week}_mcq.json")
+
+def save_mcq_questions(course_code, week, questions):
+    """Save MCQ questions to JSON file"""
+    try:
+        mcq_file = get_mcq_file(course_code, week)
+        os.makedirs(os.path.dirname(mcq_file), exist_ok=True)
+        
+        with open(mcq_file, 'w') as f:
+            json.dump(questions, f, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Error saving MCQ questions: {e}")
+        return False
+
+def load_mcq_questions(course_code, week):
+    """Load MCQ questions from JSON file"""
+    try:
+        mcq_file = get_mcq_file(course_code, week)
+        if os.path.exists(mcq_file):
+            with open(mcq_file, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        st.error(f"Error loading MCQ questions: {e}")
+        return []
+
+def auto_grade_mcq_submission(questions, answers):
+    """Automatically grade MCQ submissions and return score"""
+    try:
+        total_questions = len(questions)
+        correct_answers = 0
+        
+        for i, question in enumerate(questions):
+            if i < len(answers):
+                user_answer = answers[i].strip().lower()
+                correct_answer = question.get('correct_answer', '').strip().lower()
+                
+                # For multiple choice
+                if question['type'] == 'mcq':
+                    if user_answer == correct_answer:
+                        correct_answers += 1
+                
+                # For gap filling - allow partial matches
+                elif question['type'] == 'gap_fill':
+                    # Split correct answers if multiple are acceptable
+                    correct_options = [opt.strip().lower() for opt in correct_answer.split('|')]
+                    if user_answer in correct_options:
+                        correct_answers += 1
+        
+        score_percentage = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        return round(score_percentage, 1), correct_answers, total_questions
+        
+    except Exception as e:
+        st.error(f"Error in auto-grading: {e}")
+        return 0, 0, 0
+
+def save_mcq_submission(course_code, week, student_name, student_matric, answers, score):
+    """Save MCQ submission with automatic grading"""
+    try:
+        classwork_file = get_file(course_code, "classwork")
+        
+        submission_data = {
+            'Name': student_name,
+            'Matric': student_matric,
+            'Week': week,
+            'Type': 'MCQ',
+            'Answers': json.dumps(answers),
+            'Score': score,
+            'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        if os.path.exists(classwork_file):
+            df = pd.read_csv(classwork_file)
+            # Check for existing submission
+            existing = df[
+                (df['Name'] == student_name) & 
+                (df['Matric'] == student_matric) & 
+                (df['Week'] == week) &
+                (df['Type'] == 'MCQ')
+            ]
+            if not existing.empty:
+                st.warning("⚠️ You have already submitted MCQ for this week.")
+                return False
+            
+            df = pd.concat([df, pd.DataFrame([submission_data])], ignore_index=True)
+        else:
+            # Create new dataframe with proper columns
+            df = pd.DataFrame([submission_data])
+        
+        df.to_csv(classwork_file, index=False)
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error saving MCQ submission: {e}")
+        return False
+
+def display_mcq_questions(questions):
+    """Display MCQ questions to students"""
+    answers = []
+    
+    for i, question in enumerate(questions):
+        st.markdown(f'<div class="mcq-question">', unsafe_allow_html=True)
+        
+        if question['type'] == 'mcq':
+            st.write(f"**Q{i+1}: {question['question']}**")
+            options = question['options']
+            
+            # Display options
+            selected_option = st.radio(
+                f"Select your answer for Q{i+1}:",
+                options=options,
+                key=f"mcq_{i}",
+                index=None
+            )
+            answers.append(selected_option if selected_option else "")
+            
+        elif question['type'] == 'gap_fill':
+            st.write(f"**Q{i+1}: {question['question']}**")
+            st.markdown('<div class="gap-filling">', unsafe_allow_html=True)
+            user_answer = st.text_input(
+                f"Your answer for Q{i+1}:",
+                placeholder="Type your answer here...",
+                key=f"gap_{i}"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            answers.append(user_answer if user_answer else "")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    return answers
 
 # ===============================================================
 # 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
@@ -788,7 +926,60 @@ def compute_grade(total_score):
         return "F"
     except:
         return ""
-
+        
+def calculate_final_grade(student_scores):
+    """Calculate final grade after 15 weeks including exam"""
+    if student_scores.empty:
+        return None, None, None, None, None, None
+    
+    try:
+        # Filter out weeks without scores and separate exam
+        valid_scores = student_scores[
+            (student_scores['Assignment'] > 0) | 
+            (student_scores['Test'] > 0) | 
+            (student_scores['Practical'] > 0) |
+            (student_scores['Classwork'] > 0)
+        ]
+        
+        if valid_scores.empty:
+            return None, None, None, None, None, None
+        
+        # Calculate averages for continuous assessment (Weeks 1-15)
+        ca_scores = valid_scores[valid_scores['Week'] != 'Exam']
+        
+        if ca_scores.empty:
+            assignment_avg = test_avg = practical_avg = classwork_avg = 0
+        else:
+            assignment_avg = ca_scores['Assignment'].mean()
+            test_avg = ca_scores['Test'].mean()
+            practical_avg = ca_scores['Practical'].mean()
+            classwork_avg = ca_scores['Classwork'].mean()
+        
+        # Get exam score
+        exam_scores = valid_scores[valid_scores['Week'] == 'Exam']
+        if exam_scores.empty:
+            exam_score = 0
+        else:
+            exam_score = exam_scores['Exam'].iloc[0]
+        
+        # Calculate final total with weights
+        final_total = round(
+            assignment_avg * 0.08 +      # 8%
+            test_avg * 0.08 +            # 8%
+            practical_avg * 0.05 +       # 5%
+            classwork_avg * 0.09 +       # 9%
+            exam_score * 0.70,           # 70%
+            1
+        )
+        
+        final_grade = compute_grade(final_total)
+        
+        return final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score
+        
+    except Exception as e:
+        st.error(f"Error calculating final grade: {e}")
+        return None, None, None, None, None, None, None
+        
 def get_student_activity_summary(course_code, student_name, student_matric):
     """Get comprehensive activity summary for student"""
     summary = {
@@ -1485,51 +1676,77 @@ def student_view(course_code):
             student_scores = load_student_scores(course_code, student_name, student_matric)
             
             if not student_scores.empty:
-                # Display overall performance
-                st.subheader("🎯 Overall Performance")
-                
-                col1, col2, col3, col4, col5 = st.columns(5)
-                
-                with col1:
-                    avg_assignment = student_scores["Assignment"].mean()
-                    st.metric("Avg Assignment", f"{avg_assignment:.1f}%")
-                
-                with col2:
-                    avg_test = student_scores["Test"].mean()
-                    st.metric("Avg Test", f"{avg_test:.1f}%")
-                
-                with col3:
-                    avg_practical = student_scores["Practical"].mean()
-                    st.metric("Avg Practical", f"{avg_practical:.1f}%")
-                
-                with col4:
-                    avg_exam = student_scores["Exam"].mean()
-                    st.metric("Avg Exam", f"{avg_exam:.1f}%")
-                
-                with col5:
-                    avg_classwork = student_scores["Classwork"].mean()
-                    st.metric("Avg Classwork", f"{avg_classwork:.1f}%")
-                
-                # Overall average
-                overall_avg = student_scores["Total"].mean()
-                st.metric("📈 Overall Average", f"{overall_avg:.1f}%")
-                
-                # Detailed scores table
-                st.subheader("📋 Detailed Scores by Week")
+                # Display weekly scores
+                st.subheader("📋 Weekly Scores")
                 display_columns = ["Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]
                 display_df = student_scores[display_columns].copy()
                 
                 # Format percentages
                 for col in ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total"]:
-                    display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+                    display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x != 0 else "N/A")
                 
                 st.dataframe(display_df, use_container_width=True)
+                
+                # FINAL GRADE CALCULATION AFTER 15 WEEKS + EXAM
+                st.subheader("🎓 Final Grade Calculation")
+                
+                final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score = calculate_final_grade(student_scores)
+                
+                if final_total is not None:
+                    st.info("""
+                    **Grading Breakdown:**
+                    - Continuous Assessment (15 weeks average): 30%
+                      - Assignment (8%): Average of 15 weeks
+                      - Test (8%): Average of 15 weeks  
+                      - Practical (5%): Average of 15 weeks
+                      - Classwork (9%): Average of 15 weeks
+                    - Exam (After 15 weeks): 70%
+                    """)
+                    
+                    # Display the calculation breakdown
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.metric("📝 Assignment Average", f"{assignment_avg:.1f}%")
+                        st.metric("📊 Test Average", f"{test_avg:.1f}%")
+                        st.metric("🔬 Practical Average", f"{practical_avg:.1f}%")
+                        st.metric("🧩 Classwork Average", f"{classwork_avg:.1f}%")
+                    
+                    with col2:
+                        st.metric("📚 Exam Score", f"{exam_score:.1f}%")
+                        st.metric("📈 Continuous Assessment (30%)", f"{(assignment_avg*0.08 + test_avg*0.08 + practical_avg*0.05 + classwork_avg*0.09):.1f}%")
+                        st.metric("🎯 Exam Contribution (70%)", f"{(exam_score * 0.70):.1f}%")
+                    
+                    # Final result
+                    st.success(f"## 🎉 Final Grade: {final_total:.1f}% - {final_grade}")
+                    
+                    # Progress bars for visualization
+                    st.subheader("📊 Grade Breakdown")
+                    
+                    ca_total = assignment_avg*0.08 + test_avg*0.08 + practical_avg*0.05 + classwork_avg*0.09
+                    exam_contribution = exam_score * 0.70
+                    
+                    st.write("**Continuous Assessment (30%):**")
+                    st.progress(ca_total / 30)
+                    st.write(f"Assignment: {assignment_avg:.1f}% × 8% = {assignment_avg*0.08:.1f}%")
+                    st.write(f"Test: {test_avg:.1f}% × 8% = {test_avg*0.08:.1f}%") 
+                    st.write(f"Practical: {practical_avg:.1f}% × 5% = {practical_avg*0.05:.1f}%")
+                    st.write(f"Classwork: {classwork_avg:.1f}% × 9% = {classwork_avg*0.09:.1f}%")
+                    
+                    st.write("**Exam (70%):**")
+                    st.progress(exam_contribution / 70)
+                    st.write(f"Exam: {exam_score:.1f}% × 70% = {exam_contribution:.1f}%")
+                    
+                else:
+                    st.info("📊 Complete your 15 weeks of continuous assessment and exam to see your final grade.")
                 
             else:
                 st.info("📊 No scores recorded yet for your account. Scores will appear here once your lecturer grades your work.")
         
         else:
             st.warning("⚠️ Please set your identity above to view your scores.")
+            
+       
         # ===============================================================
         # 📈 ACTIVITY SUMMARY SECTION
         # ===============================================================
@@ -1800,9 +2017,6 @@ def student_view(course_code):
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
-# ===============================================================
-# 👩‍🏫 ADMIN VIEW  
-# ===============================================================
 
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
@@ -1827,13 +2041,14 @@ def admin_view(course_code):
         st.title("👩‍🏫 Admin Dashboard")
         
         # Create tabs for better organization - INCLUDING COURSE MANAGER
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10= st.tabs([
             "📚 Course Manager",  # NEW TAB ADDED
             "📖 Lecture Management", 
             "🎥 Video Management", 
             "🕒 Attendance Control",
             "📊 Attendance Records",
             "🧩 Classwork Control", 
+            "📝 MCQ Management",  # NEW TAB FOR MCQ
             "📝 Classwork Submissions",
             "📝 Grading System",
             "📂 Student Submissions"
@@ -2128,17 +2343,14 @@ def admin_view(course_code):
             
             classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_week")
             
-            # Get current classwork status
             current_classwork_status = get_classwork_status(course_code, classwork_week)
             is_classwork_open = current_classwork_status.get("is_open", False)
             
-            # Display current status
             if is_classwork_open:
                 st.success(f"✅ Classwork is CURRENTLY OPEN for {course_code} - {classwork_week}")
             else:
                 st.warning(f"🚫 Classwork is CURRENTLY CLOSED for {course_code} - {classwork_week}")
             
-            # Classwork control buttons
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary"):
@@ -2153,12 +2365,11 @@ def admin_view(course_code):
                         st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
                         st.rerun()
             
-            # Auto-close functionality for classwork
             if is_classwork_open and current_classwork_status.get("open_time"):
                 try:
                     open_time = datetime.fromisoformat(current_classwork_status["open_time"])
                     elapsed = (datetime.now() - open_time).total_seconds()
-                    remaining = max(0, 1200 - elapsed)  # 20 minutes
+                    remaining = max(0, 1200 - elapsed)
                     
                     if remaining <= 0:
                         set_classwork_status(course_code, classwork_week, False)
@@ -2173,46 +2384,188 @@ def admin_view(course_code):
 
         with tab7:
             # ===============================================================
-            # 📝 CLASSWORK SUBMISSIONS
+            # 📝 AUTOMATED MCQ MANAGEMENT
             # ===============================================================
-            st.header("📝 Classwork Submissions")
+            st.header("🧩 Automated MCQ & Gap-Filling Management")
             
-            # Create tabs for different viewing options
-            cw_tab1, cw_tab2 = st.tabs([
-                "📅 Weekly Submissions", 
-                "📚 All Submissions"
-            ])
+            mcq_week = st.selectbox("Select Week for MCQ", [f"Week {i}" for i in range(1, 16)], key="mcq_week")
             
-            with cw_tab1:
-                st.subheader("Weekly Classwork Submissions")
-                cw_week = st.selectbox(
-                    "Select Week to View", 
-                    [f"Week {i}" for i in range(1, 16)], 
-                    key=f"{course_code}_cw_week"
-                )
-                view_classwork_submissions(course_code, cw_week)
+            st.subheader("📝 Create Automated Questions")
             
-            with cw_tab2:
-                st.subheader("All Classwork Submissions")
-                view_all_classwork_submissions(course_code)
+            # Load existing questions
+            existing_questions = load_mcq_questions(course_code, mcq_week)
+            
+            with st.form("mcq_creation_form"):
+                st.write("**Add New Question:**")
+                
+                question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key="question_type")
+                question_text = st.text_area("Question Text", placeholder="Enter your question here...")
+                
+                if question_type == "Multiple Choice (MCQ)":
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        option_a = st.text_input("Option A", placeholder="First option")
+                        option_b = st.text_input("Option B", placeholder="Second option")
+                    with col2:
+                        option_c = st.text_input("Option C", placeholder="Third option")
+                        option_d = st.text_input("Option D", placeholder="Fourth option")
+                    
+                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D"])
+                    options = {
+                        "A": option_a,
+                        "B": option_b, 
+                        "C": option_c,
+                        "D": option_d
+                    }
+                    
+                else:  # Gap Filling
+                    correct_answer = st.text_input("Correct Answer(s)", 
+                                                 placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)")
+                    st.caption("💡 Use | to separate multiple acceptable answers")
+                    options = {}
+                
+                add_question = st.form_submit_button("➕ Add Question")
+                
+                if add_question and question_text:
+                    new_question = {
+                        "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
+                        "question": question_text,
+                        "options": options,
+                        "correct_answer": correct_answer
+                    }
+                    
+                    existing_questions.append(new_question)
+                    if save_mcq_questions(course_code, mcq_week, existing_questions):
+                        st.success("✅ Question added successfully!")
+                        st.rerun()
+            
+            # Display existing questions
+            st.subheader("📋 Existing Questions")
+            if existing_questions:
+                for i, question in enumerate(existing_questions):
+                    with st.expander(f"Question {i+1}: {question['question'][:50]}...", expanded=False):
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.write(f"**Type:** {question['type'].replace('_', ' ').title()}")
+                            st.write(f"**Question:** {question['question']}")
+                            
+                            if question['type'] == 'mcq':
+                                st.write("**Options:**")
+                                for opt, text in question['options'].items():
+                                    st.write(f"{opt}: {text}")
+                            
+                            st.write(f"**Correct Answer:** {question['correct_answer']}")
+                        
+                        with col2:
+                            if st.button("🗑️ Delete", key=f"delete_q_{i}"):
+                                existing_questions.pop(i)
+                                save_mcq_questions(course_code, mcq_week, existing_questions)
+                                st.success("✅ Question deleted!")
+                                st.rerun()
+                
+                # Clear all questions
+                if st.button("🚨 Clear All Questions", type="secondary"):
+                    if save_mcq_questions(course_code, mcq_week, []):
+                        st.success("✅ All questions cleared!")
+                        st.rerun()
+            else:
+                st.info("No questions added yet. Create questions using the form above.")
+            
+            # Preview for students
+            st.subheader("👁️ Student Preview")
+            if existing_questions:
+                st.info("This is how students will see the questions:")
+                display_mcq_questions(existing_questions)
+            else:
+                st.warning("No questions to preview. Add questions first.")
 
         with tab8:
             # ===============================================================
-            # 📊 GRADING SYSTEM
+            # 📝 CLASSWORK SUBMISSIONS (INCLUDING MCQ)
             # ===============================================================
-             # ===============================================================
-            # 📝 GRADING SYSTEM WITH UPDATED WEIGHTS
+            st.header("📝 Classwork Submissions")
+            
+            cw_tab1, cw_tab2 = st.tabs(["📅 Weekly Submissions", "📚 All Submissions"])
+            
+            with cw_tab1:
+                st.subheader("Weekly Classwork Submissions")
+                cw_week = st.selectbox("Select Week to View", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_cw_week_view")
+                
+                try:
+                    classwork_file = get_file(course_code, "classwork")
+                    
+                    if not os.path.exists(classwork_file):
+                        st.warning(f"No classwork submissions found for {course_code} - {cw_week}")
+                    else:
+                        df = pd.read_csv(classwork_file)
+                        
+                        if df.empty:
+                            st.warning(f"No classwork submissions found for {course_code} - {cw_week}")
+                        else:
+                            week_submissions = df[df['Week'] == cw_week]
+                            
+                            if week_submissions.empty:
+                                st.warning(f"No classwork submissions found for {course_code} - {cw_week}")
+                            else:
+                                st.success(f"📝 Classwork Submissions for {course_code} - {cw_week}")
+                                
+                                # Separate MCQ and text submissions
+                                mcq_submissions = week_submissions[week_submissions['Type'] == 'MCQ']
+                                text_submissions = week_submissions[week_submissions['Type'] != 'MCQ']
+                                
+                                if not mcq_submissions.empty:
+                                    st.subheader("🧩 MCQ Submissions (Auto-graded)")
+                                    for idx, row in mcq_submissions.iterrows():
+                                        with st.expander(f"🎯 {row['Name']} ({row['Matric']}) - Score: {row['Score']}%", expanded=False):
+                                            st.write(f"**Student:** {row['Name']} ({row['Matric']})")
+                                            st.write(f"**Score:** {row['Score']}%")
+                                            st.write(f"**Submitted:** {row['Timestamp']}")
+                                
+                                if not text_submissions.empty:
+                                    st.subheader("📝 Text Submissions")
+                                    for idx, row in text_submissions.iterrows():
+                                        with st.expander(f"📄 {row['Name']} ({row['Matric']})", expanded=False):
+                                            st.write(f"**Student:** {row['Name']} ({row['Matric']})")
+                                            st.write(f"**Submitted:** {row['Timestamp']}")
+                                            try:
+                                                answers = json.loads(row['Answers'])
+                                                st.write("**Answers:**")
+                                                for i, answer in enumerate(answers):
+                                                    if answer.strip():
+                                                        st.write(f"**Q{i+1}:** {answer}")
+                                                        st.divider()
+                                            except:
+                                                st.write("**Answers:** Unable to parse answers")
+                                
+                                # Download option
+                                csv_data = week_submissions.to_csv(index=False)
+                                st.download_button(
+                                    label="📥 Download Classwork Submissions",
+                                    data=csv_data,
+                                    file_name=f"classwork_{course_code}_{cw_week.replace(' ', '')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                                
+                except Exception as e:
+                    st.error(f"Error loading classwork submissions: {e}")
+
+
+        with tab9:
+              # ===============================================================
+            # 📝 GRADING SYSTEM WITH FINAL GRADE CALCULATION
             # ===============================================================
             st.header("📝 Grading System")
             
             # Display grading weights
             st.info("""
-            **Grading Weights:**
-            - Exam: 70%
-            - Assignment: 8% 
-            - Practical: 5%
-            - Test: 8%
-            - Classwork: 9%
+            **Grading Weights (After 15 Weeks + Exam):**
+            - Continuous Assessment (15 weeks average): 30%
+              - Assignment: 8% 
+              - Test: 8%
+              - Practical: 5%
+              - Classwork: 9%
+            - Exam (After 15 weeks): 70%
             """)
             
             # Ensure scores file exists with proper structure
@@ -2225,7 +2578,7 @@ def admin_view(course_code):
                 col1, col2 = st.columns(2)
                 with col1:
                     student_name = st.text_input("Student Name", key="grade_name")
-                    week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)], key="grade_week")
+                    week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)] + ["Exam"], key="grade_week")
                     assignment_score = st.number_input("Assignment Score (0-100)", min_value=0, max_value=100, value=0, key="assignment_score")
                     test_score = st.number_input("Test Score (0-100)", min_value=0, max_value=100, value=0, key="test_score")
                 with col2:
@@ -2240,16 +2593,20 @@ def admin_view(course_code):
                     if not student_name or not student_matric:
                         st.error("Please enter student name and matric number.")
                     else:
-                        # Calculate total with updated weights
-                        total_score = round(
-                            assignment_score * 0.08 +      # 8%
-                            test_score * 0.08 +            # 8%
-                            practical_score * 0.05 +       # 5%
-                            exam_score * 0.70 +           # 70%
-                            classwork_score * 0.09,       # 9%
-                            1
-                        )
-                        grade = compute_grade(total_score)
+                        # For weekly scores, calculate weekly total
+                        if week != "Exam":
+                            weekly_total = round(
+                                assignment_score * 0.08 + 
+                                test_score * 0.08 + 
+                                practical_score * 0.05 + 
+                                classwork_score * 0.09, 
+                                1
+                            )
+                            weekly_grade = compute_grade(weekly_total)
+                        else:
+                            # For exam, we don't calculate weekly total
+                            weekly_total = 0
+                            weekly_grade = ""
                         
                         # Load current scores
                         scores_df = pd.read_csv(scores_file)
@@ -2265,7 +2622,7 @@ def admin_view(course_code):
                             # Update existing entry
                             scores_df.loc[mask, [
                                 "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"
-                            ]] = [assignment_score, test_score, practical_score, exam_score, classwork_score, total_score, grade]
+                            ]] = [assignment_score, test_score, practical_score, exam_score, classwork_score, weekly_total, weekly_grade]
                         else:
                             # Add new entry
                             new_row = {
@@ -2277,14 +2634,13 @@ def admin_view(course_code):
                                 "Practical": practical_score,
                                 "Exam": exam_score,
                                 "Classwork": classwork_score,
-                                "Total": total_score,
-                                "Grade": grade
+                                "Total": weekly_total,
+                                "Grade": weekly_grade
                             }
                             scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
                         
                         scores_df.to_csv(scores_file, index=False)
                         st.success(f"✅ Grade saved for {student_name} ({student_matric}) - {week}")
-                        st.info(f"**Total Score:** {total_score}% | **Grade:** {grade}")
 
             # Option 2: CSV Upload for Bulk Grading
             st.subheader("📁 Bulk Grade Upload (CSV)")
@@ -2301,14 +2657,19 @@ def admin_view(course_code):
                     # Validate required columns
                     required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Classwork"]
                     if all(col in uploaded_df.columns for col in required_cols):
-                        # Calculate totals with updated weights
-                        uploaded_df["Total"] = (
-                            uploaded_df["Assignment"].fillna(0).astype(float) * 0.08 +
-                            uploaded_df["Test"].fillna(0).astype(float) * 0.08 +
-                            uploaded_df["Practical"].fillna(0).astype(float) * 0.05 +
-                            uploaded_df["Exam"].fillna(0).astype(float) * 0.70 +
-                            uploaded_df["Classwork"].fillna(0).astype(float) * 0.09
-                        ).round(1)
+                        # Calculate totals based on week type
+                        def calculate_row_total(row):
+                            if row['Week'] != 'Exam':
+                                return round(
+                                    row['Assignment'] * 0.08 + 
+                                    row['Test'] * 0.08 + 
+                                    row['Practical'] * 0.05 + 
+                                    row['Classwork'] * 0.09, 
+                                    1
+                                )
+                            return 0
+                        
+                        uploaded_df["Total"] = uploaded_df.apply(calculate_row_total, axis=1)
                         uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade)
                         
                         # Load current scores
@@ -2353,23 +2714,73 @@ def admin_view(course_code):
                 except Exception as e:
                     st.error(f"❌ Error processing CSV: {e}")
 
-            # Display current grades
-            st.subheader("📊 Current Grades")
+            # Display current grades with final calculation
+            st.subheader("📊 Current Grades & Final Calculations")
             if os.path.exists(scores_file):
                 try:
                     scores_df = pd.read_csv(scores_file)
                     if not scores_df.empty:
+                        # Show individual scores
                         st.dataframe(scores_df, use_container_width=True)
                         
-                        # Download option
-                        csv_data = scores_df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download Grades CSV",
-                            data=csv_data,
-                            file_name=f"{course_code}_grades.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
+                        # Calculate and show final grades for each student
+                        st.subheader("🎓 Final Grade Calculations")
+                        
+                        # Group by student
+                        students = scores_df[['StudentName', 'MatricNo']].drop_duplicates()
+                        
+                        final_grades_data = []
+                        for _, student in students.iterrows():
+                            student_name = student['StudentName']
+                            matric = student['MatricNo']
+                            
+                            student_scores = scores_df[
+                                (scores_df['StudentName'] == student_name) & 
+                                (scores_df['MatricNo'] == matric)
+                            ]
+                            
+                            final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score = calculate_final_grade(student_scores)
+                            
+                            if final_total is not None:
+                                final_grades_data.append({
+                                    'StudentName': student_name,
+                                    'MatricNo': matric,
+                                    'CA_Assignment_Avg': round(assignment_avg, 1),
+                                    'CA_Test_Avg': round(test_avg, 1),
+                                    'CA_Practical_Avg': round(practical_avg, 1),
+                                    'CA_Classwork_Avg': round(classwork_avg, 1),
+                                    'Exam_Score': exam_score,
+                                    'Final_Total': final_total,
+                                    'Final_Grade': final_grade
+                                })
+                        
+                        if final_grades_data:
+                            final_df = pd.DataFrame(final_grades_data)
+                            st.dataframe(final_df, use_container_width=True)
+                            
+                            # Download options
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                csv_all = scores_df.to_csv(index=False)
+                                st.download_button(
+                                    label="📥 Download All Scores CSV",
+                                    data=csv_all,
+                                    file_name=f"{course_code}_all_scores.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                            
+                            with col2:
+                                csv_final = final_df.to_csv(index=False)
+                                st.download_button(
+                                    label="📥 Download Final Grades CSV",
+                                    data=csv_final,
+                                    file_name=f"{course_code}_final_grades.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                        else:
+                            st.info("No complete data available for final grade calculation.")
                     else:
                         st.info("No grades recorded yet.")
                 except Exception as e:
@@ -2377,8 +2788,7 @@ def admin_view(course_code):
             else:
                 st.info("No grades file found yet.")
 
-
-        with tab9:
+        with tab10:
             # ===============================================================
             # 📂 VIEW STUDENT SUBMISSIONS
             # ===============================================================
@@ -2509,6 +2919,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
