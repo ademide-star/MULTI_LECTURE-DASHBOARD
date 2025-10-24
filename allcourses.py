@@ -1456,15 +1456,39 @@ def student_view(course_code):
         # 📊 SCORES VIEWING SECTION
         # ===============================================================
         if student_name and student_matric:
+            # Load and display student scores
             st.header("📊 My Scores & Grades")
             
+            def load_student_scores(course_code, student_name, student_matric):
+                """Load scores for specific student"""
+                scores_file = get_file(course_code, "scores")
+                
+                if not os.path.exists(scores_file):
+                    return pd.DataFrame()
+                
+                try:
+                    scores_df = pd.read_csv(scores_file)
+                    
+                    # Check if required columns exist
+                    if "StudentName" not in scores_df.columns or "MatricNo" not in scores_df.columns:
+                        return pd.DataFrame()
+                        
+                    # Filter for current student
+                    student_scores = scores_df[
+                        (scores_df["StudentName"].astype(str).str.strip().str.lower() == student_name.lower()) &
+                        (scores_df["MatricNo"].astype(str).str.strip().str.lower() == student_matric.lower())
+                    ]
+                    return student_scores
+                except Exception as e:
+                    return pd.DataFrame()
+
             student_scores = load_student_scores(course_code, student_name, student_matric)
             
             if not student_scores.empty:
                 # Display overall performance
                 st.subheader("🎯 Overall Performance")
                 
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3, col4, col5 = st.columns(5)
                 
                 with col1:
                     avg_assignment = student_scores["Assignment"].mean()
@@ -1482,24 +1506,30 @@ def student_view(course_code):
                     avg_exam = student_scores["Exam"].mean()
                     st.metric("Avg Exam", f"{avg_exam:.1f}%")
                 
+                with col5:
+                    avg_classwork = student_scores["Classwork"].mean()
+                    st.metric("Avg Classwork", f"{avg_classwork:.1f}%")
+                
                 # Overall average
                 overall_avg = student_scores["Total"].mean()
                 st.metric("📈 Overall Average", f"{overall_avg:.1f}%")
                 
                 # Detailed scores table
                 st.subheader("📋 Detailed Scores by Week")
-                display_columns = ["Week", "Assignment", "Test", "Practical", "Exam", "Total", "Grade"]
+                display_columns = ["Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]
                 display_df = student_scores[display_columns].copy()
                 
                 # Format percentages
-                for col in ["Assignment", "Test", "Practical", "Exam", "Total"]:
+                for col in ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total"]:
                     display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
                 
                 st.dataframe(display_df, use_container_width=True)
                 
             else:
                 st.info("📊 No scores recorded yet for your account. Scores will appear here once your lecturer grades your work.")
-
+        
+        else:
+            st.warning("⚠️ Please set your identity above to view your scores.")
         # ===============================================================
         # 📈 ACTIVITY SUMMARY SECTION
         # ===============================================================
@@ -2170,7 +2200,20 @@ def admin_view(course_code):
             # ===============================================================
             # 📊 GRADING SYSTEM
             # ===============================================================
+             # ===============================================================
+            # 📝 GRADING SYSTEM WITH UPDATED WEIGHTS
+            # ===============================================================
             st.header("📝 Grading System")
+            
+            # Display grading weights
+            st.info("""
+            **Grading Weights:**
+            - Exam: 70%
+            - Assignment: 8% 
+            - Practical: 5%
+            - Test: 8%
+            - Classwork: 9%
+            """)
             
             # Ensure scores file exists with proper structure
             scores_df = ensure_scores_file(course_code)
@@ -2183,12 +2226,13 @@ def admin_view(course_code):
                 with col1:
                     student_name = st.text_input("Student Name", key="grade_name")
                     week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)], key="grade_week")
-                    assignment_score = st.number_input("Assignment Score (0-100)", min_value=0, max_value=100, value=0)
-                    test_score = st.number_input("Test Score (0-100)", min_value=0, max_value=100, value=0)
+                    assignment_score = st.number_input("Assignment Score (0-100)", min_value=0, max_value=100, value=0, key="assignment_score")
+                    test_score = st.number_input("Test Score (0-100)", min_value=0, max_value=100, value=0, key="test_score")
                 with col2:
                     student_matric = st.text_input("Matric Number", key="grade_matric")
-                    practical_score = st.number_input("Practical Score (0-100)", min_value=0, max_value=100, value=0)
-                    exam_score = st.number_input("Exam Score (0-100)", min_value=0, max_value=100, value=0)
+                    practical_score = st.number_input("Practical Score (0-100)", min_value=0, max_value=100, value=0, key="practical_score")
+                    exam_score = st.number_input("Exam Score (0-100)", min_value=0, max_value=100, value=0, key="exam_score")
+                    classwork_score = st.number_input("Classwork Score (0-100)", min_value=0, max_value=100, value=0, key="classwork_score")
                 
                 submit_grade = st.form_submit_button("💾 Save Grade", use_container_width=True)
                 
@@ -2196,12 +2240,13 @@ def admin_view(course_code):
                     if not student_name or not student_matric:
                         st.error("Please enter student name and matric number.")
                     else:
-                        # Calculate total and grade
+                        # Calculate total with updated weights
                         total_score = round(
-                            assignment_score * 0.20 + 
-                            test_score * 0.20 + 
-                            practical_score * 0.10 + 
-                            exam_score * 0.50, 
+                            assignment_score * 0.08 +      # 8%
+                            test_score * 0.08 +            # 8%
+                            practical_score * 0.05 +       # 5%
+                            exam_score * 0.70 +           # 70%
+                            classwork_score * 0.09,       # 9%
                             1
                         )
                         grade = compute_grade(total_score)
@@ -2219,8 +2264,8 @@ def admin_view(course_code):
                         if mask.any():
                             # Update existing entry
                             scores_df.loc[mask, [
-                                "Assignment", "Test", "Practical", "Exam", "Total", "Grade"
-                            ]] = [assignment_score, test_score, practical_score, exam_score, total_score, grade]
+                                "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"
+                            ]] = [assignment_score, test_score, practical_score, exam_score, classwork_score, total_score, grade]
                         else:
                             # Add new entry
                             new_row = {
@@ -2231,6 +2276,7 @@ def admin_view(course_code):
                                 "Test": test_score,
                                 "Practical": practical_score,
                                 "Exam": exam_score,
+                                "Classwork": classwork_score,
                                 "Total": total_score,
                                 "Grade": grade
                             }
@@ -2238,11 +2284,12 @@ def admin_view(course_code):
                         
                         scores_df.to_csv(scores_file, index=False)
                         st.success(f"✅ Grade saved for {student_name} ({student_matric}) - {week}")
+                        st.info(f"**Total Score:** {total_score}% | **Grade:** {grade}")
 
             # Option 2: CSV Upload for Bulk Grading
             st.subheader("📁 Bulk Grade Upload (CSV)")
             uploaded_csv = st.file_uploader(
-                "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam", 
+                "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam, Classwork", 
                 type=["csv"],
                 key="grade_csv"
             )
@@ -2252,14 +2299,15 @@ def admin_view(course_code):
                     uploaded_df = pd.read_csv(uploaded_csv)
                     
                     # Validate required columns
-                    required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam"]
+                    required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Classwork"]
                     if all(col in uploaded_df.columns for col in required_cols):
-                        # Calculate totals and grades
+                        # Calculate totals with updated weights
                         uploaded_df["Total"] = (
-                            uploaded_df["Assignment"].fillna(0).astype(float) * 0.20 +
-                            uploaded_df["Test"].fillna(0).astype(float) * 0.20 +
-                            uploaded_df["Practical"].fillna(0).astype(float) * 0.10 +
-                            uploaded_df["Exam"].fillna(0).astype(float) * 0.50
+                            uploaded_df["Assignment"].fillna(0).astype(float) * 0.08 +
+                            uploaded_df["Test"].fillna(0).astype(float) * 0.08 +
+                            uploaded_df["Practical"].fillna(0).astype(float) * 0.05 +
+                            uploaded_df["Exam"].fillna(0).astype(float) * 0.70 +
+                            uploaded_df["Classwork"].fillna(0).astype(float) * 0.09
                         ).round(1)
                         uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade)
                         
@@ -2277,8 +2325,8 @@ def admin_view(course_code):
                                 (existing_df["Week"].astype(str).str.lower() == str(row["Week"]).lower())
                             )
                             if mask.any():
-                                existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Total", "Grade"]] = [
-                                    row["Assignment"], row["Test"], row["Practical"], row["Exam"], row["Total"], row["Grade"]
+                                existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]] = [
+                                    row["Assignment"], row["Test"], row["Practical"], row["Exam"], row["Classwork"], row["Total"], row["Grade"]
                                 ]
                             else:
                                 new_row = {
@@ -2289,6 +2337,7 @@ def admin_view(course_code):
                                     "Test": row["Test"],
                                     "Practical": row["Practical"],
                                     "Exam": row["Exam"],
+                                    "Classwork": row["Classwork"],
                                     "Total": row["Total"],
                                     "Grade": row["Grade"]
                                 }
@@ -2298,7 +2347,8 @@ def admin_view(course_code):
                         st.success(f"✅ Successfully processed {len(uploaded_df)} grade records!")
                         st.dataframe(existing_df, use_container_width=True)
                     else:
-                        st.error("❌ CSV must contain columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam")
+                        missing_cols = [col for col in required_cols if col not in uploaded_df.columns]
+                        st.error(f"❌ CSV missing required columns: {', '.join(missing_cols)}")
                         
                 except Exception as e:
                     st.error(f"❌ Error processing CSV: {e}")
@@ -2326,6 +2376,7 @@ def admin_view(course_code):
                     st.error(f"Error loading grades: {e}")
             else:
                 st.info("No grades file found yet.")
+
 
         with tab9:
             # ===============================================================
@@ -2458,5 +2509,6 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
