@@ -1,17 +1,35 @@
 import streamlit as st
 import pandas as pd
+import sqlite3
 import os
+import re
+import json
+import base64
+from datetime import datetime, date, timedelta, time
+from streamlit_autorefresh import st_autorefresh
+
 # ===============================================================
-# 🎯 CONFIGURATION & CONSTANTS
+# 🎯 PAGE CONFIGURATION - MUST BE FIRST STREAMLIT COMMAND
 # ===============================================================
 
-# Page Configuration
-st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
+st.set_page_config(
+    page_title="Multi-Course Dashboard", 
+    page_icon="📚", 
+    layout="wide"
+)
 
-# --- CUSTOM RESPONSIVE STYLING ---
+# ===============================================================
+# 🎨 CUSTOM STYLING - HIDE STREAMLIT ELEMENTS
+# ===============================================================
+
 st.markdown(
     """
     <style>
+    /* Hide Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
     /* Desktop: mimic wide layout */
     @media (min-width: 900px) {
         .block-container {
@@ -29,38 +47,26 @@ st.markdown(
             padding-right: 0.5rem !important;
         }
         .streamlit-expanderHeader {
-            font-size: 1.1rem !important;  /* Bigger expander text on mobile */
+            font-size: 1.1rem !important;
         }
+    }
+    
+    section[data-testid="stSidebar"] {
+        min-width: 250px !important;
+        max-width: 250px !important;
+    }
+    button[kind="header"] {
+        display: none !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-permanent_sidebar = """
-    <style>
-    section[data-testid="stSidebar"] {
-        min-width: 250px !important;  /* force width */
-        max-width: 250px !important;
-    }
-    button[kind="header"] {
-        display: none !important;  /* hide expander toggle */
-    }
-    </style>
-"""
-st.markdown(permanent_sidebar, unsafe_allow_html=True)
 
-import streamlit as st
-import pandas as pd
-import os
-import re
-import json
-import io
-import zipfile
-import base64
-from datetime import datetime, date, timedelta, time
-from streamlit_autorefresh import st_autorefresh
+# ===============================================================
+# 🗂 CONSTANTS AND DIRECTORIES
+# ===============================================================
 
-# File Paths
 PERSISTENT_DATA_DIR = "persistent_data"
 ATTENDANCE_STATUS_FILE = "attendance_status.json"
 
@@ -80,8 +86,6 @@ COURSES = {
 def ensure_directories():
     """Create all required directories"""
     directories = [
-        "data", "uploads", "student_uploads", "scores", "modules",
-        "classwork_status", "video_lectures", "attendance", "records",
         PERSISTENT_DATA_DIR,
         os.path.join(PERSISTENT_DATA_DIR, "pdfs"),
         os.path.join(PERSISTENT_DATA_DIR, "videos"), 
@@ -103,31 +107,14 @@ def ensure_directories():
 
 # Initialize directories
 ensure_directories()
-import streamlit as st
-import sqlite3
-import pandas as pd
-from datetime import datetime
 
-# Page configuration
-st.set_page_config(
-    page_title="Course Manager Pro",
-    page_icon="📚",
-    layout="wide"
-)
+# ===============================================================
+# 🗄️ DATABASE FUNCTIONS FOR COURSE PERSISTENCE
+# ===============================================================
 
-# Hide Streamlit elements
-hide_style = """
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-</style>
-"""
-st.markdown(hide_style, unsafe_allow_html=True)
-
-# Database setup
 def init_db():
-    conn = sqlite3.connect('courses.db')
+    """Initialize SQLite database for course storage"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS weekly_courses
@@ -140,7 +127,8 @@ def init_db():
     conn.close()
 
 def add_course_to_db(week_name, course_name):
-    conn = sqlite3.connect('courses.db')
+    """Add course to database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
     c.execute('INSERT INTO weekly_courses (week_name, course_name) VALUES (?, ?)', 
               (week_name, course_name))
@@ -148,97 +136,30 @@ def add_course_to_db(week_name, course_name):
     conn.close()
 
 def get_weeks_from_db():
-    conn = sqlite3.connect('courses.db')
+    """Get all unique weeks from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
-    c.execute('SELECT DISTINCT week_name FROM weekly_courses')
+    c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
     weeks = [row[0] for row in c.fetchall()]
     conn.close()
     return weeks
 
 def get_courses_by_week(week_name):
-    conn = sqlite3.connect('courses.db')
+    """Get all courses for a specific week"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
-    c.execute('SELECT course_name FROM weekly_courses WHERE week_name = ?', (week_name,))
+    c.execute('SELECT course_name FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
     courses = [row[0] for row in c.fetchall()]
     conn.close()
     return courses
 
-def main():
-    # Initialize database
-    init_db()
-    
-    st.title("📚 Persistent Course Manager")
-    
-    # Navigation
-    st.sidebar.title("Menu")
-    option = st.sidebar.selectbox("Choose Action", 
-                                 ["Add New Week", "View Courses", "Manage Data"])
-    
-    if option == "Add New Week":
-        add_new_week()
-    elif option == "View Courses":
-        view_courses()
-    elif option == "Manage Data":
-        manage_data()
-
-def add_new_week():
-    st.header("Add Courses for New Week")
-    
-    week_name = st.text_input("Week Identifier:")
-    courses_text = st.text_area("Courses (one per line):")
-    
-    if st.button("Save to Database"):
-        if week_name and courses_text:
-            courses_list = [course.strip() for course in courses_text.split('\n') if course.strip()]
-            
-            for course in courses_list:
-                add_course_to_db(week_name, course)
-            
-            st.success(f"Added {len(courses_list)} courses for {week_name}!")
-        else:
-            st.error("Please fill in both fields.")
-
-def view_courses():
-    st.header("Your Courses")
-    
-    weeks = get_weeks_from_db()
-    if not weeks:
-        st.info("No courses found. Add some courses first!")
-        return
-    
-    selected_week = st.selectbox("Select Week:", weeks)
-    
-    if selected_week:
-        courses = get_courses_by_week(selected_week)
-        st.subheader(f"Courses for {selected_week}")
-        
-        for i, course in enumerate(courses, 1):
-            st.write(f"✅ {course}")
-
-def manage_data():
-    st.header("Data Management")
-    
-    st.info("Your data is automatically saved in a local database.")
-    
-    # Show all data
-    conn = sqlite3.connect('courses.db')
-    df = pd.read_sql_query('SELECT week_name, course_name FROM weekly_courses', conn)
+def delete_week_from_db(week_name):
+    """Delete a week and all its courses from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
+    conn.commit()
     conn.close()
-    
-    if not df.empty:
-        st.subheader("All Courses Data")
-        st.dataframe(df)
-        
-        # Export option
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name="courses_backup.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("No data available.")
 
 # ===============================================================
 # 🔧 HELPER FUNCTIONS
@@ -308,6 +229,145 @@ def ensure_scores_file(course_code):
             df = pd.DataFrame(columns=required_columns)
             df.to_csv(scores_file, index=False)
             return df
+
+# ===============================================================
+# 📱 COURSE MANAGEMENT PAGES
+# ===============================================================
+
+def show_course_dashboard():
+    """Main dashboard for course management"""
+    st.title("📚 Course Management Dashboard")
+    
+    # Initialize database
+    init_db()
+    
+    # Get available weeks
+    weeks = get_weeks_from_db()
+    
+    if weeks:
+        st.success(f"✅ Database loaded successfully! Found {len(weeks)} weeks of courses.")
+        
+        # Show weekly summary
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            selected_week = st.selectbox("Select Week to View", weeks)
+            
+            if selected_week:
+                courses = get_courses_by_week(selected_week)
+                st.subheader(f"📅 Courses for {selected_week}")
+                
+                for i, course in enumerate(courses, 1):
+                    st.write(f"{i}. **{course}**")
+        
+        with col2:
+            st.subheader("🗂️ Quick Actions")
+            if st.button("🔄 Refresh Data"):
+                st.rerun()
+                
+            if st.button("🗑️ Delete Selected Week"):
+                if selected_week:
+                    delete_week_from_db(selected_week)
+                    st.success(f"Deleted {selected_week}!")
+                    st.rerun()
+    else:
+        st.info("📝 No courses added yet. Go to 'Add Courses' to get started!")
+
+def add_courses_page():
+    """Page for adding new courses"""
+    st.title("➕ Add Weekly Courses")
+    
+    week_name = st.text_input("**Week Name** (e.g., 'Week 1', 'Spring Semester Week 1'):")
+    
+    st.subheader("📚 Add Courses for this Week")
+    course_input = st.text_area("**Enter courses** (one per line):", height=200,
+                               placeholder="MCB 221 – General Microbiology\nBCH 201 – General Biochemistry\nBIO 203 – General Physiology")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("💾 Save Courses", type="primary"):
+            if week_name and course_input:
+                courses_list = [course.strip() for course in course_input.split('\n') if course.strip()]
+                
+                # Add each course to database
+                for course in courses_list:
+                    add_course_to_db(week_name, course)
+                
+                st.success(f"✅ Successfully added {len(courses_list)} courses for {week_name}!")
+                st.balloons()
+            else:
+                st.error("❌ Please provide both week name and courses.")
+    
+    with col2:
+        if st.button("🔄 Clear Form"):
+            st.rerun()
+
+def view_all_courses_page():
+    """Page to view all courses"""
+    st.title("📋 All Courses")
+    
+    weeks = get_weeks_from_db()
+    
+    if not weeks:
+        st.info("ℹ️ No courses available. Add some courses first!")
+        return
+    
+    # Show all weeks in expanders
+    for week in weeks:
+        courses = get_courses_by_week(week)
+        with st.expander(f"📅 {week} ({len(courses)} courses)"):
+            for i, course in enumerate(courses, 1):
+                st.write(f"{i}. {course}")
+    
+    # Export option
+    st.subheader("📤 Export Data")
+    if st.button("📥 Download All Courses as CSV"):
+        try:
+            conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+            df = pd.read_sql_query('SELECT week_name, course_name FROM weekly_courses ORDER BY week_name, id', conn)
+            conn.close()
+            
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="⬇️ Download CSV",
+                data=csv,
+                file_name="all_courses.csv",
+                mime="text/csv"
+            )
+        except Exception as e:
+            st.error(f"Error exporting data: {e}")
+
+def data_management_page():
+    """Page for data management"""
+    st.title("⚙️ Data Management")
+    
+    st.info("💾 Your data is automatically saved in a local SQLite database that persists across reboots.")
+    
+    # Show database info
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
+        conn.close()
+        
+        if not df.empty:
+            st.subheader("📊 Database Contents")
+            st.dataframe(df)
+            
+            # Statistics
+            total_courses = len(df)
+            total_weeks = df['week_name'].nunique()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Weeks", total_weeks)
+            with col2:
+                st.metric("Total Courses", total_courses)
+        else:
+            st.info("ℹ️ No data available in the database.")
+            
+    except Exception as e:
+        st.error(f"❌ Error accessing database: {e}")
 
 # ===============================================================
 # 📊 ATTENDANCE MANAGEMENT
@@ -2232,57 +2292,91 @@ def admin_view(course_code):
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
 # ===============================================================
-# 🎯 MAIN APPLICATION
+# 🚀 MAIN APPLICATION
 # ===============================================================
 
-# UI Styling
+def main():
+    """Main application with navigation"""
+    
+    # Application Header
+    st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
+    st.title("📚 Multi-Course Portal")
+    
+    # Auto-refresh (once per day)
+    st_autorefresh(interval=86_400_000, key="daily_refresh")
+    
+    # Sidebar navigation
+    st.sidebar.title("🎓 Navigation")
+    
+    # Role Selection
+    if "role" not in st.session_state:
+        st.session_state["role"] = None
+    
+    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin", "Course Manager"], key="role_selector")
+    
+    if role != "Select":
+        st.session_state["role"] = role
+    else:
+        st.session_state["role"] = None
+    
+    # Course Selection (for Student and Admin views)
+    if st.session_state["role"] in ["Student", "Admin"]:
+        course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
+        course_code = COURSES[course]
+        st.sidebar.markdown("---")
+    
+    # Course Manager Navigation
+    if st.session_state["role"] == "Course Manager":
+        st.sidebar.markdown("---")
+        page = st.sidebar.radio(
+            "Course Management:",
+            ["📊 Dashboard", "➕ Add Courses", "📋 View All Courses", "⚙️ Data Management"]
+        )
+    
+    # Main content area based on role
+    if st.session_state["role"] == "Admin":
+        admin_view(course_code)
+    elif st.session_state["role"] == "Student":
+        student_view(course_code)
+    elif st.session_state["role"] == "Course Manager":
+        # Course Manager pages
+        if page == "📊 Dashboard":
+            show_course_dashboard()
+        elif page == "➕ Add Courses":
+            add_courses_page()
+        elif page == "📋 View All Courses":
+            view_all_courses_page()
+        elif page == "⚙️ Data Management":
+            data_management_page()
+    else:
+        st.warning("👆 Please select your role from the sidebar to continue.")
+        
+        # Show course manager preview
+        st.info("💡 **New Feature:** Select 'Course Manager' role to manage weekly courses with persistent storage!")
+
+# Footer
 st.markdown("""
     <style>
-    footer {visibility: hidden;}
-    #MainMenu {visibility: hidden;}
-    .viewerBadge_container__1QSob, .viewerBadge_link__1S137, .viewerBadge_text__1JaDK { display: none !important; }
     .custom-footer {
-        position: fixed; left: 0; bottom: 0; width: 100%; background-color: #f0f2f6;
-        color: #333; text-align: center; padding: 8px; font-size: 15px; font-weight: 500;
+        position: relative;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #f0f2f6;
+        color: #333;
+        text-align: center;
+        padding: 8px;
+        font-size: 15px;
+        font-weight: 500;
         border-top: 1px solid #ccc;
+        margin-top: 2rem;
     }
     </style>
     <div class="custom-footer">
-        Developed by <b>Mide</b> | © 2025 | 
-        <a href="https://example.com" target="_blank" style="text-decoration:none; color:#1f77b4;">
-            Visit our website
-        </a>
+        Developed by <b>Mide</b> | © 2025 | Persistent Course Management System
     </div>
 """, unsafe_allow_html=True)
 
-# Application Header
-st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
-st.title("📚 Multi-Course Portal")
-st_autorefresh(interval=86_400_000, key="daily_refresh")
-
-# Role Selection
-if "role" not in st.session_state:
-    st.session_state["role"] = None
-
-st.sidebar.title("🔐 Login Panel")
-role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin"], key="role_selector")
-
-if role != "Select":
-    st.session_state["role"] = role
-else:
-    st.session_state["role"] = None
-
-# Course Selection
-course = st.selectbox("Select Course:", list(COURSES.keys()))
-course_code = COURSES[course]
-
-# Role-based View Routing
-if st.session_state["role"] == "Admin":
-    admin_view(course_code)
-elif st.session_state["role"] == "Student":
-    student_view(course_code)
-else:
-    st.warning("Please select your role from the sidebar to continue.")
-
-
+if __name__ == "__main__":
+    main()
 
