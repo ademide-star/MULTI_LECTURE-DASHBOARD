@@ -109,10 +109,10 @@ def ensure_directories():
 ensure_directories()
 
 # ===============================================================
-# 🗄️ DATABASE FUNCTIONS FOR COURSE PERSISTENCE
+# 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
 # ===============================================================
 
-def init_db():
+def init_course_db():
     """Initialize SQLite database for course storage"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
@@ -121,17 +121,18 @@ def init_db():
         (id INTEGER PRIMARY KEY AUTOINCREMENT,
          week_name TEXT NOT NULL,
          course_name TEXT NOT NULL,
+         course_code TEXT NOT NULL,
          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
     ''')
     conn.commit()
     conn.close()
 
-def add_course_to_db(week_name, course_name):
+def add_course_to_db(week_name, course_name, course_code):
     """Add course to database"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
-    c.execute('INSERT INTO weekly_courses (week_name, course_name) VALUES (?, ?)', 
-              (week_name, course_name))
+    c.execute('INSERT INTO weekly_courses (week_name, course_name, course_code) VALUES (?, ?, ?)', 
+              (week_name, course_name, course_code))
     conn.commit()
     conn.close()
 
@@ -148,8 +149,8 @@ def get_courses_by_week(week_name):
     """Get all courses for a specific week"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
-    c.execute('SELECT course_name FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
-    courses = [row[0] for row in c.fetchall()]
+    c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
+    courses = [{"name": row[0], "code": row[1]} for row in c.fetchall()]
     conn.close()
     return courses
 
@@ -160,6 +161,13 @@ def delete_week_from_db(week_name):
     c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
     conn.commit()
     conn.close()
+
+def get_all_courses_from_db():
+    """Get all courses from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    df = pd.read_sql_query('SELECT week_name, course_name, course_code, created_at FROM weekly_courses ORDER BY created_at', conn)
+    conn.close()
+    return df
 
 # ===============================================================
 # 🔧 HELPER FUNCTIONS
@@ -229,145 +237,6 @@ def ensure_scores_file(course_code):
             df = pd.DataFrame(columns=required_columns)
             df.to_csv(scores_file, index=False)
             return df
-
-# ===============================================================
-# 📱 COURSE MANAGEMENT PAGES
-# ===============================================================
-
-def show_course_dashboard():
-    """Main dashboard for course management"""
-    st.title("📚 Course Management Dashboard")
-    
-    # Initialize database
-    init_db()
-    
-    # Get available weeks
-    weeks = get_weeks_from_db()
-    
-    if weeks:
-        st.success(f"✅ Database loaded successfully! Found {len(weeks)} weeks of courses.")
-        
-        # Show weekly summary
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            selected_week = st.selectbox("Select Week to View", weeks)
-            
-            if selected_week:
-                courses = get_courses_by_week(selected_week)
-                st.subheader(f"📅 Courses for {selected_week}")
-                
-                for i, course in enumerate(courses, 1):
-                    st.write(f"{i}. **{course}**")
-        
-        with col2:
-            st.subheader("🗂️ Quick Actions")
-            if st.button("🔄 Refresh Data"):
-                st.rerun()
-                
-            if st.button("🗑️ Delete Selected Week"):
-                if selected_week:
-                    delete_week_from_db(selected_week)
-                    st.success(f"Deleted {selected_week}!")
-                    st.rerun()
-    else:
-        st.info("📝 No courses added yet. Go to 'Add Courses' to get started!")
-
-def add_courses_page():
-    """Page for adding new courses"""
-    st.title("➕ Add Weekly Courses")
-    
-    week_name = st.text_input("**Week Name** (e.g., 'Week 1', 'Spring Semester Week 1'):")
-    
-    st.subheader("📚 Add Courses for this Week")
-    course_input = st.text_area("**Enter courses** (one per line):", height=200,
-                               placeholder="MCB 221 – General Microbiology\nBCH 201 – General Biochemistry\nBIO 203 – General Physiology")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("💾 Save Courses", type="primary"):
-            if week_name and course_input:
-                courses_list = [course.strip() for course in course_input.split('\n') if course.strip()]
-                
-                # Add each course to database
-                for course in courses_list:
-                    add_course_to_db(week_name, course)
-                
-                st.success(f"✅ Successfully added {len(courses_list)} courses for {week_name}!")
-                st.balloons()
-            else:
-                st.error("❌ Please provide both week name and courses.")
-    
-    with col2:
-        if st.button("🔄 Clear Form"):
-            st.rerun()
-
-def view_all_courses_page():
-    """Page to view all courses"""
-    st.title("📋 All Courses")
-    
-    weeks = get_weeks_from_db()
-    
-    if not weeks:
-        st.info("ℹ️ No courses available. Add some courses first!")
-        return
-    
-    # Show all weeks in expanders
-    for week in weeks:
-        courses = get_courses_by_week(week)
-        with st.expander(f"📅 {week} ({len(courses)} courses)"):
-            for i, course in enumerate(courses, 1):
-                st.write(f"{i}. {course}")
-    
-    # Export option
-    st.subheader("📤 Export Data")
-    if st.button("📥 Download All Courses as CSV"):
-        try:
-            conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-            df = pd.read_sql_query('SELECT week_name, course_name FROM weekly_courses ORDER BY week_name, id', conn)
-            conn.close()
-            
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="⬇️ Download CSV",
-                data=csv,
-                file_name="all_courses.csv",
-                mime="text/csv"
-            )
-        except Exception as e:
-            st.error(f"Error exporting data: {e}")
-
-def data_management_page():
-    """Page for data management"""
-    st.title("⚙️ Data Management")
-    
-    st.info("💾 Your data is automatically saved in a local SQLite database that persists across reboots.")
-    
-    # Show database info
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
-        conn.close()
-        
-        if not df.empty:
-            st.subheader("📊 Database Contents")
-            st.dataframe(df)
-            
-            # Statistics
-            total_courses = len(df)
-            total_weeks = df['week_name'].nunique()
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Total Weeks", total_weeks)
-            with col2:
-                st.metric("Total Courses", total_courses)
-        else:
-            st.info("ℹ️ No data available in the database.")
-            
-    except Exception as e:
-        st.error(f"❌ Error accessing database: {e}")
 
 # ===============================================================
 # 📊 ATTENDANCE MANAGEMENT
@@ -655,6 +524,153 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
     else:
         updated = new_entry
     updated.to_csv(log_file, index=False)
+
+# ===============================================================
+# 🎥 VIDEO MANAGEMENT
+# ===============================================================
+
+def get_video_files(course_code):
+    """Get list of video files for a course"""
+    video_dir = get_persistent_path("video", course_code)
+    
+    if not os.path.exists(video_dir):
+        return []
+    
+    video_files = sorted([f for f in os.listdir(video_dir) 
+                         if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
+    return video_files
+
+def upload_video(course_code, uploaded_video):
+    """Upload video to persistent storage"""
+    try:
+        video_dir = get_persistent_path("video", course_code)
+        os.makedirs(video_dir, exist_ok=True)
+        
+        safe_name = "".join(c for c in uploaded_video.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+        safe_name = safe_name.replace(' ', '_')
+        
+        # Handle duplicates
+        base_name, ext = os.path.splitext(safe_name)
+        save_path = os.path.join(video_dir, safe_name)
+        counter = 1
+        while os.path.exists(save_path):
+            save_path = os.path.join(video_dir, f"{base_name}_{counter}{ext}")
+            counter += 1
+        
+        with open(save_path, "wb") as f:
+            f.write(uploaded_video.getbuffer())
+        
+        return True, f"✅ Video uploaded successfully: {os.path.basename(save_path)}"
+    except Exception as e:
+        return False, f"❌ Error uploading video: {str(e)}"
+
+# ===============================================================
+# 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
+# ===============================================================
+
+def show_course_manager():
+    """Course management integrated into admin view"""
+    st.header("📚 Course Manager")
+    
+    # Initialize database
+    init_course_db()
+    
+    # Create tabs for course management
+    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Courses", "📋 View Courses", "⚙️ Manage Data"])
+    
+    with cm_tab1:
+        st.subheader("Add Weekly Courses")
+        
+        week_name = st.text_input("**Week Name** (e.g., 'Week 1', 'Spring Semester Week 1'):", key="week_name_input")
+        
+        st.subheader("📚 Add Courses for this Week")
+        course_input = st.text_area("**Enter courses** (one per line):", height=200,
+                                   placeholder="MCB 221 – General Microbiology\nBCH 201 – General Biochemistry\nBIO 203 – General Physiology",
+                                   key="course_text_area")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("💾 Save Courses to Database", type="primary", key="save_courses_btn"):
+                if week_name and course_input:
+                    courses_list = [course.strip() for course in course_input.split('\n') if course.strip()]
+                    
+                    # Add each course to database
+                    for course in courses_list:
+                        course_code = COURSES.get(course, "UNKNOWN")
+                        add_course_to_db(week_name, course, course_code)
+                    
+                    st.success(f"✅ Successfully added {len(courses_list)} courses for {week_name}!")
+                    st.balloons()
+                else:
+                    st.error("❌ Please provide both week name and courses.")
+        
+        with col2:
+            if st.button("🔄 Clear Form", key="clear_form_btn"):
+                st.rerun()
+    
+    with cm_tab2:
+        st.subheader("View All Courses")
+        
+        weeks = get_weeks_from_db()
+        
+        if not weeks:
+            st.info("ℹ️ No courses available. Add some courses first!")
+        else:
+            # Show all weeks in expanders
+            for week in weeks:
+                courses = get_courses_by_week(week)
+                with st.expander(f"📅 {week} ({len(courses)} courses)"):
+                    for i, course in enumerate(courses, 1):
+                        st.write(f"{i}. **{course['name']}** ({course['code']})")
+    
+    with cm_tab3:
+        st.subheader("Data Management")
+        
+        st.info("💾 Your course data is automatically saved in a local SQLite database that persists across reboots.")
+        
+        # Show database info
+        try:
+            df = get_all_courses_from_db()
+            
+            if not df.empty:
+                st.subheader("📊 Database Contents")
+                st.dataframe(df)
+                
+                # Statistics
+                total_courses = len(df)
+                total_weeks = df['week_name'].nunique()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Weeks", total_weeks)
+                with col2:
+                    st.metric("Total Courses", total_courses)
+                
+                # Export option
+                st.subheader("📤 Export Data")
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Courses CSV",
+                    data=csv,
+                    file_name="all_courses.csv",
+                    mime="text/csv"
+                )
+                
+                # Delete option
+                st.subheader("🗑️ Delete Data")
+                weeks_to_delete = st.multiselect("Select weeks to delete:", df['week_name'].unique())
+                if st.button("🚨 Delete Selected Weeks", type="secondary"):
+                    for week in weeks_to_delete:
+                        delete_week_from_db(week)
+                    st.success(f"✅ Deleted {len(weeks_to_delete)} weeks!")
+                    st.rerun()
+                    
+            else:
+                st.info("ℹ️ No data available in the database.")
+                
+        except Exception as e:
+            st.error(f"❌ Error accessing database: {e}")
 
 # ===============================================================
 # 📊 SCORES MANAGEMENT
@@ -1686,8 +1702,12 @@ def student_view(course_code):
 # 👩‍🏫 ADMIN VIEW  
 # ===============================================================
 
+# ===============================================================
+# 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
+# ===============================================================
+
 def admin_view(course_code):
-    """Admin dashboard view"""
+    """Admin dashboard view with integrated course manager"""
     try:
         # Admin authentication
         ADMIN_PASS = "bimpe2025class"
@@ -1698,15 +1718,16 @@ def admin_view(course_code):
             return
         
         st.session_state["role"] = "Admin"
-        st.success(f"✅ Logged in as Admin {course_code}")
+        st.success(f"✅ Logged in as Admin - {course_code}")
         
         ensure_directories()
         
         st.title("👩‍🏫 Admin Dashboard")
         
-        # Create tabs for better organization
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-            "📚 Lecture Management", 
+        # Create tabs for better organization - INCLUDING COURSE MANAGER
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+            "📚 Course Manager",  # NEW TAB ADDED
+            "📖 Lecture Management", 
             "🎥 Video Management", 
             "🕒 Attendance Control",
             "📊 Attendance Records",
@@ -1718,9 +1739,15 @@ def admin_view(course_code):
         
         with tab1:
             # ===============================================================
-            # 📚 LECTURE MANAGEMENT
+            # 📚 COURSE MANAGER (INTEGRATED)
             # ===============================================================
-            st.header("📚 Lecture Management")
+            show_course_manager()
+        
+        with tab2:
+            # ===============================================================
+            # 📖 LECTURE MANAGEMENT
+            # ===============================================================
+            st.header("📖 Lecture Management")
             
             # Load lectures
             lectures_df = load_lectures(course_code)
@@ -1822,7 +1849,7 @@ def admin_view(course_code):
                     except Exception as e:
                         st.error(f"❌ Error saving to file: {e}")
 
-        with tab2:
+        with tab3:
             # ===============================================================
             # 🎥 VIDEO MANAGEMENT
             # ===============================================================
@@ -1896,7 +1923,7 @@ def admin_view(course_code):
             else:
                 st.info("No videos in permanent storage yet. Upload videos above.")
 
-        with tab3:
+        with tab4:
             # ===============================================================
             # 🕒 ATTENDANCE CONTROL
             # ===============================================================
@@ -1947,7 +1974,7 @@ def admin_view(course_code):
                 except Exception as e:
                     st.error(f"Error in auto-close: {e}")
 
-        with tab4:
+        with tab5:
             # ===============================================================
             # 📊 ATTENDANCE RECORDS
             # ===============================================================
@@ -1991,7 +2018,7 @@ def admin_view(course_code):
                 else:
                     st.info("No attendance data found for any course.")
 
-        with tab5:
+        with tab6:
             # ===============================================================
             # 🧩 CLASSWORK CONTROL
             # ===============================================================
@@ -2042,7 +2069,7 @@ def admin_view(course_code):
                 except Exception as e:
                     st.error(f"Error in classwork auto-close: {e}")
 
-        with tab6:
+        with tab7:
             # ===============================================================
             # 📝 CLASSWORK SUBMISSIONS
             # ===============================================================
@@ -2067,7 +2094,7 @@ def admin_view(course_code):
                 st.subheader("All Classwork Submissions")
                 view_all_classwork_submissions(course_code)
 
-        with tab7:
+        with tab8:
             # ===============================================================
             # 📊 GRADING SYSTEM
             # ===============================================================
@@ -2228,7 +2255,7 @@ def admin_view(course_code):
             else:
                 st.info("No grades file found yet.")
 
-        with tab8:
+        with tab9:
             # ===============================================================
             # 📂 VIEW STUDENT SUBMISSIONS
             # ===============================================================
@@ -2291,6 +2318,7 @@ def admin_view(course_code):
         st.error(f"An error occurred in the admin dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
+
 # ===============================================================
 # 🚀 MAIN APPLICATION
 # ===============================================================
@@ -2312,7 +2340,7 @@ def main():
     if "role" not in st.session_state:
         st.session_state["role"] = None
     
-    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin", "Course Manager"], key="role_selector")
+    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin"], key="role_selector")
     
     if role != "Select":
         st.session_state["role"] = role
@@ -2325,34 +2353,13 @@ def main():
         course_code = COURSES[course]
         st.sidebar.markdown("---")
     
-    # Course Manager Navigation
-    if st.session_state["role"] == "Course Manager":
-        st.sidebar.markdown("---")
-        page = st.sidebar.radio(
-            "Course Management:",
-            ["📊 Dashboard", "➕ Add Courses", "📋 View All Courses", "⚙️ Data Management"]
-        )
-    
     # Main content area based on role
     if st.session_state["role"] == "Admin":
         admin_view(course_code)
     elif st.session_state["role"] == "Student":
         student_view(course_code)
-    elif st.session_state["role"] == "Course Manager":
-        # Course Manager pages
-        if page == "📊 Dashboard":
-            show_course_dashboard()
-        elif page == "➕ Add Courses":
-            add_courses_page()
-        elif page == "📋 View All Courses":
-            view_all_courses_page()
-        elif page == "⚙️ Data Management":
-            data_management_page()
     else:
         st.warning("👆 Please select your role from the sidebar to continue.")
-        
-        # Show course manager preview
-        st.info("💡 **New Feature:** Select 'Course Manager' role to manage weekly courses with persistent storage!")
 
 # Footer
 st.markdown("""
@@ -2373,7 +2380,7 @@ st.markdown("""
     }
     </style>
     <div class="custom-footer">
-        Developed by <b>Mide</b> | © 2025 | Persistent Course Management System
+        Developed by <b>Mide</b> | © 2025 | Integrated Course Management System
     </div>
 """, unsafe_allow_html=True)
 
