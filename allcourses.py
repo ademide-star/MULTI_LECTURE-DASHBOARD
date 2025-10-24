@@ -9,6 +9,15 @@ import base64
 from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
 
+
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # ===============================================================
 # 🎯 CONFIGURATION & CONSTANTS
 # ===============================================================
@@ -2103,3 +2112,4 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
