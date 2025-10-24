@@ -1,6 +1,57 @@
 import streamlit as st
 import pandas as pd
 import os
+# ===============================================================
+# 🎯 CONFIGURATION & CONSTANTS
+# ===============================================================
+
+# Page Configuration
+st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
+
+# --- CUSTOM RESPONSIVE STYLING ---
+st.markdown(
+    """
+    <style>
+    /* Desktop: mimic wide layout */
+    @media (min-width: 900px) {
+        .block-container {
+            max-width: 95% !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+    }
+
+    /* Mobile: make sure expanders are fully visible */
+    @media (max-width: 899px) {
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        .streamlit-expanderHeader {
+            font-size: 1.1rem !important;  /* Bigger expander text on mobile */
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+permanent_sidebar = """
+    <style>
+    section[data-testid="stSidebar"] {
+        min-width: 250px !important;  /* force width */
+        max-width: 250px !important;
+    }
+    button[kind="header"] {
+        display: none !important;  /* hide expander toggle */
+    }
+    </style>
+"""
+st.markdown(permanent_sidebar, unsafe_allow_html=True)
+
+import streamlit as st
+import pandas as pd
+import os
 import re
 import json
 import io
@@ -8,22 +59,6 @@ import zipfile
 import base64
 from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
-
-
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-# ===============================================================
-# 🎯 CONFIGURATION & CONSTANTS
-# ===============================================================
-
-# Page Configuration
-st.set_page_config(page_title="Multi-Course Dashboard", page_icon="📚", layout="wide")
 
 # File Paths
 PERSISTENT_DATA_DIR = "persistent_data"
@@ -2112,4 +2147,5 @@ elif st.session_state["role"] == "Student":
     student_view(course_code)
 else:
     st.warning("Please select your role from the sidebar to continue.")
+
 
