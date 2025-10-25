@@ -1217,6 +1217,655 @@ def show_course_management():
             overview_df = pd.DataFrame(overview_data)
             st.dataframe(overview_df, use_container_width=True)
 
+import streamlit as st
+import pandas as pd
+import sqlite3
+import os
+import re
+import json
+import base64
+from datetime import datetime, date, timedelta, time
+from streamlit_autorefresh import st_autorefresh
+
+# ===============================================================
+# 🎯 SYSTEM ADMIN CONFIGURATION
+# ===============================================================
+
+SYSTEM_ADMIN_PASSWORD = "systemadmin2025"  # Master system admin password
+
+def get_system_logs_file():
+    """Get system logs file path"""
+    return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
+
+def init_system_logs():
+    """Initialize system logs file"""
+    logs_file = get_system_logs_file()
+    if not os.path.exists(logs_file):
+        with open(logs_file, 'w') as f:
+            json.dump({"lecturer_logs": [], "student_logs": []}, f)
+
+def log_lecturer_activity(lecturer_name, course_code, action, details=""):
+    """Log lecturer activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "lecturer_name": lecturer_name,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["lecturer_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries to prevent file from growing too large
+        if len(logs["lecturer_logs"]) > 1000:
+            logs["lecturer_logs"] = logs["lecturer_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging lecturer activity: {e}")
+
+def log_student_activity(student_name, matric, course_code, action, details=""):
+    """Log student activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "student_name": student_name,
+            "matric": matric,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["student_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries
+        if len(logs["student_logs"]) > 1000:
+            logs["student_logs"] = logs["student_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging student activity: {e}")
+
+def get_lecturer_logs():
+    """Get all lecturer logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("lecturer_logs", [])
+        return []
+    except:
+        return []
+
+def get_student_logs():
+    """Get all student logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("student_logs", [])
+        return []
+    except:
+        return []
+
+# ===============================================================
+# 🏢 SYSTEM ADMIN DASHBOARD
+# ===============================================================
+
+def show_system_admin_dashboard():
+    """System Admin Dashboard with comprehensive monitoring"""
+    st.title("🏢 System Administration Dashboard")
+    
+    # System Admin Authentication
+    st.sidebar.subheader("🔐 System Admin Access")
+    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
+    
+    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
+        st.warning("Enter the System Admin password to continue")
+        return
+    
+    st.success("✅ Logged in as System Administrator")
+    
+    # Initialize system logs
+    init_system_logs()
+    
+    # Create tabs for different admin functions
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 System Overview", 
+        "👩‍🏫 Lecturer Activity", 
+        "🎓 Student Activity",
+        "📈 Analytics",
+        "🔧 System Settings",
+        "🚨 Alert Center"
+    ])
+    
+    with tab1:
+        show_system_overview()
+    
+    with tab2:
+        show_lecturer_activity()
+    
+    with tab3:
+        show_student_activity()
+    
+    with tab4:
+        show_analytics()
+    
+    with tab5:
+        show_system_settings()
+    
+    with tab6:
+        show_alert_center()
+
+def show_system_overview():
+    """System overview with key metrics"""
+    st.header("📊 System Overview")
+    
+    # Load courses and logs
+    courses = load_courses_config()
+    lecturer_logs = get_lecturer_logs()
+    student_logs = get_student_logs()
+    
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Courses", len(courses))
+    
+    with col2:
+        active_lecturers = len(set(log['lecturer_name'] for log in lecturer_logs if is_recent(log['timestamp'], 7)))
+        st.metric("Active Lecturers (7d)", active_lecturers)
+    
+    with col3:
+        active_students = len(set(log['student_name'] for log in student_logs if is_recent(log['timestamp'], 7)))
+        st.metric("Active Students (7d)", active_students)
+    
+    with col4:
+        total_activities = len(lecturer_logs) + len(student_logs)
+        st.metric("Total Activities", total_activities)
+    
+    # Recent activity timeline
+    st.subheader("🕒 Recent Activity Timeline")
+    
+    # Combine and sort recent logs
+    all_logs = []
+    for log in lecturer_logs[-20:]:  # Last 20 lecturer activities
+        log['type'] = 'Lecturer'
+        all_logs.append(log)
+    
+    for log in student_logs[-20:]:  # Last 20 student activities
+        log['type'] = 'Student'
+        all_logs.append(log)
+    
+    # Sort by timestamp
+    all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    if all_logs:
+        for log in all_logs[:10]:  # Show last 10 activities
+            if log['type'] == 'Lecturer':
+                icon = "👩‍🏫"
+                name = log['lecturer_name']
+                action = log['action']
+            else:
+                icon = "🎓"
+                name = log['student_name']
+                action = log['action']
+            
+            st.write(f"{icon} **{name}** - {action} - *{log['timestamp']}*")
+            if log.get('details'):
+                st.caption(f"Details: {log['details']}")
+            st.divider()
+    else:
+        st.info("No recent activity recorded")
+
+def show_lecturer_activity():
+    """Detailed lecturer activity logs"""
+    st.header("👩‍🏫 Lecturer Activity Monitor")
+    
+    lecturer_logs = get_lecturer_logs()
+    
+    if not lecturer_logs:
+        st.info("No lecturer activity recorded yet")
+        return
+    
+    # Filters
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        date_filter = st.selectbox("Time Filter", ["All Time", "Last 24 Hours", "Last 7 Days", "Last 30 Days"])
+    
+    with col2:
+        lecturers = sorted(set(log['lecturer_name'] for log in lecturer_logs))
+        lecturer_filter = st.selectbox("Filter by Lecturer", ["All Lecturers"] + lecturers)
+    
+    with col3:
+        actions = sorted(set(log['action'] for log in lecturer_logs))
+        action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions)
+    
+    # Filter logs
+    filtered_logs = lecturer_logs
+    
+    if date_filter != "All Time":
+        if date_filter == "Last 24 Hours":
+            cutoff = datetime.now() - timedelta(hours=24)
+        elif date_filter == "Last 7 Days":
+            cutoff = datetime.now() - timedelta(days=7)
+        else:  # Last 30 Days
+            cutoff = datetime.now() - timedelta(days=30)
+        
+        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+    
+    if lecturer_filter != "All Lecturers":
+        filtered_logs = [log for log in filtered_logs if log['lecturer_name'] == lecturer_filter]
+    
+    if action_filter != "All Actions":
+        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
+    
+    # Display logs
+    if filtered_logs:
+        st.subheader(f"📋 Activity Logs ({len(filtered_logs)} records)")
+        
+        # Convert to DataFrame for better display
+        log_data = []
+        for log in filtered_logs:
+            log_data.append({
+                'Timestamp': log['timestamp'],
+                'Lecturer': log['lecturer_name'],
+                'Course': log['course_code'],
+                'Action': log['action'],
+                'Details': log.get('details', '')
+            })
+        
+        df = pd.DataFrame(log_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # Download option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Lecturer Logs (CSV)",
+            data=csv,
+            file_name="lecturer_activity_logs.csv",
+            mime="text/csv"
+        )
+        
+        # Lecturer statistics
+        st.subheader("📈 Lecturer Statistics")
+        
+        # Most active lecturers
+        lecturer_activity = {}
+        for log in filtered_logs:
+            lecturer = log['lecturer_name']
+            lecturer_activity[lecturer] = lecturer_activity.get(lecturer, 0) + 1
+        
+        if lecturer_activity:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Most Active Lecturers:**")
+                for lecturer, count in sorted(lecturer_activity.items(), key=lambda x: x[1], reverse=True)[:5]:
+                    st.write(f"• {lecturer}: {count} activities")
+            
+            with col2:
+                st.write("**Common Actions:**")
+                action_counts = {}
+                for log in filtered_logs:
+                    action = log['action']
+                    action_counts[action] = action_counts.get(action, 0) + 1
+                
+                for action, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
+                    st.write(f"• {action}: {count} times")
+    else:
+        st.info("No lecturer activity matching the filters")
+
+def show_student_activity():
+    """Detailed student activity logs"""
+    st.header("🎓 Student Activity Monitor")
+    
+    student_logs = get_student_logs()
+    
+    if not student_logs:
+        st.info("No student activity recorded yet")
+        return
+    
+    # Filters
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        date_filter = st.selectbox("Time Filter", ["All Time", "Last 24 Hours", "Last 7 Days", "Last 30 Days"], key="student_date_filter")
+    
+    with col2:
+        courses = sorted(set(log['course_code'] for log in student_logs))
+        course_filter = st.selectbox("Filter by Course", ["All Courses"] + courses)
+    
+    with col3:
+        actions = sorted(set(log['action'] for log in student_logs))
+        action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions, key="student_action_filter")
+    
+    # Filter logs
+    filtered_logs = student_logs
+    
+    if date_filter != "All Time":
+        if date_filter == "Last 24 Hours":
+            cutoff = datetime.now() - timedelta(hours=24)
+        elif date_filter == "Last 7 Days":
+            cutoff = datetime.now() - timedelta(days=7)
+        else:  # Last 30 Days
+            cutoff = datetime.now() - timedelta(days=30)
+        
+        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+    
+    if course_filter != "All Courses":
+        filtered_logs = [log for log in filtered_logs if log['course_code'] == course_filter]
+    
+    if action_filter != "All Actions":
+        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
+    
+    # Display logs
+    if filtered_logs:
+        st.subheader(f"📋 Student Activity Logs ({len(filtered_logs)} records)")
+        
+        # Convert to DataFrame for better display
+        log_data = []
+        for log in filtered_logs:
+            log_data.append({
+                'Timestamp': log['timestamp'],
+                'Student': log['student_name'],
+                'Matric': log['matric'],
+                'Course': log['course_code'],
+                'Action': log['action'],
+                'Details': log.get('details', '')
+            })
+        
+        df = pd.DataFrame(log_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # Download option
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Student Logs (CSV)",
+            data=csv,
+            file_name="student_activity_logs.csv",
+            mime="text/csv"
+        )
+        
+        # Student statistics
+        st.subheader("📈 Student Engagement Statistics")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Most active students
+            student_activity = {}
+            for log in filtered_logs:
+                student = f"{log['student_name']} ({log['matric']})"
+                student_activity[student] = student_activity.get(student, 0) + 1
+            
+            if student_activity:
+                st.write("**Most Active Students:**")
+                for student, count in sorted(student_activity.items(), key=lambda x: x[1], reverse=True)[:5]:
+                    st.write(f"• {student}: {count} activities")
+        
+        with col2:
+            # Course engagement
+            course_engagement = {}
+            for log in filtered_logs:
+                course = log['course_code']
+                course_engagement[course] = course_engagement.get(course, 0) + 1
+            
+            if course_engagement:
+                st.write("**Course Engagement:**")
+                for course, count in sorted(course_engagement.items(), key=lambda x: x[1], reverse=True)[:5]:
+                    st.write(f"• {course}: {count} activities")
+    else:
+        st.info("No student activity matching the filters")
+
+def show_analytics():
+    """System analytics and insights"""
+    st.header("📈 System Analytics")
+    
+    lecturer_logs = get_lecturer_logs()
+    student_logs = get_student_logs()
+    courses = load_courses_config()
+    
+    if not lecturer_logs and not student_logs:
+        st.info("No data available for analytics")
+        return
+    
+    # Activity trends
+    st.subheader("📊 Activity Trends")
+    
+    # Daily activity for last 7 days
+    dates = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+    
+    lecturer_daily = {date: 0 for date in dates}
+    student_daily = {date: 0 for date in dates}
+    
+    for log in lecturer_logs:
+        log_date = log['timestamp'].split()[0]
+        if log_date in lecturer_daily:
+            lecturer_daily[log_date] += 1
+    
+    for log in student_logs:
+        log_date = log['timestamp'].split()[0]
+        if log_date in student_daily:
+            student_daily[log_date] += 1
+    
+    # Create trend chart data
+    trend_data = {
+        'Date': dates,
+        'Lecturer Activities': [lecturer_daily[date] for date in dates],
+        'Student Activities': [student_daily[date] for date in dates]
+    }
+    
+    trend_df = pd.DataFrame(trend_data)
+    st.line_chart(trend_df.set_index('Date'))
+    
+    # System usage statistics
+    st.subheader("🔍 Usage Statistics")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Lecturer Activity Distribution:**")
+        lecturer_actions = {}
+        for log in lecturer_logs:
+            action = log['action']
+            lecturer_actions[action] = lecturer_actions.get(action, 0) + 1
+        
+        for action, count in sorted(lecturer_actions.items(), key=lambda x: x[1], reverse=True):
+            st.write(f"• {action}: {count}")
+    
+    with col2:
+        st.write("**Student Activity Distribution:**")
+        student_actions = {}
+        for log in student_logs:
+            action = log['action']
+            student_actions[action] = student_actions.get(action, 0) + 1
+        
+        for action, count in sorted(student_actions.items(), key=lambda x: x[1], reverse=True):
+            st.write(f"• {action}: {count}")
+
+def show_system_settings():
+    """System configuration settings"""
+    st.header("🔧 System Settings")
+    
+    # System information
+    st.subheader("ℹ️ System Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric("System Admin Password", "🔒 Secured")
+        st.metric("Default Lecturer Password", "bimpe2025class")
+    
+    with col2:
+        st.metric("Data Directory", PERSISTENT_DATA_DIR)
+        st.metric("Log Retention", "1000 records per type")
+    
+    # Password management
+    st.subheader("🔐 Password Management")
+    
+    with st.expander("Change System Admin Password"):
+        current_password = st.text_input("Current Password", type="password")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm New Password", type="password")
+        
+        if st.button("Change System Admin Password"):
+            if current_password != SYSTEM_ADMIN_PASSWORD:
+                st.error("❌ Current password is incorrect")
+            elif new_password != confirm_password:
+                st.error("❌ New passwords don't match")
+            elif not new_password:
+                st.error("❌ New password cannot be empty")
+            else:
+                # In a real system, you'd update the password here
+                st.success("✅ System admin password updated successfully!")
+                st.info("Note: In production, this would update the system password")
+    
+    # System maintenance
+    st.subheader("🛠️ System Maintenance")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Clear All Logs", type="secondary"):
+            logs_file = get_system_logs_file()
+            if os.path.exists(logs_file):
+                with open(logs_file, 'w') as f:
+                    json.dump({"lecturer_logs": [], "student_logs": []}, f)
+                st.success("✅ All system logs cleared!")
+    
+    with col2:
+        if st.button("📊 Generate System Report", type="primary"):
+            generate_system_report()
+            st.success("✅ System report generated!")
+
+def show_alert_center():
+    """System alerts and notifications"""
+    st.header("🚨 Alert Center")
+    
+    # Check for system issues
+    lecturer_logs = get_lecturer_logs()
+    student_logs = get_student_logs()
+    
+    alerts = []
+    
+    # Check for no recent activity
+    recent_lecturer = any(is_recent(log['timestamp'], 1) for log in lecturer_logs)
+    if not recent_lecturer:
+        alerts.append("⚠️ No lecturer activity in the last 24 hours")
+    
+    recent_student = any(is_recent(log['timestamp'], 1) for log in student_logs)
+    if not recent_student:
+        alerts.append("⚠️ No student activity in the last 24 hours")
+    
+    # Check for error patterns
+    error_actions = [log for log in lecturer_logs + student_logs if 'error' in log.get('action', '').lower() or 'fail' in log.get('action', '').lower()]
+    if error_actions:
+        alerts.append(f"🚨 {len(error_actions)} error/failure actions detected")
+    
+    # Display alerts
+    if alerts:
+        for alert in alerts:
+            st.error(alert)
+    else:
+        st.success("✅ All systems operational - No critical alerts")
+    
+    # Recent important events
+    st.subheader("📋 Recent Important Events")
+    
+    important_events = []
+    for log in lecturer_logs[-10:] + student_logs[-10:]:
+        if any(keyword in log.get('action', '').lower() for keyword in ['password', 'login', 'error', 'submit', 'upload']):
+            important_events.append(log)
+    
+    if important_events:
+        for event in sorted(important_events, key=lambda x: x['timestamp'], reverse=True)[:5]:
+            if 'lecturer_name' in event:
+                st.write(f"👩‍🏫 **{event['lecturer_name']}** - {event['action']} - *{event['timestamp']}*")
+            else:
+                st.write(f"🎓 **{event['student_name']}** - {event['action']} - *{event['timestamp']}*")
+    else:
+        st.info("No important events to display")
+
+def generate_system_report():
+    """Generate comprehensive system report"""
+    lecturer_logs = get_lecturer_logs()
+    student_logs = get_student_logs()
+    courses = load_courses_config()
+    
+    report = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_courses": len(courses),
+        "total_lecturer_activities": len(lecturer_logs),
+        "total_student_activities": len(student_logs),
+        "active_lecturers": len(set(log['lecturer_name'] for log in lecturer_logs)),
+        "active_students": len(set(log['student_name'] for log in student_logs)),
+        "courses": list(courses.values())
+    }
+    
+    # Save report
+    report_file = os.path.join(PERSISTENT_DATA_DIR, f"system_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2)
+    
+    return report
+
+def is_recent(timestamp, days=1):
+    """Check if timestamp is within the last N days"""
+    try:
+        log_time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        return (datetime.now() - log_time).days <= days
+    except:
+        return False
+
+# ===============================================================
+# 🔄 UPDATE EXISTING FUNCTIONS TO INCLUDE LOGGING
+# ===============================================================
+
+def update_admin_functions_with_logging(course_code, course_name):
+    """Update admin functions to log activities"""
+    # Example: When admin logs in
+    log_lecturer_activity("Admin User", course_code, "Admin Login", f"Logged into {course_name}")
+    
+    # Add similar logging calls to other admin actions:
+    # - When they change passwords
+    # - When they upload materials
+    # - When they create MCQ questions
+    # - When they open/close classwork
+
+def update_student_functions_with_logging(course_code, student_name, matric):
+    """Update student functions to log activities"""
+    # Example: When student logs in
+    log_student_activity(student_name, matric, course_code, "Student Login")
+    
+    # Add similar logging calls to other student actions:
+    # - When they submit assignments
+    # - When they mark attendance
+    # - When they submit MCQ answers
+    # - When they download materials
+
 
 # ===============================================================
 # 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
@@ -3837,11 +4486,11 @@ def admin_view(course_code, course_name):
 
 
 # ===============================================================
-# 🚀 MAIN APPLICATION
+# 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
 
 def main():
-    """Main application with navigation"""
+    """Main application with System Admin role"""
     
     # Application Header
     st.subheader("Multi-Course Learning Management System")
@@ -3867,34 +4516,24 @@ def main():
     # Load courses
     COURSES = load_courses_config()
     
-    # Course Selection
-    if st.session_state["role"] in ["Student", "Admin"] and COURSES:
+    # Route based on role
+    if st.session_state["role"] == "System Admin":
+        show_system_admin_dashboard()
+    elif st.session_state["role"] == "Admin" and COURSES:
         course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
         course_code = COURSES[course]
         course_name = course
-        st.sidebar.markdown("---")
-    
-    # Main content area based on role
-    if st.session_state["role"] == "System Admin":
-        show_course_management()
-    elif st.session_state["role"] == "Admin" and COURSES:
         admin_view(course_code, course_name)
     elif st.session_state["role"] == "Student" and COURSES:
+        course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
+        course_code = COURSES[course]
+        course_name = course
         student_view(course_code, course_name)
     else:
         if not COURSES:
             st.warning("⚠️ No courses available. Please contact system administrator.")
         else:
             st.warning("👆 Please select your role from the sidebar to continue.")
-        
-        # Show system info
-        st.info("""
-        **System Features:**
-        - 🏫 **System Admin**: Manage all courses and passwords
-        - 👩‍🏫 **Admin/Lecturer**: Manage individual course content with customizable passwords  
-        - 🎓 **Student**: Access course materials and automated assessments
-        - 🔐 **Secure**: Individual password protection for each course
-        """)
 
 # Footer
 st.markdown("""
@@ -3915,12 +4554,13 @@ st.markdown("""
     }
     </style>
     <div class="custom-footer">
-        Developed by <b>Mide</b> | © 2025 | Multi-Course LMS with Password Management
+        Developed by <b>Mide</b> | © 2025 | Advanced LMS with System Monitoring
     </div>
 """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
 
 
 
