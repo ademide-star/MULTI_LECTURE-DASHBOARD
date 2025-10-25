@@ -1901,7 +1901,50 @@ def compute_grade(score):
 
 
 # ===============================================================
-# 🎓 STUDENT VIEW
+# 📊 FINAL GRADE CALCULATION FUNCTIONS
+# ===============================================================
+
+def calculate_final_grade(student_scores):
+    """Calculate final grade for a student based on all scores"""
+    try:
+        if student_scores.empty:
+            return None, None, 0, 0, 0, 0, 0
+        
+        # Separate weekly scores and exam score
+        weekly_scores = student_scores[student_scores['Week'] != 'Exam']
+        exam_scores = student_scores[student_scores['Week'] == 'Exam']
+        
+        # Calculate averages for continuous assessment
+        assignment_avg = weekly_scores['Assignment'].mean() if not weekly_scores.empty and 'Assignment' in weekly_scores.columns else 0
+        test_avg = weekly_scores['Test'].mean() if not weekly_scores.empty and 'Test' in weekly_scores.columns else 0
+        practical_avg = weekly_scores['Practical'].mean() if not weekly_scores.empty and 'Practical' in weekly_scores.columns else 0
+        classwork_avg = weekly_scores['Classwork'].mean() if not weekly_scores.empty and 'Classwork' in weekly_scores.columns else 0
+        
+        # Get exam score
+        exam_score = exam_scores['Exam'].iloc[0] if not exam_scores.empty and 'Exam' in exam_scores.columns else 0
+        
+        # Calculate final total (CA 30% + Exam 70%)
+        ca_total = (
+            (assignment_avg * 0.08) + 
+            (test_avg * 0.08) + 
+            (practical_avg * 0.05) + 
+            (classwork_avg * 0.09)
+        )
+        exam_contribution = exam_score * 0.70
+        final_total = ca_total + exam_contribution
+        
+        # Compute final grade
+        final_grade = compute_grade(final_total)
+        
+        return final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score
+        
+    except Exception as e:
+        st.error(f"Error calculating final grade: {e}")
+        return None, None, 0, 0, 0, 0, 0
+
+
+# ===============================================================
+# 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
 
 def student_view(course_code):
@@ -2111,7 +2154,7 @@ def student_view(course_code):
 
         with tab5:
             # ===============================================================
-            # 📊 SCORES VIEWING SECTION
+            # 📊 SCORES VIEWING SECTION - FIXED VERSION
             # ===============================================================
             st.header("📊 My Scores & Grades")
             
@@ -2136,6 +2179,7 @@ def student_view(course_code):
                     ]
                     return student_scores
                 except Exception as e:
+                    st.error(f"Error loading scores: {e}")
                     return pd.DataFrame()
 
             student_scores = load_student_scores(course_code, student_name, student_matric)
@@ -2144,20 +2188,26 @@ def student_view(course_code):
                 # Display weekly scores
                 st.subheader("📋 Weekly Scores")
                 display_columns = ["Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]
-                display_df = student_scores[display_columns].copy()
+                # Only show columns that exist in the dataframe
+                available_columns = [col for col in display_columns if col in student_scores.columns]
+                display_df = student_scores[available_columns].copy()
                 
                 # Format percentages
                 for col in ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total"]:
-                    display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x != 0 else "N/A")
+                    if col in display_df.columns:
+                        display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x != 0 else "N/A")
                 
                 st.dataframe(display_df, use_container_width=True)
                 
                 # FINAL GRADE CALCULATION AFTER 15 WEEKS + EXAM
                 st.subheader("🎓 Final Grade Calculation")
                 
-                final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score = calculate_final_grade(student_scores)
+                # Use the fixed calculate_final_grade function
+                result = calculate_final_grade(student_scores)
                 
-                if final_total is not None:
+                if result[0] is not None:  # Check if final_total is not None
+                    final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score = result
+                    
                     st.info("""
                     **Grading Breakdown:**
                     - Continuous Assessment (15 weeks average): 30%
@@ -2192,18 +2242,19 @@ def student_view(course_code):
                     exam_contribution = exam_score * 0.70
                     
                     st.write("**Continuous Assessment (30%):**")
-                    st.progress(ca_total / 30)
+                    st.progress(min(ca_total / 30, 1.0))  # Ensure progress doesn't exceed 1.0
                     st.write(f"Assignment: {assignment_avg:.1f}% × 8% = {assignment_avg*0.08:.1f}%")
                     st.write(f"Test: {test_avg:.1f}% × 8% = {test_avg*0.08:.1f}%") 
                     st.write(f"Practical: {practical_avg:.1f}% × 5% = {practical_avg*0.05:.1f}%")
                     st.write(f"Classwork: {classwork_avg:.1f}% × 9% = {classwork_avg*0.09:.1f}%")
                     
                     st.write("**Exam (70%):**")
-                    st.progress(exam_contribution / 70)
+                    st.progress(min(exam_contribution / 70, 1.0))  # Ensure progress doesn't exceed 1.0
                     st.write(f"Exam: {exam_score:.1f}% × 70% = {exam_contribution:.1f}%")
                     
                 else:
                     st.info("📊 Complete your 15 weeks of continuous assessment and exam to see your final grade.")
+                    st.info("💡 You need scores for all 15 weeks plus an exam score to calculate your final grade.")
                 
             else:
                 st.info("📊 No scores recorded yet for your account. Scores will appear here once your lecturer grades your work.")
@@ -2242,174 +2293,6 @@ def student_view(course_code):
     except Exception as e:
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
-
-
-def display_weekly_lecture_materials(course_code, week, student_name, student_matric):
-    """Display lecture materials for a specific week"""
-    lectures_df = load_lectures(course_code)
-    
-    # Find the row for the selected week
-    week_row = lectures_df[lectures_df["Week"] == week]
-    
-    if week_row.empty:
-        st.info(f"No lecture materials available for {week} yet.")
-        return
-    
-    row = week_row.iloc[0]
-    
-    st.subheader(f"📖 {row['Topic']}")
-    
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        if row["Brief"] and str(row["Brief"]).strip():
-            st.markdown(f"**Description:** {row['Brief']}")
-        
-        # Assignment section
-        if row["Assignment"] and str(row["Assignment"]).strip():
-            st.markdown(f"**Assignment:** {row['Assignment']}")
-    
-    with col2:
-        # PDF access
-        pdf_file = row.get("PDF_File", "")
-        if not isinstance(pdf_file, str):
-            pdf_file = str(pdf_file) if pdf_file is not None else ""
-        pdf_file = pdf_file.strip()
-        
-        if pdf_file and os.path.exists(pdf_file):
-            try:
-                with open(pdf_file, "rb") as pdf_file_obj:
-                    file_size = os.path.getsize(pdf_file) / (1024 * 1024)
-                    st.download_button(
-                        label=f"📥 Download PDF ({file_size:.1f}MB)",
-                        data=pdf_file_obj,
-                        file_name=os.path.basename(pdf_file),
-                        mime="application/pdf",
-                        key=f"student_pdf_{week.replace(' ', '_')}"
-                    )
-                    st.success("✅ PDF available")
-            except Exception as e:
-                st.error(f"⚠️ Error loading PDF: {e}")
-        else:
-            st.info("No PDF available")
-
-
-def display_classwork_section(course_code, week, student_name, student_matric):
-    """Display classwork section for the selected week"""
-    
-    st.markdown("---")
-    st.subheader(f"🧩 Classwork - {week}")
-    
-    # Check for automated MCQ questions for this week
-    mcq_questions = load_mcq_questions(course_code, week)
-    
-    if mcq_questions and len(mcq_questions) > 0:
-        st.markdown("### 🧩 Automated Classwork Questions")
-        
-        # Check if classwork is open
-        classwork_status = is_classwork_open(course_code, week)
-        close_classwork_after_20min(course_code, week)  # Auto-close check
-
-        # Display classwork status
-        if classwork_status:
-            st.success("✅ Classwork is OPEN - You can submit your answers")
-            
-            # Show auto-close countdown if open
-            current_status = get_classwork_status(course_code, week)
-            if current_status.get("is_open", False) and current_status.get("open_time"):
-                try:
-                    open_time = datetime.fromisoformat(current_status["open_time"])
-                    elapsed = (datetime.now() - open_time).total_seconds()
-                    remaining = max(0, 1200 - elapsed)  # 20 minutes
-                    
-                    if remaining > 0:
-                        mins = int(remaining // 60)
-                        secs = int(remaining % 60)
-                        st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
-                except:
-                    pass
-        else:
-            st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
-
-        # Check if already submitted
-        classwork_file = get_file(course_code, "classwork")
-        already_submitted = False
-        previous_score = 0
-        
-        if os.path.exists(classwork_file):
-            try:
-                df = pd.read_csv(classwork_file)
-                existing = df[
-                    (df['Name'] == student_name) & 
-                    (df['Matric'] == student_matric) & 
-                    (df['Week'] == week) &
-                    (df['Type'] == 'MCQ')
-                ]
-                already_submitted = not existing.empty
-                if already_submitted:
-                    previous_score = existing.iloc[0]['Score']
-            except Exception as e:
-                st.error(f"Error checking previous submissions: {e}")
-
-        if already_submitted:
-            st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
-            
-            if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
-                try:
-                    # Remove previous submission
-                    df = df.drop(existing.index)
-                    df.to_csv(classwork_file, index=False)
-                    st.success("✅ Previous submission cleared. You can retake now.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error clearing previous submission: {e}")
-        
-        elif classwork_status:
-            with st.form(f"mcq_form_{week.replace(' ', '_')}"):
-                st.write("**Answer the following questions:**")
-                answers = display_mcq_questions(mcq_questions)
-                
-                submit_mcq = st.form_submit_button(
-                    "🚀 Submit Classwork Answers", 
-                    use_container_width=True
-                )
-
-                if submit_mcq:
-                    if not student_name or not student_matric:
-                        st.error("❌ Please set your identity first using the form above.")
-                    elif any(not str(answer).strip() for answer in answers):
-                        st.error("❌ Please answer all questions before submitting.")
-                    else:
-                        # Auto-grade submission
-                        score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
-                        
-                        # Save submission
-                        success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
-                        if success:
-                            # Update classwork score in main scores file
-                            update_classwork_score(course_code, student_name, student_matric, week, score)
-                            
-                            st.balloons()
-                            st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
-                            st.rerun()
-                        else:
-                            st.error("❌ Failed to save your submission. Please try again.")
-        else:
-            st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
-            
-            # Show questions in read-only mode when closed
-            st.markdown("---")
-            st.write("**Questions Preview (Read-only):**")
-            for i, question in enumerate(mcq_questions):
-                st.write(f"**Q{i+1}: {question['question']}**")
-                if question['type'] == 'mcq':
-                    st.write("Options:")
-                    for opt, text in question['options'].items():
-                        st.write(f"- {opt}: {text}")
-                st.write("")  # Add spacing
-    else:
-        st.info(f"No automated classwork assigned for {week} yet.")
-        st.write("💡 *If you believe there should be classwork, please ask your lecturer to check the Admin dashboard.*")
 
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
@@ -3417,6 +3300,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
