@@ -146,13 +146,12 @@ def load_mcq_questions(course_code, week):
         mcq_file = get_file(course_code, "mcq")
         mcq_dir = os.path.dirname(mcq_file)
         week_file = os.path.join(mcq_dir, f"{week}_questions.json")
-        
-        st.write(f"🔍 Looking for MCQ file: {week_file}")  # DEBUG
+    
         
         if os.path.exists(week_file):
             with open(week_file, 'r') as f:
                 questions = json.load(f)
-                st.write(f"✅ Loaded {len(questions)} questions from {week_file}")  # DEBUG
+
                 return questions
         else:
             st.write(f"❌ MCQ file not found: {week_file}")  # DEBUG
@@ -3525,6 +3524,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
