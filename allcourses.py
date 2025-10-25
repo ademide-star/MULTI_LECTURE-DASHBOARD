@@ -1671,7 +1671,215 @@ def view_all_classwork_submissions(course_code):
         
     except Exception as e:
         st.error(f"Error loading classwork submissions: {e}")
+# ===============================================================
+# 🧩 AUTOMATED CLASSWORK SECTION WITH OPEN/CLOSE CONTROL
+# ===============================================================
 
+def display_mcq_questions(questions):
+    """Display MCQ questions and collect answers"""
+    answers = []
+    for i, question in enumerate(questions):
+        st.write(f"**Q{i+1}: {question['question']}**")
+        
+        if question['type'] == 'mcq':
+            # Display multiple choice options
+            options = question['options']
+            selected_option = st.radio(
+                f"Select your answer for Q{i+1}:",
+                options=list(options.keys()),
+                format_func=lambda x: f"{x}: {options[x]}",
+                key=f"mcq_{i}"
+            )
+            answers.append(selected_option)
+        else:  # gap_fill
+            # Display text input for gap filling
+            answer = st.text_input(
+                f"Your answer for Q{i+1}:",
+                placeholder="Type your answer here...",
+                key=f"gap_{i}"
+            )
+            answers.append(answer)
+    
+    return answers
+
+def auto_grade_mcq_submission(questions, answers):
+    """Auto-grade MCQ submissions"""
+    correct = 0
+    total = len(questions)
+    
+    for i, question in enumerate(questions):
+        if i < len(answers):
+            user_answer = answers[i].strip()
+            correct_answer = question['correct_answer']
+            
+            if question['type'] == 'mcq':
+                # For MCQ, check if selected option matches correct answer
+                if user_answer.upper() == correct_answer.upper():
+                    correct += 1
+            else:
+                # For gap filling, check if answer matches any of the correct options
+                correct_options = [opt.strip() for opt in correct_answer.split('|')]
+                if user_answer.lower() in [opt.lower() for opt in correct_options]:
+                    correct += 1
+    
+    score = round((correct / total) * 100, 1) if total > 0 else 0
+    return score, correct, total
+
+def save_mcq_submission(course_code, week, student_name, student_matric, answers, score):
+    """Save MCQ submission to file"""
+    try:
+        classwork_file = get_file(course_code, "classwork")
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(classwork_file), exist_ok=True)
+        
+        # Prepare submission data
+        submission = {
+            'Name': student_name,
+            'Matric': student_matric,
+            'Week': week,
+            'Type': 'MCQ',
+            'Answers': json.dumps(answers),
+            'Score': score,
+            'Timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # Load existing data or create new DataFrame
+        if os.path.exists(classwork_file):
+            df = pd.read_csv(classwork_file)
+        else:
+            df = pd.DataFrame(columns=['Name', 'Matric', 'Week', 'Type', 'Answers', 'Score', 'Timestamp'])
+        
+        # Remove any previous submission by this student for this week
+        mask = (
+            (df['Name'] == student_name) & 
+            (df['Matric'] == student_matric) & 
+            (df['Week'] == week) &
+            (df['Type'] == 'MCQ')
+        )
+        df = df[~mask]
+        
+        # Add new submission
+        df = pd.concat([df, pd.DataFrame([submission])], ignore_index=True)
+        
+        # Save to file
+        df.to_csv(classwork_file, index=False)
+        return True
+        
+    except Exception as e:
+        st.error(f"Error saving submission: {e}")
+        return False
+
+# Check for automated MCQ questions for this week
+mcq_questions = load_mcq_questions(course_code, week)
+
+if mcq_questions and len(mcq_questions) > 0:
+    st.markdown("### 🧩 Automated Classwork Questions")
+    
+    # Check if classwork is open
+    classwork_status = is_classwork_open(course_code, week)
+    close_classwork_after_20min(course_code, week)  # Auto-close check
+
+    # Display classwork status
+    if classwork_status:
+        st.success("✅ Classwork is OPEN - You can submit your answers")
+        
+        # Show auto-close countdown if open
+        current_status = get_classwork_status(course_code, week)
+        if current_status.get("is_open", False) and current_status.get("open_time"):
+            try:
+                open_time = datetime.fromisoformat(current_status["open_time"])
+                elapsed = (datetime.now() - open_time).total_seconds()
+                remaining = max(0, 1200 - elapsed)  # 20 minutes
+                
+                if remaining > 0:
+                    mins = int(remaining // 60)
+                    secs = int(remaining % 60)
+                    st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
+            except:
+                pass
+    else:
+        st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
+
+    # Check if already submitted
+    classwork_file = get_file(course_code, "classwork")
+    already_submitted = False
+    previous_score = 0
+    
+    if os.path.exists(classwork_file):
+        try:
+            df = pd.read_csv(classwork_file)
+            existing = df[
+                (df['Name'] == student_name) & 
+                (df['Matric'] == student_matric) & 
+                (df['Week'] == week) &
+                (df['Type'] == 'MCQ')
+            ]
+            already_submitted = not existing.empty
+            if already_submitted:
+                previous_score = existing.iloc[0]['Score']
+        except Exception as e:
+            st.error(f"Error checking previous submissions: {e}")
+
+    if already_submitted:
+        st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
+        
+        if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
+            try:
+                # Remove previous submission
+                df = df.drop(existing.index)
+                df.to_csv(classwork_file, index=False)
+                st.success("✅ Previous submission cleared. You can retake now.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error clearing previous submission: {e}")
+    
+    elif classwork_status:
+        with st.form(f"mcq_form_{week.replace(' ', '_')}"):
+            st.write("**Answer the following questions:**")
+            answers = display_mcq_questions(mcq_questions)
+            
+            submit_mcq = st.form_submit_button(
+                "🚀 Submit Classwork Answers", 
+                use_container_width=True
+            )
+
+            if submit_mcq:
+                if not student_name or not student_matric:
+                    st.error("❌ Please set your identity first using the form above.")
+                elif any(not str(answer).strip() for answer in answers):
+                    st.error("❌ Please answer all questions before submitting.")
+                else:
+                    # Auto-grade submission
+                    score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
+                    
+                    # Save submission
+                    success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
+                    if success:
+                        # Update classwork score in main scores file
+                        update_classwork_score(course_code, student_name, student_matric, week, score)
+                        
+                        st.balloons()
+                        st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to save your submission. Please try again.")
+    else:
+        st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
+        
+        # Show questions in read-only mode when closed (so students can see them)
+        st.markdown("---")
+        st.write("**Questions Preview (Read-only):**")
+        for i, question in enumerate(mcq_questions):
+            st.write(f"**Q{i+1}: {question['question']}**")
+            if question['type'] == 'mcq':
+                st.write("Options:")
+                for opt, text in question['options'].items():
+                    st.write(f"- {opt}: {text}")
+            st.write("")  # Add spacing
+else:
+    st.info("No automated classwork assigned for this week yet.")
+    
 # ===============================================================
 # 🎓 STUDENT VIEW
 # ===============================================================
