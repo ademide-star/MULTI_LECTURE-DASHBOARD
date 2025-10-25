@@ -1710,6 +1710,8 @@ def view_all_classwork_submissions(course_code):
         
     except Exception as e:
         st.error(f"Error loading classwork submissions: {e}")
+
+
 # ===============================================================
 # 🧩 AUTOMATED CLASSWORK SECTION WITH OPEN/CLOSE CONTROL
 # ===============================================================
@@ -1809,8 +1811,6 @@ def save_mcq_submission(course_code, week, student_name, student_matric, answers
         st.error(f"Error saving submission: {e}")
         return False
 
-
-    
 # ===============================================================
 # 🎓 STUDENT VIEW
 # ===============================================================
@@ -1851,12 +1851,179 @@ def student_view(course_code):
             st.success(f"**Logged in as:** {student_name} ({student_matric})")
         else:
             st.warning("⚠️ Please set your identity above to view your scores and submit work.")
+            return
 
-        # ===============================================================
-        # 📊 SCORES VIEWING SECTION
-        # ===============================================================
-        if student_name and student_matric:
-            # Load and display student scores
+        # Week selection in sidebar for consistent navigation
+        st.sidebar.header("📅 Week Navigation")
+        selected_week = st.sidebar.selectbox(
+            "Select Week", 
+            [f"Week {i}" for i in range(1, 16)],
+            key="student_main_week_selector"
+        )
+        
+        # Create tabs for different sections
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "📖 Lecture & Classwork", 
+            "🎥 Video Lectures", 
+            "🕒 Attendance",
+            "📤 Submissions",
+            "📊 My Progress"
+        ])
+
+        with tab1:
+            # ===============================================================
+            # 📖 LECTURE MATERIALS & CLASSWORK FOR SELECTED WEEK
+            # ===============================================================
+            st.header(f"📚 {course_code} - {selected_week}")
+            
+            # Display lecture materials for selected week
+            display_weekly_lecture_materials(course_code, selected_week, student_name, student_matric)
+            
+            # Display classwork for selected week
+            display_classwork_section(course_code, selected_week, student_name, student_matric)
+
+        with tab2:
+            # ===============================================================
+            # 🎥 VIDEO LECTURES SECTION
+            # ===============================================================
+            st.header("🎥 Video Lectures")
+            
+            video_files = get_video_files(course_code)
+            
+            if video_files:
+                st.success(f"Found {len(video_files)} video lecture(s) available!")
+                
+                for i, video in enumerate(video_files):
+                    video_path = get_persistent_path("video", course_code, video)
+                    
+                    with st.expander(f"🎬 {video}", expanded=False):
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            try:
+                                st.video(video_path, start_time=0)
+                                file_size = os.path.getsize(video_path) / (1024 * 1024)
+                                st.caption(f"File size: {file_size:.2f} MB")
+                            except Exception as e:
+                                st.error(f"⚠️ Cannot play this video: {str(e)}")
+                                st.info("The video format might not be supported in your browser. Try downloading it instead.")
+                        
+                        with col2:
+                            try:
+                                with open(video_path, "rb") as vid_file:
+                                    st.download_button(
+                                        label="📥 Download Video",
+                                        data=vid_file,
+                                        file_name=video,
+                                        mime="video/mp4",
+                                        key=f"student_download_{i}",
+                                        use_container_width=True
+                                    )
+                            except Exception as e:
+                                st.error("Download unavailable")
+            else:
+                st.info("No video lectures available yet. Check back later for uploaded content.")
+
+        with tab3:
+            # ===============================================================
+            # 🕒 ATTENDANCE SECTION
+            # ===============================================================
+            st.header("🕒 Mark Attendance")
+            
+            with st.form(f"{course_code}_attendance_form"):
+                # Pre-fill with session state values
+                name = st.text_input("Full Name", value=student_name, key=f"{course_code}_student_name")
+                matric = st.text_input("Matric Number", value=student_matric, key=f"{course_code}_student_matric")
+                
+                # Use the selected week from sidebar
+                st.write(f"**Selected Week:** {selected_week}")
+                
+                submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
+
+            if submit_attendance:
+                if not name.strip() or not matric.strip():
+                    st.warning("Please enter your full name and matric number.")
+                else:
+                    # Save identity to session state
+                    st.session_state.student_identity = {"name": name.strip(), "matric": matric.strip()}
+                    student_name = name.strip()
+                    student_matric = matric.strip()
+                    
+                    # Check if attendance is open
+                    status_data = get_attendance_status(course_code, selected_week)
+                    is_attendance_open = status_data.get("is_open", False)
+                    
+                    if not is_attendance_open:
+                        st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
+                    elif has_marked_attendance(course_code, selected_week, student_name, student_matric):
+                        st.info("✅ Attendance already marked for this week.")
+                    else:
+                        ok = mark_attendance_entry(course_code, student_name, student_matric, selected_week)
+                        if ok:
+                            st.session_state["attended_week"] = str(selected_week)
+                            st.success(f"🎉 Attendance recorded successfully for {course_code} - {selected_week}.")
+                            st.balloons()
+                        else:
+                            st.error("⚠️ Failed to record attendance. Try again later.")
+
+        with tab4:
+            # ===============================================================
+            # 📤 STUDENT SUBMISSIONS SECTION
+            # ===============================================================
+            st.header("📤 Submit Assignments")
+            
+            # Assignment submission
+            st.subheader("📝 Assignment Submission")
+            with st.form("assignment_upload_form"):
+                st.write(f"**Selected Week:** {selected_week}")
+                assignment_file = st.file_uploader("Upload Assignment File", type=["pdf", "doc", "docx", "txt", "zip"], key="assignment_upload")
+                submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
+                
+                if submit_assignment:
+                    if not assignment_file:
+                        st.error("❌ Please select a file to upload.")
+                    else:
+                        file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
+                        if file_path:
+                            log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
+                            st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+
+            # Drawing submission
+            st.subheader("🎨 Drawing Submission")
+            with st.form("drawing_upload_form"):
+                st.write(f"**Selected Week:** {selected_week}")
+                drawing_file = st.file_uploader("Upload Drawing File", type=["jpg", "jpeg", "png", "gif", "pdf"], key="drawing_upload")
+                submit_drawing = st.form_submit_button("📤 Submit Drawing", use_container_width=True)
+                
+                if submit_drawing:
+                    if not drawing_file:
+                        st.error("❌ Please select a file to upload.")
+                    else:
+                        file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
+                        if file_path:
+                            log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
+                            st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
+
+            # Seminar submission
+            st.subheader("📊 Seminar Submission")
+            with st.form("seminar_upload_form"):
+                st.write(f"**Selected Week:** {selected_week}")
+                seminar_file = st.file_uploader("Upload Seminar File", type=["pdf", "ppt", "pptx", "doc", "docx"], key="seminar_upload")
+                submit_seminar = st.form_submit_button("📤 Submit Seminar", use_container_width=True)
+                
+                if submit_seminar:
+                    if not seminar_file:
+                        st.error("❌ Please select a file to upload.")
+                    else:
+                        file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
+                        if file_path:
+                            log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
+                            st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
+
+        with tab5:
+            # ===============================================================
+            # 📊 SCORES VIEWING SECTION
+            # ===============================================================
             st.header("📊 My Scores & Grades")
             
             def load_student_scores(course_code, student_name, student_matric):
@@ -1951,15 +2118,10 @@ def student_view(course_code):
                 
             else:
                 st.info("📊 No scores recorded yet for your account. Scores will appear here once your lecturer grades your work.")
-        
-        else:
-            st.warning("⚠️ Please set your identity above to view your scores.")
             
-       
-        # ===============================================================
-        # 📈 ACTIVITY SUMMARY SECTION
-        # ===============================================================
-        if student_name and student_matric:
+            # ===============================================================
+            # 📈 ACTIVITY SUMMARY SECTION
+            # ===============================================================
             st.header("📈 My Activity Summary")
             
             activity_summary = get_student_activity_summary(course_code, student_name, student_matric)
@@ -1985,317 +2147,6 @@ def student_view(course_code):
             else:
                 st.info("No recent activity. Start by marking attendance or submitting assignments!")
 
-        # ===============================================================
-        # 🕒 ATTENDANCE SECTION
-        # ===============================================================
-        st.header("🕒 Mark Attendance")
-        
-        with st.form(f"{course_code}_attendance_form"):
-            # Pre-fill with session state values
-            name = st.text_input("Full Name", value=student_name, key=f"{course_code}_student_name")
-            matric = st.text_input("Matric Number", value=student_matric, key=f"{course_code}_student_matric")
-            week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_att_week")
-            submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-
-        if submit_attendance:
-            if not name.strip() or not matric.strip():
-                st.warning("Please enter your full name and matric number.")
-            else:
-                # Save identity to session state
-                st.session_state.student_identity = {"name": name.strip(), "matric": matric.strip()}
-                student_name = name.strip()
-                student_matric = matric.strip()
-                
-                # Check if attendance is open
-                status_data = get_attendance_status(course_code, week)
-                is_attendance_open = status_data.get("is_open", False)
-                
-                if not is_attendance_open:
-                    st.error("🚫 Attendance for this course is currently closed. Please wait for your lecturer to open it.")
-                elif has_marked_attendance(course_code, week, student_name, student_matric):
-                    st.info("✅ Attendance already marked for this week.")
-                else:
-                    ok = mark_attendance_entry(course_code, student_name, student_matric, week)
-                    if ok:
-                        st.session_state["attended_week"] = str(week)
-                        st.success(f"🎉 Attendance recorded successfully for {course_code} - {week}.")
-                        st.balloons()
-                    else:
-                        st.error("⚠️ Failed to record attendance. Try again later.")
-
-        # ===============================================================
-        # 📖 LECTURE MATERIALS
-        # ===============================================================
-        st.header(f"📚 {course_code} Lecture Materials")
-        
-        lectures_df = load_lectures(course_code)
-        
-        if lectures_df.empty or lectures_df["Week"].isna().all():
-            st.info("No lecture materials available yet. Check back later!")
-        else:
-            # Display each week's materials
-            for _, row in lectures_df.iterrows():
-                if pd.isna(row["Week"]) or row["Week"] == "":
-                    continue
-                    
-                week = row["Week"]
-                    
-                with st.expander(f"📖 {row['Week']}: {row['Topic']}", expanded=False):
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        if row["Brief"] and str(row["Brief"]).strip():
-                            st.markdown(f"**Description:** {row['Brief']}")
-                        
-                        # Assignment section
-                        if row["Assignment"] and str(row["Assignment"]).strip():
-                            st.markdown(f"**Assignment:** {row['Assignment']}")
-                    
-                    with col2:
-                        # PDF access
-                        pdf_file = row.get("PDF_File", "")
-                        if not isinstance(pdf_file, str):
-                            pdf_file = str(pdf_file) if pdf_file is not None else ""
-                        pdf_file = pdf_file.strip()
-                        
-                        if pdf_file and os.path.exists(pdf_file):
-                            try:
-                                with open(pdf_file, "rb") as pdf_file_obj:
-                                    file_size = os.path.getsize(pdf_file) / (1024 * 1024)
-                                    st.download_button(
-                                        label=f"📥 Download PDF ({file_size:.1f}MB)",
-                                        data=pdf_file_obj,
-                                        file_name=os.path.basename(pdf_file),
-                                        mime="application/pdf",
-                                        key=f"student_pdf_{row['Week'].replace(' ', '_')}"
-                                    )
-                                    st.success("✅ PDF available")
-                            except Exception as e:
-                                st.error(f"⚠️ Error loading PDF: {e}")
-                        else:
-                            st.info("No PDF available")
-
-
-                    #===================================================
-                    # 🧩 AUTOMATED CLASSWORK SECTION (REPLACES OLD CLASSWORK)
-                    #=====================================================
-       # DEBUG: Check if MCQ questions are being loaded
-        st.write("🔍 DEBUG: Checking MCQ questions...")
-        st.write(f"Course: {course_code}, Week: {week}")
-
-# Check for automated MCQ questions for this week
-        mcq_questions = load_mcq_questions(course_code, week)
-
-# Debug output
-        st.write(f"MCQ questions found: {len(mcq_questions) if mcq_questions else 0}")
-        if mcq_questions:
-            st.write(f"First question: {mcq_questions[0]}")
-        else:
-            st.write("No questions found")
-# Check for automated MCQ questions for this week
-        mcq_questions = load_mcq_questions(course_code, week)
-
-        if mcq_questions and len(mcq_questions) > 0:
-            st.markdown("### 🧩 Automated Classwork Questions")
-    
-    # Check if classwork is open
-            classwork_status = is_classwork_open(course_code, week)
-            close_classwork_after_20min(course_code, week)  # Auto-close check
-
-    # Display classwork status
-            if classwork_status:
-                st.success("✅ Classwork is OPEN - You can submit your answers")
-        
-        # Show auto-close countdown if open
-                current_status = get_classwork_status(course_code, week)
-                if current_status.get("is_open", False) and current_status.get("open_time"):
-                    try:
-                        open_time = datetime.fromisoformat(current_status["open_time"])
-                        elapsed = (datetime.now() - open_time).total_seconds()
-                        remaining = max(0, 1200 - elapsed)  # 20 minutes
-                
-                        if remaining > 0:
-                            mins = int(remaining // 60)
-                            secs = int(remaining % 60)
-                            st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
-                    except:
-                        pass
-            else:
-                st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
-
-    # Check if already submitted
-            classwork_file = get_file(course_code, "classwork")
-            already_submitted = False
-            previous_score = 0
-    
-            if os.path.exists(classwork_file):
-                try:
-                    df = pd.read_csv(classwork_file)
-                    existing = df[
-                        (df['Name'] == student_name) & 
-                        (df['Matric'] == student_matric) & 
-                        (df['Week'] == week) &
-                        (df['Type'] == 'MCQ')
-                    ]
-                    already_submitted = not existing.empty
-                    if already_submitted:
-                        previous_score = existing.iloc[0]['Score']
-                except Exception as e:
-                    st.error(f"Error checking previous submissions: {e}")
-
-            if already_submitted:
-                st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
-        
-                if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
-                    try:
-                # Remove previous submission
-                        df = df.drop(existing.index)
-                        df.to_csv(classwork_file, index=False)
-                        st.success("✅ Previous submission cleared. You can retake now.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error clearing previous submission: {e}")
-    
-            elif classwork_status:
-                with st.form(f"mcq_form_{week.replace(' ', '_')}"):
-                    st.write("**Answer the following questions:**")
-                    answers = display_mcq_questions(mcq_questions)
-            
-                    submit_mcq = st.form_submit_button(
-                        "🚀 Submit Classwork Answers", 
-                        use_container_width=True
-            )
-
-                    if submit_mcq:
-                        if not student_name or not student_matric:
-                            st.error("❌ Please set your identity first using the form above.")
-                        elif any(not str(answer).strip() for answer in answers):
-                            st.error("❌ Please answer all questions before submitting.")
-                        else:
-                    # Auto-grade submission
-                            score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
-                    
-                    # Save submission
-                            success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
-                            if success:
-                        # Update classwork score in main scores file
-                                update_classwork_score(course_code, student_name, student_matric, week, score)
-                        
-                                st.balloons()
-                                st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to save your submission. Please try again.")
-            else:
-                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
-        
-        # Show questions in read-only mode when closed (so students can see them)
-                st.markdown("---")
-                st.write("**Questions Preview (Read-only):**")
-                for i, question in enumerate(mcq_questions):
-                    st.write(f"**Q{i+1}: {question['question']}**")
-                    if question['type'] == 'mcq':
-                        st.write("Options:")
-                        for opt, text in question['options'].items():
-                            st.write(f"- {opt}: {text}")
-                    st.write("")  # Add spacing
-        else:
-            st.info("No automated classwork assigned for this week yet.")
-        # ===============================================================
-        # 🎥 VIDEO LECTURES SECTION
-        # ===============================================================
-        st.header("🎥 Video Lectures")
-        
-        video_files = get_video_files(course_code)
-        
-        if video_files:
-            st.success(f"Found {len(video_files)} video lecture(s) available!")
-            
-            for i, video in enumerate(video_files):
-                video_path = get_persistent_path("video", course_code, video)
-                
-                with st.expander(f"🎬 {video}", expanded=False):
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        try:
-                            st.video(video_path, start_time=0)
-                            file_size = os.path.getsize(video_path) / (1024 * 1024)
-                            st.caption(f"File size: {file_size:.2f} MB")
-                        except Exception as e:
-                            st.error(f"⚠️ Cannot play this video: {str(e)}")
-                            st.info("The video format might not be supported in your browser. Try downloading it instead.")
-                    
-                    with col2:
-                        try:
-                            with open(video_path, "rb") as vid_file:
-                                st.download_button(
-                                    label="📥 Download Video",
-                                    data=vid_file,
-                                    file_name=video,
-                                    mime="video/mp4",
-                                    key=f"student_download_{i}",
-                                    use_container_width=True
-                                )
-                        except Exception as e:
-                            st.error("Download unavailable")
-        else:
-            st.info("No video lectures available yet. Check back later for uploaded content.")
-
-        # ===============================================================
-        # 📤 STUDENT SUBMISSIONS SECTION
-        # ===============================================================
-        if student_name and student_matric:
-            st.header("📤 Submit Assignments")
-            
-            # Assignment submission
-            st.subheader("📝 Assignment Submission")
-            with st.form("assignment_upload_form"):
-                assignment_week = st.selectbox("Select Week for Assignment", [f"Week {i}" for i in range(1, 16)], key="assignment_week")
-                assignment_file = st.file_uploader("Upload Assignment File", type=["pdf", "doc", "docx", "txt", "zip"], key="assignment_upload")
-                submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
-                
-                if submit_assignment:
-                    if not assignment_file:
-                        st.error("❌ Please select a file to upload.")
-                    else:
-                        file_path = save_file(course_code, student_name, assignment_week, assignment_file, "assignment")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, assignment_week, assignment_file.name, "assignment")
-                            st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
-
-            # Drawing submission
-            st.subheader("🎨 Drawing Submission")
-            with st.form("drawing_upload_form"):
-                drawing_week = st.selectbox("Select Week for Drawing", [f"Week {i}" for i in range(1, 16)], key="drawing_week")
-                drawing_file = st.file_uploader("Upload Drawing File", type=["jpg", "jpeg", "png", "gif", "pdf"], key="drawing_upload")
-                submit_drawing = st.form_submit_button("📤 Submit Drawing", use_container_width=True)
-                
-                if submit_drawing:
-                    if not drawing_file:
-                        st.error("❌ Please select a file to upload.")
-                    else:
-                        file_path = save_file(course_code, student_name, drawing_week, drawing_file, "drawing")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, drawing_week, drawing_file.name, "drawing")
-                            st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
-
-            # Seminar submission
-            st.subheader("📊 Seminar Submission")
-            with st.form("seminar_upload_form"):
-                seminar_week = st.selectbox("Select Week for Seminar", [f"Week {i}" for i in range(1, 16)], key="seminar_week")
-                seminar_file = st.file_uploader("Upload Seminar File", type=["pdf", "ppt", "pptx", "doc", "docx"], key="seminar_upload")
-                submit_seminar = st.form_submit_button("📤 Submit Seminar", use_container_width=True)
-                
-                if submit_seminar:
-                    if not seminar_file:
-                        st.error("❌ Please select a file to upload.")
-                    else:
-                        file_path = save_file(course_code, student_name, seminar_week, seminar_file, "seminar")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, seminar_week, seminar_file.name, "seminar")
-                            st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
-
         st.markdown("---")
         st.markdown(f"*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
@@ -2303,6 +2154,175 @@ def student_view(course_code):
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
+
+def display_weekly_lecture_materials(course_code, week, student_name, student_matric):
+    """Display lecture materials for a specific week"""
+    lectures_df = load_lectures(course_code)
+    
+    # Find the row for the selected week
+    week_row = lectures_df[lectures_df["Week"] == week]
+    
+    if week_row.empty:
+        st.info(f"No lecture materials available for {week} yet.")
+        return
+    
+    row = week_row.iloc[0]
+    
+    st.subheader(f"📖 {row['Topic']}")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        if row["Brief"] and str(row["Brief"]).strip():
+            st.markdown(f"**Description:** {row['Brief']}")
+        
+        # Assignment section
+        if row["Assignment"] and str(row["Assignment"]).strip():
+            st.markdown(f"**Assignment:** {row['Assignment']}")
+    
+    with col2:
+        # PDF access
+        pdf_file = row.get("PDF_File", "")
+        if not isinstance(pdf_file, str):
+            pdf_file = str(pdf_file) if pdf_file is not None else ""
+        pdf_file = pdf_file.strip()
+        
+        if pdf_file and os.path.exists(pdf_file):
+            try:
+                with open(pdf_file, "rb") as pdf_file_obj:
+                    file_size = os.path.getsize(pdf_file) / (1024 * 1024)
+                    st.download_button(
+                        label=f"📥 Download PDF ({file_size:.1f}MB)",
+                        data=pdf_file_obj,
+                        file_name=os.path.basename(pdf_file),
+                        mime="application/pdf",
+                        key=f"student_pdf_{week.replace(' ', '_')}"
+                    )
+                    st.success("✅ PDF available")
+            except Exception as e:
+                st.error(f"⚠️ Error loading PDF: {e}")
+        else:
+            st.info("No PDF available")
+
+
+def display_classwork_section(course_code, week, student_name, student_matric):
+    """Display classwork section for the selected week"""
+    
+    st.markdown("---")
+    st.subheader(f"🧩 Classwork - {week}")
+    
+    # Check for automated MCQ questions for this week
+    mcq_questions = load_mcq_questions(course_code, week)
+    
+    if mcq_questions and len(mcq_questions) > 0:
+        st.markdown("### 🧩 Automated Classwork Questions")
+        
+        # Check if classwork is open
+        classwork_status = is_classwork_open(course_code, week)
+        close_classwork_after_20min(course_code, week)  # Auto-close check
+
+        # Display classwork status
+        if classwork_status:
+            st.success("✅ Classwork is OPEN - You can submit your answers")
+            
+            # Show auto-close countdown if open
+            current_status = get_classwork_status(course_code, week)
+            if current_status.get("is_open", False) and current_status.get("open_time"):
+                try:
+                    open_time = datetime.fromisoformat(current_status["open_time"])
+                    elapsed = (datetime.now() - open_time).total_seconds()
+                    remaining = max(0, 1200 - elapsed)  # 20 minutes
+                    
+                    if remaining > 0:
+                        mins = int(remaining // 60)
+                        secs = int(remaining % 60)
+                        st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
+                except:
+                    pass
+        else:
+            st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
+
+        # Check if already submitted
+        classwork_file = get_file(course_code, "classwork")
+        already_submitted = False
+        previous_score = 0
+        
+        if os.path.exists(classwork_file):
+            try:
+                df = pd.read_csv(classwork_file)
+                existing = df[
+                    (df['Name'] == student_name) & 
+                    (df['Matric'] == student_matric) & 
+                    (df['Week'] == week) &
+                    (df['Type'] == 'MCQ')
+                ]
+                already_submitted = not existing.empty
+                if already_submitted:
+                    previous_score = existing.iloc[0]['Score']
+            except Exception as e:
+                st.error(f"Error checking previous submissions: {e}")
+
+        if already_submitted:
+            st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
+            
+            if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
+                try:
+                    # Remove previous submission
+                    df = df.drop(existing.index)
+                    df.to_csv(classwork_file, index=False)
+                    st.success("✅ Previous submission cleared. You can retake now.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error clearing previous submission: {e}")
+        
+        elif classwork_status:
+            with st.form(f"mcq_form_{week.replace(' ', '_')}"):
+                st.write("**Answer the following questions:**")
+                answers = display_mcq_questions(mcq_questions)
+                
+                submit_mcq = st.form_submit_button(
+                    "🚀 Submit Classwork Answers", 
+                    use_container_width=True
+                )
+
+                if submit_mcq:
+                    if not student_name or not student_matric:
+                        st.error("❌ Please set your identity first using the form above.")
+                    elif any(not str(answer).strip() for answer in answers):
+                        st.error("❌ Please answer all questions before submitting.")
+                    else:
+                        # Auto-grade submission
+                        score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
+                        
+                        # Save submission
+                        success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
+                        if success:
+                            # Update classwork score in main scores file
+                            update_classwork_score(course_code, student_name, student_matric, week, score)
+                            
+                            st.balloons()
+                            st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to save your submission. Please try again.")
+        else:
+            st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
+            
+            # Show questions in read-only mode when closed
+            st.markdown("---")
+            st.write("**Questions Preview (Read-only):**")
+            for i, question in enumerate(mcq_questions):
+                st.write(f"**Q{i+1}: {question['question']}**")
+                if question['type'] == 'mcq':
+                    st.write("Options:")
+                    for opt, text in question['options'].items():
+                        st.write(f"- {opt}: {text}")
+                st.write("")  # Add spacing
+    else:
+        st.info(f"No automated classwork assigned for {week} yet.")
+        st.write("💡 *If you believe there should be classwork, please ask your lecturer to check the Admin dashboard.*")
+    
+# 
 
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
@@ -3310,6 +3330,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
