@@ -1998,7 +1998,7 @@ def calculate_final_grade(student_scores):
         return None, None, 0, 0, 0, 0, 0
 
 def display_classwork_section(course_code, week, student_name, student_matric):
-    """Display classwork section for the selected week"""
+    """Display classwork section for the selected week - PREVENTS DOUBLE SUBMISSION"""
     try:
         st.markdown("---")
         st.subheader(f"🧩 Classwork - {week}")
@@ -2034,38 +2034,57 @@ def display_classwork_section(course_code, week, student_name, student_matric):
             else:
                 st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
 
-            # Check if already submitted
+            # Check if already submitted - STRICTER CHECK
             classwork_file = get_file(course_code, "classwork")
             already_submitted = False
             previous_score = 0
+            submission_data = None
             
             if os.path.exists(classwork_file):
                 try:
                     df = pd.read_csv(classwork_file)
                     existing = df[
-                        (df['Name'] == student_name) & 
-                        (df['Matric'] == student_matric) & 
-                        (df['Week'] == week) &
+                        (df['Name'].astype(str).str.strip().str.lower() == student_name.lower()) & 
+                        (df['Matric'].astype(str).str.strip().str.lower() == student_matric.lower()) & 
+                        (df['Week'].astype(str).str.strip().str.lower() == week.lower()) &
                         (df['Type'] == 'MCQ')
                     ]
                     already_submitted = not existing.empty
                     if already_submitted:
-                        previous_score = existing.iloc[0]['Score']
+                        submission_data = existing.iloc[0]
+                        previous_score = submission_data['Score']
                 except Exception as e:
                     st.error(f"Error checking previous submissions: {e}")
 
+            # PREVENT DOUBLE SUBMISSION - Show different UI if already submitted
             if already_submitted:
                 st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
+                st.info("📝 You cannot submit again for this week. If you believe this is an error, contact your lecturer.")
                 
-                if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
+                # Show submission details
+                with st.expander("📋 View Your Submission", expanded=False):
+                    st.write(f"**Student:** {submission_data['Name']} ({submission_data['Matric']})")
+                    st.write(f"**Week:** {submission_data['Week']}")
+                    st.write(f"**Score:** {submission_data['Score']}%")
+                    st.write(f"**Submitted:** {submission_data['Timestamp']}")
+                    
+                    # Show answers if available
                     try:
-                        # Remove previous submission
-                        df = df.drop(existing.index)
-                        df.to_csv(classwork_file, index=False)
-                        st.success("✅ Previous submission cleared. You can retake now.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error clearing previous submission: {e}")
+                        answers = json.loads(submission_data['Answers'])
+                        st.write("**Your Answers:**")
+                        for i, (question, answer) in enumerate(zip(mcq_questions, answers)):
+                            st.write(f"**Q{i+1}:** {question['question']}")
+                            st.write(f"**Your Answer:** {answer}")
+                            
+                            # Show correct answer for learning purposes
+                            correct_answer = question['correct_answer']
+                            if question['type'] == 'mcq':
+                                st.write(f"**Correct Answer:** {correct_answer} - {question['options'].get(correct_answer, '')}")
+                            else:
+                                st.write(f"**Correct Answer(s):** {correct_answer}")
+                            st.markdown("---")
+                    except:
+                        st.write("Unable to display answer details")
             
             elif classwork_status:
                 with st.form(f"mcq_form_{week.replace(' ', '_')}"):
@@ -2074,7 +2093,9 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                     
                     submit_mcq = st.form_submit_button(
                         "🚀 Submit Classwork Answers", 
-                        use_container_width=True
+                        use_container_width=True,
+                        # Disable button if already submitted (extra safety)
+                        disabled=already_submitted
                     )
 
                     if submit_mcq:
@@ -2083,6 +2104,19 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                         elif any(not str(answer).strip() for answer in answers):
                             st.error("❌ Please answer all questions before submitting.")
                         else:
+                            # DOUBLE CHECK: Ensure no submission exists (race condition protection)
+                            if os.path.exists(classwork_file):
+                                df_check = pd.read_csv(classwork_file)
+                                existing_check = df_check[
+                                    (df_check['Name'].astype(str).str.strip().str.lower() == student_name.lower()) & 
+                                    (df_check['Matric'].astype(str).str.strip().str.lower() == student_matric.lower()) & 
+                                    (df_check['Week'].astype(str).str.strip().str.lower() == week.lower()) &
+                                    (df_check['Type'] == 'MCQ')
+                                ]
+                                if not existing_check.empty:
+                                    st.error("❌ Submission already exists! You cannot submit twice.")
+                                    return
+                            
                             # Auto-grade submission
                             score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
                             
@@ -2094,6 +2128,7 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                                 
                                 st.balloons()
                                 st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
+                                st.info("📝 You cannot submit again for this week.")
                                 st.rerun()
                             else:
                                 st.error("❌ Failed to save your submission. Please try again.")
@@ -2287,11 +2322,16 @@ def student_view(course_code):
                 if submit_assignment:
                     if not assignment_file:
                         st.error("❌ Please select a file to upload.")
-                    else:
-                        file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
-                            st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+                        else:
+                            existing_check = check_existing_submission(course_code, student_matric, selected_week, "assignment")
+                            if not existing_check.empty:
+                                st.error("❌ Submission already exists! You cannot submit twice.")
+                            else:
+                                file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
+                                if file_path:
+                                    log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
+                                    st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+                           
 
             # Drawing submission
             st.subheader("🎨 Drawing Submission")
@@ -2303,11 +2343,16 @@ def student_view(course_code):
                 if submit_drawing:
                     if not drawing_file:
                         st.error("❌ Please select a file to upload.")
-                    else:
-                        file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
-                            st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
+                        else:
+                            existing_check = check_existing_submission(course_code, student_matric, selected_week, "drawing")
+                            if not existing_check.empty:
+                                st.error("❌ Submission already exists! You cannot submit twice.")
+                            else:
+                                file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
+                                if file_path:
+                                    log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
+                                    st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
+                            
 
             # Seminar submission
             st.subheader("📊 Seminar Submission")
@@ -2320,10 +2365,17 @@ def student_view(course_code):
                     if not seminar_file:
                         st.error("❌ Please select a file to upload.")
                     else:
-                        file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
-                            st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
+                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "seminar")
+                        if not existing_check.empty:
+                            st.error("❌ Submission already exists! You cannot submit twice.")
+                        else:
+                            file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
+                        
+                            if file_path:
+                                log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
+                                st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
+                            
+                                    
 
         with tab5:
             # ===============================================================
@@ -3473,6 +3525,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
