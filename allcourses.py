@@ -1899,7 +1899,62 @@ def compute_grade(score):
     else:
         return "F"
 
-
+def display_weekly_lecture_materials(course_code, week, student_name, student_matric):
+    """Display lecture materials for a specific week"""
+    try:
+        lectures_df = load_lectures(course_code)
+        
+        if lectures_df.empty:
+            st.info(f"No lecture materials available for {week} yet.")
+            return
+        
+        # Find the row for the selected week
+        week_row = lectures_df[lectures_df["Week"] == week]
+        
+        if week_row.empty:
+            st.info(f"No lecture materials available for {week} yet.")
+            return
+        
+        row = week_row.iloc[0]
+        
+        st.subheader(f"📖 {row['Topic']}")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            if row["Brief"] and str(row["Brief"]).strip():
+                st.markdown(f"**Description:** {row['Brief']}")
+            
+            # Assignment section
+            if row["Assignment"] and str(row["Assignment"]).strip():
+                st.markdown(f"**Assignment:** {row['Assignment']}")
+        
+        with col2:
+            # PDF access
+            pdf_file = row.get("PDF_File", "")
+            if not isinstance(pdf_file, str):
+                pdf_file = str(pdf_file) if pdf_file is not None else ""
+            pdf_file = pdf_file.strip()
+            
+            if pdf_file and os.path.exists(pdf_file):
+                try:
+                    with open(pdf_file, "rb") as pdf_file_obj:
+                        file_size = os.path.getsize(pdf_file) / (1024 * 1024)
+                        st.download_button(
+                            label=f"📥 Download PDF ({file_size:.1f}MB)",
+                            data=pdf_file_obj,
+                            file_name=os.path.basename(pdf_file),
+                            mime="application/pdf",
+                            key=f"student_pdf_{week.replace(' ', '_')}"
+                        )
+                        st.success("✅ PDF available")
+                except Exception as e:
+                    st.error(f"⚠️ Error loading PDF: {e}")
+            else:
+                st.info("No PDF available")
+    
+    except Exception as e:
+        st.error(f"Error loading lecture materials: {e}")
 # ===============================================================
 # 📊 FINAL GRADE CALCULATION FUNCTIONS
 # ===============================================================
@@ -3300,6 +3355,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
