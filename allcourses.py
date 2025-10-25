@@ -2499,12 +2499,12 @@ def display_classwork_section(course_code, week, student_name, student_matric):
 # 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
 
-def student_view(course_code):
+def student_view(course_code, course_name):
     """Student dashboard view with persistent storage and scores viewing"""
     try:
         ensure_directories()
         
-        st.title(f"🎓 Student Dashboard - {course_code}")
+        st.title(f"🎓 Student Dashboard - {course_code, course_name}")
         
         # Initialize student identity
         if "student_identity" not in st.session_state:
@@ -3921,6 +3921,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
