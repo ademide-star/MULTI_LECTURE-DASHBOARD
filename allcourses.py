@@ -2158,7 +2158,7 @@ def admin_view(course_code):
         st.title("👩‍🏫 Admin Dashboard")
         
         # Create tabs for better organization - INCLUDING COURSE MANAGER
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10= st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "📚 Course Manager",  # NEW TAB ADDED
             "📖 Lecture Management", 
             "🎥 Video Management", 
@@ -2183,15 +2183,15 @@ def admin_view(course_code):
             # ===============================================================
             st.header("📖 Lecture Management")
 
-# Load lectures
+            # Load lectures
             lectures_df = load_lectures(course_code)
             st.session_state["lectures_df"] = lectures_df
 
-# Add/Edit Lecture Section
+            # Add/Edit Lecture Section
             with st.expander("📘 Add / Edit Lecture Materials & Assignment", expanded=True):
-                week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)])
+                week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key="lecture_week_select")
     
-    # Find or create row for this week
+                # Find or create row for this week
                 if week in lectures_df["Week"].values:
                     row_idx = lectures_df[lectures_df["Week"] == week].index[0]
                 else:
@@ -2200,19 +2200,19 @@ def admin_view(course_code):
                     row_idx = lectures_df[lectures_df["Week"] == week].index[0]
                     st.session_state["lectures_df"] = lectures_df
 
-    # Text input fields
+                # Text input fields
                 topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
                 brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
                 assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
 
-    # PDF Upload section
+                # PDF Upload section
                 st.markdown("**Upload PDF Files (Permanent Storage)**")
                 pdf_dir = get_persistent_path("pdf", course_code)
                 os.makedirs(pdf_dir, exist_ok=True)
 
                 lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
 
-    # Handle current PDF
+                # Handle current PDF
                 current_pdf = lectures_df.at[row_idx, "PDF_File"]
                 current_pdf = str(current_pdf) if current_pdf is not None else ""
                 current_pdf = current_pdf.strip()
@@ -2228,7 +2228,7 @@ def admin_view(course_code):
                             file_name=os.path.basename(current_pdf),
                             mime="application/pdf",
                             key=f"download_{week}"
-            )
+                        )
         
                     if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
                         try:
@@ -2242,131 +2242,132 @@ def admin_view(course_code):
                         except Exception as e:
                             st.error(f"❌ Error removing PDF: {e}")
 
-    # Handle new PDF upload
-                    if lecture_pdf is not None:
-                        safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
-                        safe_name = safe_name.replace(' ', '_')
+                # Handle new PDF upload
+                if lecture_pdf is not None:
+                    safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+                    safe_name = safe_name.replace(' ', '_')
         
-                        pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
-                        pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
+                    pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
+                    pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
         
-                        try:
-                            with st.spinner("Uploading PDF to permanent storage..."):
-                                with open(pdf_path, "wb") as f:
-                                    f.write(lecture_pdf.getbuffer())
+                    try:
+                        with st.spinner("Uploading PDF to permanent storage..."):
+                            with open(pdf_path, "wb") as f:
+                                f.write(lecture_pdf.getbuffer())
             
-                            lectures_df.at[row_idx, "PDF_File"] = pdf_path
-                            st.session_state["lectures_df"] = lectures_df
-                            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+                        lectures_df.at[row_idx, "PDF_File"] = pdf_path
+                        st.session_state["lectures_df"] = lectures_df
+                        lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
             
-                            st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
-                            st.rerun()
+                        st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
+                        st.rerun()
             
-                        except Exception as e:
-                            st.error(f"❌ Error saving PDF: {str(e)}")
+                    except Exception as e:
+                        st.error(f"❌ Error saving PDF: {str(e)}")
 
-    # Automated MCQ Section for this week
-                    st.markdown("---")
-                    st.subheader("🧩 Automated MCQ Questions")
+                # Automated MCQ Section for this week
+                st.markdown("---")
+                st.subheader("🧩 Automated MCQ Questions")
     
-    # Load existing MCQ questions for this week
-                    existing_questions = load_mcq_questions(course_code, week)
+                # Load existing MCQ questions for this week
+                existing_questions = load_mcq_questions(course_code, week)
     
-                    with st.expander("Create Automated MCQ/Gap-Filling Questions", expanded=False):
-                        st.write("**Add New Question:**")
+                with st.expander("Create Automated MCQ/Gap-Filling Questions", expanded=False):
+                    st.write("**Add New Question:**")
         
-                        with st.form(f"mcq_creation_form_{week}"):
-                            question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key=f"question_type_{week}")
-                            question_text = st.text_area("Question Text", placeholder="Enter your question here...", key=f"question_text_{week}")
+                    with st.form(f"mcq_creation_form_{week}"):
+                        question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key=f"question_type_{week}")
+                        question_text = st.text_area("Question Text", placeholder="Enter your question here...", key=f"question_text_{week}")
             
-                            if question_type == "Multiple Choice (MCQ)":
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
-                                    option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
-                                    option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
-                                with col2:
-                                    option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
-                                    option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
+                        if question_type == "Multiple Choice (MCQ)":
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
+                                option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
+                                option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
+                            with col2:
+                                option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
+                                option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
                 
-                                correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
-                                options = {
-                                    "A": option_a,
-                                    "B": option_b, 
-                                    "C": option_c,
-                                    "D": option_d,
-                                    "E": option_e
-                }
+                            correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
+                            options = {
+                                "A": option_a,
+                                "B": option_b, 
+                                "C": option_c,
+                                "D": option_d,
+                                "E": option_e
+                            }
                 
-                            else:  # Gap Filling
-                                correct_answer = st.text_input("Correct Answer(s)", 
-                                                placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
-                                                key=f"gap_answer_{week}")
-                                st.caption("💡 Use | to separate multiple acceptable answers")
-                                options = {}
+                        else:  # Gap Filling
+                            correct_answer = st.text_input("Correct Answer(s)", 
+                                            placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
+                                            key=f"gap_answer_{week}")
+                            st.caption("💡 Use | to separate multiple acceptable answers")
+                            options = {}
             
-                            add_question = st.form_submit_button("➕ Add Question")
+                        add_question = st.form_submit_button("➕ Add Question")
             
-                            if add_question and question_text:
-                                new_question = {
-                                    "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
-                                    "question": question_text,
-                                    "options": options,
-                                    "correct_answer": correct_answer
-                }
+                        if add_question and question_text:
+                            new_question = {
+                                "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
+                                "question": question_text,
+                                "options": options,
+                                "correct_answer": correct_answer
+                            }
                 
-                                existing_questions.append(new_question)
-                                if save_mcq_questions(course_code, week, existing_questions):
-                                    st.success("✅ Question added successfully!")
-                                    st.rerun()
-    
-    # Display existing MCQ questions for this week
-                    if existing_questions:
-                        st.write(f"**Existing Questions for {week}:**")
-                        for i, question in enumerate(existing_questions):
-                            with st.expander(f"Question {i+1}: {question['question'][:50]}...", expanded=False):
-                                col1, col2 = st.columns([3, 1])
-                                with col1:
-                                    st.write(f"**Type:** {question['type'].replace('_', ' ').title()}")
-                                    st.write(f"**Question:** {question['question']}")
-                    
-                                    if question['type'] == 'mcq':
-                                        st.write("**Options:**")
-                                        for opt, text in question['options'].items():
-                                            st.write(f"{opt}: {text}")
-                    
-                                            st.write(f"**Correct Answer:** {question['correct_answer']}")
-                
-                                with col2:
-                                    if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                                        existing_questions.pop(i)
-                                        save_mcq_questions(course_code, week, existing_questions)
-                                        st.success("✅ Question deleted!")
-                                        st.rerun()
-        
-        # Clear all questions for this week
-                        if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-                            if save_mcq_questions(course_code, week, []):
-                                st.success("✅ All questions cleared!")
+                            existing_questions.append(new_question)
+                            if save_mcq_questions(course_code, week, existing_questions):
+                                st.success("✅ Question added successfully!")
                                 st.rerun()
-                    else:
-                        st.info("No MCQ questions added for this week yet.")
-
-    # Save button for lecture materials
-                    st.markdown("---")
-                    if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
-                        try:
-                            lectures_df.at[row_idx, "Topic"] = topic
-                            lectures_df.at[row_idx, "Brief"] = brief
-                            lectures_df.at[row_idx, "Assignment"] = assignment
-            
-                            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                            st.session_state["lectures_df"] = lectures_df
-                            st.success("🎉 All lecture materials saved successfully!")
-                            st.balloons()
+    
+                # Display existing MCQ questions for this week
+                if existing_questions:
+                    st.write(f"**Existing Questions for {week}:**")
+                    for i, question in enumerate(existing_questions):
+                        with st.expander(f"Question {i+1}: {question['question'][:50]}...", expanded=False):
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.write(f"**Type:** {question['type'].replace('_', ' ').title()}")
+                                st.write(f"**Question:** {question['question']}")
+                    
+                                if question['type'] == 'mcq':
+                                    st.write("**Options:**")
+                                    for opt, text in question['options'].items():
+                                        st.write(f"{opt}: {text}")
+                    
+                                    st.write(f"**Correct Answer:** {question['correct_answer']}")
+                
+                            with col2:
+                                if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
+                                    existing_questions.pop(i)
+                                    save_mcq_questions(course_code, week, existing_questions)
+                                    st.success("✅ Question deleted!")
+                                    st.rerun()
+        
+                    # Clear all questions for this week
+                    if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
+                        if save_mcq_questions(course_code, week, []):
+                            st.success("✅ All questions cleared!")
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error saving to file: {e}")
+                else:
+                    st.info("No MCQ questions added for this week yet.")
+
+                # Save button for lecture materials
+                st.markdown("---")
+                if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
+                    try:
+                        lectures_df.at[row_idx, "Topic"] = topic
+                        lectures_df.at[row_idx, "Brief"] = brief
+                        lectures_df.at[row_idx, "Assignment"] = assignment
+            
+                        lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+                        st.session_state["lectures_df"] = lectures_df
+                        st.success("🎉 All lecture materials saved successfully!")
+                        st.balloons()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error saving to file: {e}")
+        
         with tab3:
             # ===============================================================
             # 🎥 VIDEO MANAGEMENT
@@ -2426,12 +2427,12 @@ def admin_view(course_code):
                                         data=vid_file,
                                         file_name=video,
                                         mime="video/mp4",
-                                        key=f"download_{i}"
+                                        key=f"download_video_{i}"
                                     )
                             except Exception as e:
                                 st.error(f"Download unavailable: {str(e)}")
                             
-                            if st.button("🗑️ Delete", key=f"delete_{i}"):
+                            if st.button("🗑️ Delete", key=f"delete_video_{i}"):
                                 try:
                                     os.remove(video_path)
                                     st.success(f"✅ Video deleted: {video}")
@@ -2447,7 +2448,7 @@ def admin_view(course_code):
             # ===============================================================
             st.header("🎛 Attendance Control")
             
-            selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_week_select")
+            selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_attendance_week_select")
             
             # Get current status
             current_status = get_attendance_status(course_code, selected_week)
@@ -2462,13 +2463,13 @@ def admin_view(course_code):
             # Attendance control buttons
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary"):
+                if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary", key="open_attendance_btn"):
                     success = set_attendance_status(course_code, selected_week, True, datetime.now())
                     if success:
                         st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
                         st.rerun()
             with col2:
-                if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary"):
+                if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary", key="close_attendance_btn"):
                     success = set_attendance_status(course_code, selected_week, False)
                     if success:
                         st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
@@ -2510,7 +2511,7 @@ def admin_view(course_code):
                 view_week = st.selectbox(
                     "Select Week to View", 
                     [f"Week {i}" for i in range(1, 16)], 
-                    key=f"{course_code}_view_week"
+                    key=f"{course_code}_attendance_view_week"
                 )
                 view_student_attendance_details(course_code, view_week)
             
@@ -2524,7 +2525,7 @@ def admin_view(course_code):
             # 🌐 GLOBAL OVERVIEW
             st.header("🌐 Global Attendance Overview")
 
-            if st.button("🔄 Refresh Global Overview", type="secondary"):
+            if st.button("🔄 Refresh Global Overview", type="secondary", key="refresh_global_attendance"):
                 global_df = get_global_attendance_summary()
                 
                 if not global_df.empty:
@@ -2542,7 +2543,7 @@ def admin_view(course_code):
             # ===============================================================
             st.header("🎛 Classwork Control")
             
-            classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_week")
+            classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_control_week")
             
             current_classwork_status = get_classwork_status(course_code, classwork_week)
             is_classwork_open = current_classwork_status.get("is_open", False)
@@ -2554,13 +2555,13 @@ def admin_view(course_code):
             
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary"):
+                if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary", key="open_classwork_btn"):
                     success = set_classwork_status(course_code, classwork_week, True, datetime.now())
                     if success:
                         st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
                         st.rerun()
             with col2:
-                if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary"):
+                if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary", key="close_classwork_btn"):
                     success = set_classwork_status(course_code, classwork_week, False)
                     if success:
                         st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
@@ -2582,39 +2583,36 @@ def admin_view(course_code):
                         st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
                 except Exception as e:
                     st.error(f"Error in classwork auto-close: {e}")
-                    
-        with tab6:  # Classwork Control tab
-            show_classwork_control(course_code)
-            
+        
         with tab7:
             # ===============================================================
             # 📝 AUTOMATED MCQ MANAGEMENT
             # ===============================================================
             st.header("🧩 Automated MCQ & Gap-Filling Management")
             
-            mcq_week = st.selectbox("Select Week for MCQ", [f"Week {i}" for i in range(1, 16)], key="mcq_week")
+            mcq_week = st.selectbox("Select Week for MCQ", [f"Week {i}" for i in range(1, 16)], key="mcq_management_week")
             
             st.subheader("📝 Create Automated Questions")
             
             # Load existing questions
             existing_questions = load_mcq_questions(course_code, mcq_week)
             
-            with st.form("mcq_creation_form"):
+            with st.form("mcq_creation_form_main"):
                 st.write("**Add New Question:**")
                 
-                question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key="question_type")
-                question_text = st.text_area("Question Text", placeholder="Enter your question here...")
+                question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key="question_type_main")
+                question_text = st.text_area("Question Text", placeholder="Enter your question here...", key="question_text_main")
                 
                 if question_type == "Multiple Choice (MCQ)":
                     col1, col2 = st.columns(2)
                     with col1:
-                        option_a = st.text_input("Option A", placeholder="First option")
-                        option_b = st.text_input("Option B", placeholder="Second option")
+                        option_a = st.text_input("Option A", placeholder="First option", key="option_a_main")
+                        option_b = st.text_input("Option B", placeholder="Second option", key="option_b_main")
                     with col2:
-                        option_c = st.text_input("Option C", placeholder="Third option")
-                        option_d = st.text_input("Option D", placeholder="Fourth option")
+                        option_c = st.text_input("Option C", placeholder="Third option", key="option_c_main")
+                        option_d = st.text_input("Option D", placeholder="Fourth option", key="option_d_main")
                     
-                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D"])
+                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D"], key="correct_answer_main")
                     options = {
                         "A": option_a,
                         "B": option_b, 
@@ -2624,7 +2622,8 @@ def admin_view(course_code):
                     
                 else:  # Gap Filling
                     correct_answer = st.text_input("Correct Answer(s)", 
-                                                 placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)")
+                                                 placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
+                                                 key="gap_answer_main")
                     st.caption("💡 Use | to separate multiple acceptable answers")
                     options = {}
                 
@@ -2661,14 +2660,14 @@ def admin_view(course_code):
                             st.write(f"**Correct Answer:** {question['correct_answer']}")
                         
                         with col2:
-                            if st.button("🗑️ Delete", key=f"delete_q_{i}"):
+                            if st.button("🗑️ Delete", key=f"delete_question_{i}"):
                                 existing_questions.pop(i)
                                 save_mcq_questions(course_code, mcq_week, existing_questions)
                                 st.success("✅ Question deleted!")
                                 st.rerun()
                 
                 # Clear all questions
-                if st.button("🚨 Clear All Questions", type="secondary"):
+                if st.button("🚨 Clear All Questions", type="secondary", key="clear_all_questions"):
                     if save_mcq_questions(course_code, mcq_week, []):
                         st.success("✅ All questions cleared!")
                         st.rerun()
@@ -2693,7 +2692,7 @@ def admin_view(course_code):
             
             with cw_tab1:
                 st.subheader("Weekly Classwork Submissions")
-                cw_week = st.selectbox("Select Week to View", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_cw_week_view")
+                cw_week = st.selectbox("Select Week to View", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_view_week")
                 
                 try:
                     classwork_file = get_file(course_code, "classwork")
@@ -2748,15 +2747,15 @@ def admin_view(course_code):
                                     data=csv_data,
                                     file_name=f"classwork_{course_code}_{cw_week.replace(' ', '')}.csv",
                                     mime="text/csv",
-                                    use_container_width=True
+                                    use_container_width=True,
+                                    key="download_classwork_submissions"
                                 )
                                 
                 except Exception as e:
                     st.error(f"Error loading classwork submissions: {e}")
 
-
         with tab9:
-              # ===============================================================
+            # ===============================================================
             # 📝 GRADING SYSTEM WITH FINAL GRADE CALCULATION
             # ===============================================================
             st.header("📝 Grading System")
@@ -2851,7 +2850,7 @@ def admin_view(course_code):
             uploaded_csv = st.file_uploader(
                 "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam, Classwork", 
                 type=["csv"],
-                key="grade_csv"
+                key="grade_csv_upload"
             )
             
             if uploaded_csv is not None:
@@ -2971,7 +2970,8 @@ def admin_view(course_code):
                                     data=csv_all,
                                     file_name=f"{course_code}_all_scores.csv",
                                     mime="text/csv",
-                                    use_container_width=True
+                                    use_container_width=True,
+                                    key="download_all_scores"
                                 )
                             
                             with col2:
@@ -2981,7 +2981,8 @@ def admin_view(course_code):
                                     data=csv_final,
                                     file_name=f"{course_code}_final_grades.csv",
                                     mime="text/csv",
-                                    use_container_width=True
+                                    use_container_width=True,
+                                    key="download_final_grades"
                                 )
                         else:
                             st.info("No complete data available for final grade calculation.")
