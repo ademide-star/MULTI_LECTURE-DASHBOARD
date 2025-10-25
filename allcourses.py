@@ -117,28 +117,48 @@ def get_mcq_file(course_code, week):
     return os.path.join(PERSISTENT_DATA_DIR, "mcq_questions", f"{course_code}_{safe_week}_mcq.json")
 
 def save_mcq_questions(course_code, week, questions):
-    """Save MCQ questions to JSON file"""
+    """Save MCQ questions for a course and week"""
     try:
-        mcq_file = get_mcq_file(course_code, week)
-        os.makedirs(os.path.dirname(mcq_file), exist_ok=True)
+        # Get the MCQ directory
+        mcq_file = get_file(course_code, "mcq")
+        mcq_dir = os.path.dirname(mcq_file)
         
-        with open(mcq_file, 'w') as f:
+        # Create directory if it doesn't exist
+        os.makedirs(mcq_dir, exist_ok=True)
+        
+        # Save to week-specific file
+        week_file = os.path.join(mcq_dir, f"{week}_questions.json")
+        
+        with open(week_file, 'w') as f:
             json.dump(questions, f, indent=2)
+        
+        st.write(f"✅ Saved {len(questions)} questions to {week_file}")  # DEBUG
         return True
     except Exception as e:
         st.error(f"Error saving MCQ questions: {e}")
         return False
+        
 
 def load_mcq_questions(course_code, week):
-    """Load MCQ questions from JSON file"""
+    """Load MCQ questions for a given course and week"""
     try:
-        mcq_file = get_mcq_file(course_code, week)
-        if os.path.exists(mcq_file):
-            with open(mcq_file, 'r') as f:
-                return json.load(f)
-        return []
+        # Get the file path for MCQ questions
+        mcq_file = get_file(course_code, "mcq")
+        mcq_dir = os.path.dirname(mcq_file)
+        week_file = os.path.join(mcq_dir, f"{week}_questions.json")
+        
+        st.write(f"🔍 Looking for MCQ file: {week_file}")  # DEBUG
+        
+        if os.path.exists(week_file):
+            with open(week_file, 'r') as f:
+                questions = json.load(f)
+                st.write(f"✅ Loaded {len(questions)} questions from {week_file}")  # DEBUG
+                return questions
+        else:
+            st.write(f"❌ MCQ file not found: {week_file}")  # DEBUG
+            return []
     except Exception as e:
-        st.error(f"Error loading MCQ questions: {e}")
+        st.write(f"❌ Error loading MCQ questions: {e}")  # DEBUG
         return []
 
 def auto_grade_mcq_submission(questions, answers):
@@ -385,6 +405,7 @@ def get_persistent_path(file_type, course_code="", filename=""):
         "classwork": os.path.join(base_dir, "classwork", f"{course_code}_classwork.csv"),
         "seminar": os.path.join(base_dir, "seminar", f"{course_code}_seminar.csv"),
         "lectures": os.path.join(base_dir, "lectures", f"{course_code}_lectures.csv"),
+        "mcq": os.path.join(base_dir, "mcq_questions"), 
         "attendance_status": os.path.join(base_dir, "data", "attendance_status.json"),
         "scores": os.path.join(base_dir, "scores", f"{course_code.lower()}_scores.csv")
     }
@@ -394,7 +415,24 @@ def get_persistent_path(file_type, course_code="", filename=""):
 def get_file(course_code, file_type):
     """Get file path for course-specific files"""
     return get_persistent_path(file_type, course_code)
-
+    
+def get_file(course_code, file_type):
+    """Get file path for different file types"""
+    base_dir = os.path.join(DATA_DIR, course_code)
+    os.makedirs(base_dir, exist_ok=True)
+    
+    file_map = {
+        "students": os.path.join(base_dir, "students.csv"),
+        "lectures": os.path.join(base_dir, "lectures.csv"), 
+        "attendance": os.path.join(base_dir, "attendance.csv"),
+        "classwork": os.path.join(base_dir, "classwork.csv"),
+        "scores": os.path.join(base_dir, "scores.csv"),
+        "mcq": os.path.join(base_dir, "mcq_questions"),  # Directory for MCQ files
+        "attendance_status": os.path.join(base_dir, "attendance_status.json"),
+        "classwork_status": os.path.join(base_dir, "classwork_status.json")
+    }
+    
+    return file_map.get(file_type, os.path.join(base_dir, f"{file_type}.csv"))
 def clean_text(val):
     """Clean text values"""
     return str(val or "").strip()
@@ -2040,7 +2078,19 @@ def student_view(course_code):
                     #===================================================
                     # 🧩 AUTOMATED CLASSWORK SECTION (REPLACES OLD CLASSWORK)
                     #=====================================================
+       # DEBUG: Check if MCQ questions are being loaded
+        st.write("🔍 DEBUG: Checking MCQ questions...")
+        st.write(f"Course: {course_code}, Week: {week}")
 
+# Check for automated MCQ questions for this week
+        mcq_questions = load_mcq_questions(course_code, week)
+
+# Debug output
+        st.write(f"MCQ questions found: {len(mcq_questions) if mcq_questions else 0}")
+        if mcq_questions:
+            st.write(f"First question: {mcq_questions[0]}")
+        else:
+            st.write("No questions found")
 # Check for automated MCQ questions for this week
         mcq_questions = load_mcq_questions(course_code, week)
 
@@ -3259,6 +3309,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
