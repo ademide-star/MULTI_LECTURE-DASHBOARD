@@ -2351,7 +2351,7 @@ def student_view(course_code):
                             file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
                             if file_path:
                                 log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
-                                    st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
+                                st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
                             
 
             # Seminar submission
@@ -3525,6 +3525,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
