@@ -58,6 +58,38 @@ st.markdown(
     button[kind="header"] {
         display: none !important;
     }
+    
+    /* MCQ Styling */
+    .mcq-question {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        border-left: 4px solid #4CAF50;
+    }
+    .mcq-option {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        background-color: white;
+        border: 1px solid #ddd;
+    }
+    .mcq-option:hover {
+        background-color: #e9ecef;
+    }
+    .gap-filling {
+        background-color: #fff3cd;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
+    .course-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -69,15 +101,7 @@ st.markdown(
 
 PERSISTENT_DATA_DIR = "persistent_data"
 ATTENDANCE_STATUS_FILE = "attendance_status.json"
-
-# Course Definitions
-COURSES = {
-    "MCB 221 – General Microbiology": "MCB221",
-    "BCH 201 – General Biochemistry": "BCH201", 
-    "BIO 203 – General Physiology": "BIO203",
-    "BIO 113 – Virus Bacteria Lower Plants": "BIO113",
-    "BIO 306 – Systematic Biology": "BIO306",
-}
+DEFAULT_ADMIN_PASSWORD = "bimpe2025class"  # Universal default password
 
 # ===============================================================
 # 🗂 DIRECTORY MANAGEMENT
@@ -98,7 +122,9 @@ def ensure_directories():
         os.path.join(PERSISTENT_DATA_DIR, "student_uploads"),
         os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "assignment"),
         os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "drawing"),
-        os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "seminar")
+        os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "seminar"),
+        os.path.join(PERSISTENT_DATA_DIR, "mcq_questions"),
+        os.path.join(PERSISTENT_DATA_DIR, "course_management")  # New directory for course management
     ]
     
     for directory in directories:
@@ -107,6 +133,92 @@ def ensure_directories():
 
 # Initialize directories
 ensure_directories()
+
+# ===============================================================
+# 🎯 COURSE MANAGEMENT SYSTEM
+# ===============================================================
+
+def get_courses_file():
+    """Get the courses configuration file"""
+    return os.path.join(PERSISTENT_DATA_DIR, "course_management", "courses_config.json")
+
+def get_passwords_file():
+    """Get the passwords configuration file"""
+    return os.path.join(PERSISTENT_DATA_DIR, "course_management", "admin_passwords.json")
+
+def load_courses_config():
+    """Load courses configuration from JSON file"""
+    try:
+        courses_file = get_courses_file()
+        if os.path.exists(courses_file):
+            with open(courses_file, 'r') as f:
+                return json.load(f)
+        
+        # Default courses if file doesn't exist
+        default_courses = {
+            "MCB 221 – General Microbiology": "MCB221",
+            "BCH 201 – General Biochemistry": "BCH201", 
+            "BIO 203 – General Physiology": "BIO203",
+            "BIO 113 – Virus Bacteria Lower Plants": "BIO113",
+            "BIO 306 – Systematic Biology": "BIO306",
+        }
+        save_courses_config(default_courses)
+        return default_courses
+    except Exception as e:
+        st.error(f"Error loading courses config: {e}")
+        return {}
+
+def save_courses_config(courses):
+    """Save courses configuration to JSON file"""
+    try:
+        courses_file = get_courses_file()
+        os.makedirs(os.path.dirname(courses_file), exist_ok=True)
+        with open(courses_file, 'w') as f:
+            json.dump(courses, f, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Error saving courses config: {e}")
+        return False
+
+def load_admin_passwords():
+    """Load admin passwords from JSON file"""
+    try:
+        passwords_file = get_passwords_file()
+        if os.path.exists(passwords_file):
+            with open(passwords_file, 'r') as f:
+                return json.load(f)
+        return {}
+    except Exception as e:
+        st.error(f"Error loading passwords: {e}")
+        return {}
+
+def save_admin_passwords(passwords):
+    """Save admin passwords to JSON file"""
+    try:
+        passwords_file = get_passwords_file()
+        os.makedirs(os.path.dirname(passwords_file), exist_ok=True)
+        with open(passwords_file, 'w') as f:
+            json.dump(passwords, f, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Error saving passwords: {e}")
+        return False
+
+def get_course_password(course_code):
+    """Get password for a specific course, fallback to default"""
+    passwords = load_admin_passwords()
+    return passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
+
+def set_course_password(course_code, new_password):
+    """Set new password for a specific course"""
+    passwords = load_admin_passwords()
+    passwords[course_code] = new_password
+    return save_admin_passwords(passwords)
+
+def verify_admin_password(course_code, password):
+    """Verify admin password for a course"""
+    correct_password = get_course_password(course_code)
+    return password == correct_password
 # ===============================================================
 # 🎯 AUTOMATED MCQ & GAP-FILLING SYSTEM
 # ===============================================================
@@ -872,6 +984,239 @@ def upload_video(course_code, uploaded_video):
         return True, f"✅ Video uploaded successfully: {os.path.basename(save_path)}"
     except Exception as e:
         return False, f"❌ Error uploading video: {str(e)}"
+
+# ===============================================================
+# 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
+# ===============================================================
+
+def init_course_db():
+    """Initialize SQLite database for course storage with proper migration"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    
+    # Check if table exists and get its structure
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_courses'")
+    table_exists = c.fetchone() is not None
+    
+    if table_exists:
+        # Check if course_code column exists
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' not in columns:
+            # Add the missing course_code column
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
+    
+    # Create table with all required columns
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS weekly_courses
+        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+         week_name TEXT NOT NULL,
+         course_name TEXT NOT NULL,
+         course_code TEXT NOT NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    ''')
+    conn.commit()
+    conn.close()
+
+def add_course_to_db(week_name, course_name, course_code):
+    """Add course to database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    c.execute('INSERT INTO weekly_courses (week_name, course_name, course_code) VALUES (?, ?, ?)', 
+              (week_name, course_name, course_code))
+    conn.commit()
+    conn.close()
+
+def get_weeks_from_db():
+    """Get all unique weeks from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
+    weeks = [row[0] for row in c.fetchall()]
+    conn.close()
+    return weeks
+
+def get_courses_by_week(week_name):
+    """Get all courses for a specific week"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
+    courses = [{"name": row[0], "code": row[1]} for row in c.fetchall()]
+    conn.close()
+    return courses
+
+def delete_week_from_db(week_name):
+    """Delete a week and all its courses from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
+    conn.commit()
+    conn.close()
+
+def get_all_courses_from_db():
+    """Get all courses from database with proper error handling"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        
+        # Check if course_code column exists
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' in columns:
+            df = pd.read_sql_query('SELECT week_name, course_name, course_code, created_at FROM weekly_courses ORDER BY created_at', conn)
+        else:
+            # Fallback for older database structure
+            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
+            df['course_code'] = 'UNKNOWN'
+        
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+# ===============================================================
+# 🏫 COURSE MANAGEMENT SYSTEM
+# ===============================================================
+
+def show_course_management():
+    """Course management system for super admin"""
+    st.header("🏫 Course Management System")
+    
+    # Load current courses
+    courses = load_courses_config()
+    
+    tab1, tab2, tab3 = st.tabs(["📚 Manage Courses", "🔑 Manage Passwords", "📊 System Overview"])
+    
+    with tab1:
+        st.subheader("Add/Remove Courses")
+        
+        # Add new course
+        col1, col2 = st.columns(2)
+        with col1:
+            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
+        with col2:
+            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
+        
+        if st.button("➕ Add Course", type="primary"):
+            if new_course_name and new_course_code:
+                if new_course_name in courses:
+                    st.error("❌ Course name already exists!")
+                else:
+                    courses[new_course_name] = new_course_code
+                    if save_courses_config(courses):
+                        st.success(f"✅ Course '{new_course_name}' added successfully!")
+                        st.rerun()
+            else:
+                st.error("❌ Please enter both course name and code.")
+        
+        # Display and manage existing courses
+        st.subheader("Current Courses")
+        if courses:
+            for course_name, course_code in courses.items():
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
+                with col2:
+                    if st.button("✏️", key=f"edit_{course_code}"):
+                        st.session_state[f"editing_{course_code}"] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_{course_code}"):
+                        del courses[course_name]
+                        save_courses_config(courses)
+                        st.success(f"✅ Course '{course_name}' deleted!")
+                        st.rerun()
+                
+                # Edit course
+                if st.session_state.get(f"editing_{course_code}", False):
+                    with st.form(f"edit_form_{course_code}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edited_name = st.text_input("Course Name", value=course_name, key=f"name_{course_code}")
+                        with col2:
+                            edited_code = st.text_input("Course Code", value=course_code, key=f"code_{course_code}").upper()
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save Changes"):
+                                if edited_name and edited_code:
+                                    # Remove old entry and add new one
+                                    del courses[course_name]
+                                    courses[edited_name] = edited_code
+                                    save_courses_config(courses)
+                                    st.session_state[f"editing_{course_code}"] = False
+                                    st.success("✅ Course updated successfully!")
+                                    st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state[f"editing_{course_code}"] = False
+                                st.rerun()
+        else:
+            st.info("No courses added yet. Add courses using the form above.")
+    
+    with tab2:
+        st.subheader("Manage Admin Passwords")
+        
+        passwords = load_admin_passwords()
+        courses = load_courses_config()
+        
+        if courses:
+            for course_name, course_code in courses.items():
+                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
+                
+                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
+                    st.info(f"Current password: **{current_password}**")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{course_code}")
+                    with col2:
+                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{course_code}")
+                    
+                    if st.button("🔄 Change Password", key=f"change_{course_code}"):
+                        if new_password and confirm_password:
+                            if new_password == confirm_password:
+                                if set_course_password(course_code, new_password):
+                                    st.success("✅ Password changed successfully!")
+                                    st.rerun()
+                            else:
+                                st.error("❌ Passwords don't match!")
+                        else:
+                            st.error("❌ Please enter and confirm new password!")
+                    
+                    # Reset to default
+                    if st.button("🔄 Reset to Default", key=f"reset_{course_code}"):
+                        if set_course_password(course_code, DEFAULT_ADMIN_PASSWORD):
+                            st.success("✅ Password reset to default!")
+                            st.rerun()
+        else:
+            st.info("No courses available. Add courses first.")
+    
+    with tab3:
+        st.subheader("System Overview")
+        
+        courses = load_courses_config()
+        passwords = load_admin_passwords()
+        
+        st.metric("Total Courses", len(courses))
+        
+        # Course statistics
+        if courses:
+            st.subheader("Course Details")
+            overview_data = []
+            for course_name, course_code in courses.items():
+                course_password = passwords.get(course_code, "Default")
+                overview_data.append({
+                    "Course Name": course_name,
+                    "Course Code": course_code,
+                    "Password Set": "Custom" if course_code in passwords else "Default"
+                })
+            
+            overview_df = pd.DataFrame(overview_data)
+            st.dataframe(overview_df, use_container_width=True)
+
 
 # ===============================================================
 # 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
@@ -2522,19 +2867,53 @@ def student_view(course_code):
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
 # ===============================================================
 
-def admin_view(course_code):
-    """Admin dashboard view with integrated course manager"""
+def admin_view(course_code, course_name):
+    """Admin dashboard view with password management"""
     try:
-        # Admin authentication
-        ADMIN_PASS = "bimpe2025class"
-        password = st.text_input("Enter Admin Password", type="password", key="admin_password_input")
+        # Admin authentication with course-specific password
+        st.subheader(f"🔐 Admin Access - {course_name}")
         
-        if password != ADMIN_PASS:
-            st.warning("Enter the correct Admin password to continue.")
+        password = st.text_input("Enter Admin Password", type="password", key=f"admin_password_{course_code}")
+        
+        if not password:
+            st.warning(f"Enter the admin password for {course_name} to continue.")
+            return
+        
+        if not verify_admin_password(course_code, password):
+            st.error("❌ Incorrect password. Please try again.")
             return
         
         st.session_state["role"] = "Admin"
-        st.success(f"✅ Logged in as Admin - {course_code}")
+        st.session_state["current_course"] = course_code
+        st.success(f"✅ Logged in as Admin - {course_name}")
+        
+        ensure_directories()
+        
+        st.title(f"👩‍🏫 {course_name} Admin Dashboard")
+        
+        # Password management section
+        with st.expander("🔐 Password Management", expanded=False):
+            st.subheader("Change Course Password")
+            
+            current_password = get_course_password(course_code)
+            st.info(f"Current password: **{current_password}**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                new_password = st.text_input("New Password", type="password", key=f"new_pass_admin")
+            with col2:
+                confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_admin")
+            
+            if st.button("🔄 Change Password", type="primary"):
+                if new_password and confirm_password:
+                    if new_password == confirm_password:
+                        if set_course_password(course_code, new_password):
+                            st.success("✅ Password changed successfully!")
+                            st.rerun()
+                    else:
+                        st.error("❌ Passwords don't match!")
+                else:
+                    st.error("❌ Please enter and confirm new password!")
         
         ensure_directories()
         
@@ -3465,10 +3844,10 @@ def main():
     """Main application with navigation"""
     
     # Application Header
-    st.subheader("Department of Biological Sciences, Sikiru Adetona College of Education Omu-Ijebu")
-    st.title("📚 Multi-Course Portal")
+    st.subheader("Multi-Course Learning Management System")
+    st.title("🎓 University Course Portal")
     
-    # Auto-refresh (once per day)
+    # Auto-refresh
     st_autorefresh(interval=86_400_000, key="daily_refresh")
     
     # Sidebar navigation
@@ -3478,26 +3857,44 @@ def main():
     if "role" not in st.session_state:
         st.session_state["role"] = None
     
-    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin"], key="role_selector")
+    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin", "System Admin"], key="role_selector")
     
     if role != "Select":
         st.session_state["role"] = role
     else:
         st.session_state["role"] = None
     
-    # Course Selection (for Student and Admin views)
-    if st.session_state["role"] in ["Student", "Admin"]:
+    # Load courses
+    COURSES = load_courses_config()
+    
+    # Course Selection
+    if st.session_state["role"] in ["Student", "Admin"] and COURSES:
         course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
         course_code = COURSES[course]
+        course_name = course
         st.sidebar.markdown("---")
     
     # Main content area based on role
-    if st.session_state["role"] == "Admin":
-        admin_view(course_code)
-    elif st.session_state["role"] == "Student":
-        student_view(course_code)
+    if st.session_state["role"] == "System Admin":
+        show_course_management()
+    elif st.session_state["role"] == "Admin" and COURSES:
+        admin_view(course_code, course_name)
+    elif st.session_state["role"] == "Student" and COURSES:
+        student_view(course_code, course_name)
     else:
-        st.warning("👆 Please select your role from the sidebar to continue.")
+        if not COURSES:
+            st.warning("⚠️ No courses available. Please contact system administrator.")
+        else:
+            st.warning("👆 Please select your role from the sidebar to continue.")
+        
+        # Show system info
+        st.info("""
+        **System Features:**
+        - 🏫 **System Admin**: Manage all courses and passwords
+        - 👩‍🏫 **Admin/Lecturer**: Manage individual course content with customizable passwords  
+        - 🎓 **Student**: Access course materials and automated assessments
+        - 🔐 **Secure**: Individual password protection for each course
+        """)
 
 # Footer
 st.markdown("""
@@ -3518,13 +3915,12 @@ st.markdown("""
     }
     </style>
     <div class="custom-footer">
-        Developed by <b>Mide</b> | © 2025 | Integrated Course Management System
+        Developed by <b>Mide</b> | © 2025 | Multi-Course LMS with Password Management
     </div>
 """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
 
 
 
