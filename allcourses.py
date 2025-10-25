@@ -2322,15 +2322,15 @@ def student_view(course_code):
                 if submit_assignment:
                     if not assignment_file:
                         st.error("❌ Please select a file to upload.")
+                    else:
+                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "assignment")
+                        if not existing_check.empty:
+                            st.error("❌ Submission already exists! You cannot submit twice.")
                         else:
-                            existing_check = check_existing_submission(course_code, student_matric, selected_week, "assignment")
-                            if not existing_check.empty:
-                                st.error("❌ Submission already exists! You cannot submit twice.")
-                            else:
-                                file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
-                                if file_path:
-                                    log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
-                                    st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+                            file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
+                            if file_path:
+                                log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
+                                st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
                            
 
             # Drawing submission
@@ -2343,14 +2343,14 @@ def student_view(course_code):
                 if submit_drawing:
                     if not drawing_file:
                         st.error("❌ Please select a file to upload.")
+                    else:
+                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "drawing")
+                        if not existing_check.empty:
+                            st.error("❌ Submission already exists! You cannot submit twice.")
                         else:
-                            existing_check = check_existing_submission(course_code, student_matric, selected_week, "drawing")
-                            if not existing_check.empty:
-                                st.error("❌ Submission already exists! You cannot submit twice.")
-                            else:
-                                file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
-                                if file_path:
-                                    log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
+                            file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
+                            if file_path:
+                                log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
                                     st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
                             
 
@@ -3525,6 +3525,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
