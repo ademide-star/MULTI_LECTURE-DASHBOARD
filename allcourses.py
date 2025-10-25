@@ -418,7 +418,7 @@ def get_file(course_code, file_type):
     
 def get_file(course_code, file_type):
     """Get file path for different file types"""
-    base_dir = os.path.join(DATA_DIR, course_code)
+    base_dir = os.path.join(PERSISTENT_DATA_DIR, course_code)
     os.makedirs(base_dir, exist_ok=True)
     
     file_map = {
@@ -433,6 +433,7 @@ def get_file(course_code, file_type):
     }
     
     return file_map.get(file_type, os.path.join(base_dir, f"{file_type}.csv"))
+    
 def clean_text(val):
     """Clean text values"""
     return str(val or "").strip()
@@ -3309,6 +3310,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
