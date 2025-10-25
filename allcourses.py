@@ -1812,6 +1812,95 @@ def save_mcq_submission(course_code, week, student_name, student_matric, answers
         return False
 
 # ===============================================================
+# 🔧 HELPER FUNCTIONS FOR CLASSWORK SCORING
+# ===============================================================
+
+def update_classwork_score(course_code, student_name, student_matric, week, score):
+    """Update classwork score in the main scores file"""
+    try:
+        scores_file = get_file(course_code, "scores")
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(scores_file), exist_ok=True)
+        
+        # Load existing scores or create new DataFrame
+        if os.path.exists(scores_file):
+            scores_df = pd.read_csv(scores_file)
+        else:
+            scores_df = pd.DataFrame(columns=[
+                "StudentName", "MatricNo", "Week", "Assignment", "Test", 
+                "Practical", "Exam", "Classwork", "Total", "Grade"
+            ])
+        
+        # Find existing entry for this student and week
+        mask = (
+            (scores_df["StudentName"].astype(str).str.strip().str.lower() == student_name.lower()) &
+            (scores_df["MatricNo"].astype(str).str.strip().str.lower() == student_matric.lower()) &
+            (scores_df["Week"].astype(str).str.strip().str.lower() == week.lower())
+        )
+        
+        if mask.any():
+            # Update existing entry
+            scores_df.loc[mask, "Classwork"] = score
+            # Recalculate total for weekly entries (not Exam)
+            if week != "Exam":
+                assignment_score = scores_df.loc[mask, "Assignment"].iloc[0] if "Assignment" in scores_df.columns else 0
+                test_score = scores_df.loc[mask, "Test"].iloc[0] if "Test" in scores_df.columns else 0
+                practical_score = scores_df.loc[mask, "Practical"].iloc[0] if "Practical" in scores_df.columns else 0
+                
+                weekly_total = round(
+                    assignment_score * 0.08 + 
+                    test_score * 0.08 + 
+                    practical_score * 0.05 + 
+                    score * 0.09, 
+                    1
+                )
+                scores_df.loc[mask, "Total"] = weekly_total
+                scores_df.loc[mask, "Grade"] = compute_grade(weekly_total)
+        else:
+            # Create new entry for weekly classwork
+            if week != "Exam":
+                weekly_total = round(score * 0.09, 1)  # Only classwork contribution
+                new_row = {
+                    "StudentName": student_name.title(),
+                    "MatricNo": student_matric.upper(),
+                    "Week": week,
+                    "Assignment": 0,
+                    "Test": 0,
+                    "Practical": 0,
+                    "Exam": 0,
+                    "Classwork": score,
+                    "Total": weekly_total,
+                    "Grade": compute_grade(weekly_total)
+                }
+                scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
+        
+        # Save updated scores
+        scores_df.to_csv(scores_file, index=False)
+        return True
+        
+    except Exception as e:
+        st.error(f"Error updating classwork score: {e}")
+        return False
+
+
+def compute_grade(score):
+    """Compute grade based on score percentage"""
+    if score >= 70:
+        return "A"
+    elif score >= 60:
+        return "B"
+    elif score >= 50:
+        return "C"
+    elif score >= 45:
+        return "D"
+    elif score >= 40:
+        return "E"
+    else:
+        return "F"
+
+
+# ===============================================================
 # 🎓 STUDENT VIEW
 # ===============================================================
 
@@ -2321,8 +2410,6 @@ def display_classwork_section(course_code, week, student_name, student_matric):
     else:
         st.info(f"No automated classwork assigned for {week} yet.")
         st.write("💡 *If you believe there should be classwork, please ask your lecturer to check the Admin dashboard.*")
-    
-# 
 
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
@@ -3330,6 +3417,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
