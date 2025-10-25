@@ -1997,7 +1997,125 @@ def calculate_final_grade(student_scores):
         st.error(f"Error calculating final grade: {e}")
         return None, None, 0, 0, 0, 0, 0
 
+def display_classwork_section(course_code, week, student_name, student_matric):
+    """Display classwork section for the selected week"""
+    try:
+        st.markdown("---")
+        st.subheader(f"🧩 Classwork - {week}")
+        
+        # Check for automated MCQ questions for this week
+        mcq_questions = load_mcq_questions(course_code, week)
+        
+        if mcq_questions and len(mcq_questions) > 0:
+            st.markdown("### 🧩 Automated Classwork Questions")
+            
+            # Check if classwork is open
+            classwork_status = is_classwork_open(course_code, week)
+            close_classwork_after_20min(course_code, week)  # Auto-close check
 
+            # Display classwork status
+            if classwork_status:
+                st.success("✅ Classwork is OPEN - You can submit your answers")
+                
+                # Show auto-close countdown if open
+                current_status = get_classwork_status(course_code, week)
+                if current_status.get("is_open", False) and current_status.get("open_time"):
+                    try:
+                        open_time = datetime.fromisoformat(current_status["open_time"])
+                        elapsed = (datetime.now() - open_time).total_seconds()
+                        remaining = max(0, 1200 - elapsed)  # 20 minutes
+                        
+                        if remaining > 0:
+                            mins = int(remaining // 60)
+                            secs = int(remaining % 60)
+                            st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
+                    except:
+                        pass
+            else:
+                st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
+
+            # Check if already submitted
+            classwork_file = get_file(course_code, "classwork")
+            already_submitted = False
+            previous_score = 0
+            
+            if os.path.exists(classwork_file):
+                try:
+                    df = pd.read_csv(classwork_file)
+                    existing = df[
+                        (df['Name'] == student_name) & 
+                        (df['Matric'] == student_matric) & 
+                        (df['Week'] == week) &
+                        (df['Type'] == 'MCQ')
+                    ]
+                    already_submitted = not existing.empty
+                    if already_submitted:
+                        previous_score = existing.iloc[0]['Score']
+                except Exception as e:
+                    st.error(f"Error checking previous submissions: {e}")
+
+            if already_submitted:
+                st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
+                
+                if st.button("🔄 Retake Classwork", key=f"retake_{week}"):
+                    try:
+                        # Remove previous submission
+                        df = df.drop(existing.index)
+                        df.to_csv(classwork_file, index=False)
+                        st.success("✅ Previous submission cleared. You can retake now.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error clearing previous submission: {e}")
+            
+            elif classwork_status:
+                with st.form(f"mcq_form_{week.replace(' ', '_')}"):
+                    st.write("**Answer the following questions:**")
+                    answers = display_mcq_questions(mcq_questions)
+                    
+                    submit_mcq = st.form_submit_button(
+                        "🚀 Submit Classwork Answers", 
+                        use_container_width=True
+                    )
+
+                    if submit_mcq:
+                        if not student_name or not student_matric:
+                            st.error("❌ Please set your identity first using the form above.")
+                        elif any(not str(answer).strip() for answer in answers):
+                            st.error("❌ Please answer all questions before submitting.")
+                        else:
+                            # Auto-grade submission
+                            score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
+                            
+                            # Save submission
+                            success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
+                            if success:
+                                # Update classwork score in main scores file
+                                update_classwork_score(course_code, student_name, student_matric, week, score)
+                                
+                                st.balloons()
+                                st.success(f"🎉 Classwork submitted successfully! Score: **{score}%** ({correct}/{total} correct)")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to save your submission. Please try again.")
+            else:
+                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
+                
+                # Show questions in read-only mode when closed
+                st.markdown("---")
+                st.write("**Questions Preview (Read-only):**")
+                for i, question in enumerate(mcq_questions):
+                    st.write(f"**Q{i+1}: {question['question']}**")
+                    if question['type'] == 'mcq':
+                        st.write("Options:")
+                        for opt, text in question['options'].items():
+                            st.write(f"- {opt}: {text}")
+                    st.write("")  # Add spacing
+        else:
+            st.info(f"No automated classwork assigned for {week} yet.")
+            st.write("💡 *If you believe there should be classwork, please ask your lecturer to check the Admin dashboard.*")
+    
+    except Exception as e:
+        st.error(f"Error displaying classwork section: {e}")
 # ===============================================================
 # 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
@@ -2068,7 +2186,7 @@ def student_view(course_code):
             
             # Display classwork for selected week
             display_classwork_section(course_code, selected_week, student_name, student_matric)
-
+        
         with tab2:
             # ===============================================================
             # 🎥 VIDEO LECTURES SECTION
@@ -3355,6 +3473,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
