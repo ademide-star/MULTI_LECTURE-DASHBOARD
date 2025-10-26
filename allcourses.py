@@ -2126,7 +2126,7 @@ def show_course_management():
                     courses, 
                     separator, 
                     import_mode, 
-                    skip_duplicates,
+                    remove_duplicates,
                     auto_generate_codes
                 )
                 display_import_results(results)
@@ -4938,6 +4938,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
