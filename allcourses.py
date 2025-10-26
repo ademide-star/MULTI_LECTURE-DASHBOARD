@@ -4932,16 +4932,18 @@ def admin_view(course_code, course_name):
                     with col1:
                         option_a = st.text_input("Option A", placeholder="First option", key="option_a_main")
                         option_b = st.text_input("Option B", placeholder="Second option", key="option_b_main")
+                        option_e = st.text_input("Option E", placeholder="Second option", key="option_e_main")
                     with col2:
                         option_c = st.text_input("Option C", placeholder="Third option", key="option_c_main")
                         option_d = st.text_input("Option D", placeholder="Fourth option", key="option_d_main")
                     
-                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D"], key="correct_answer_main")
+                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D" "E"], key="correct_answer_main")
                     options = {
                         "A": option_a,
                         "B": option_b, 
                         "C": option_c,
-                        "D": option_d
+                        "D": option_d,
+                        "E": option_e
                     }
                     
                 else:  # Gap Filling
@@ -5480,6 +5482,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
