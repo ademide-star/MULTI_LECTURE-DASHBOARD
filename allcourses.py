@@ -101,7 +101,7 @@ st.markdown(
 
 PERSISTENT_DATA_DIR = "persistent_data"
 ATTENDANCE_STATUS_FILE = "attendance_status.json"
-DEFAULT_ADMIN_PASSWORD = "bimpe2025class"  # Universal default password
+DEFAULT_ADMIN_PASSWORD = "sacoetec2025"  # Universal default password
 
 # ===============================================================
 # 🗂 DIRECTORY MANAGEMENT
@@ -2028,49 +2028,7 @@ def get_weeks_for_course_from_db(course_code):
     except:
         return []
 
-def get_module_details(week_name, course_code):
-    """Get detailed information about a specific module"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        # Check if additional columns exist
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' in columns and 'module_type' in columns:
-            c.execute('''
-                SELECT course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at 
-                FROM weekly_courses 
-                WHERE week_name = ? AND course_code = ? 
-                ORDER BY id
-            ''', (week_name, course_code))
-        else:
-            c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
-        
-        results = []
-        for row in c.fetchall():
-            module_info = {
-                'course_name': row[0],
-                'course_code': row[1]
-            }
-            # Add additional fields if they exist
-            if len(row) > 2:
-                module_info.update({
-                    'module_type': row[2],
-                    'duration': row[3],
-                    'difficulty': row[4],
-                    'objectives': row[5],
-                    'notes': row[6],
-                    'created_at': row[7]
-                })
-            results.append(module_info)
-        
-        conn.close()
-        return results
-    except Exception as e:
-        st.error(f"Error getting module details: {e}")
-        return []
+
 # Add these helper functions for course-specific operations
 def get_courses_by_week_for_course(week_name, course_code):
     """Get all courses for a specific week and course"""
@@ -2134,26 +2092,7 @@ def get_courses_for_course_from_db(course_code):
         st.error(f"Database error: {e}")
         return pd.DataFrame()
         
-        
-def show_student_modules(course_code, course_name, student_name, matric_number):
-    """Student view of weekly schedules"""
-    st.header("📚 Weekly Schedules")
     
-    weeks = get_weeks_simple(course_code)
-    
-    if not weeks:
-        st.info("📝 No weekly schedules have been published yet. Check back later!")
-        return
-    
-    st.success(f"✅ Found {len(weeks)} weekly schedules for {course_name}")
-    
-    for i, week in enumerate(weeks, 1):
-        courses = get_courses_by_week_simple(week, course_code)
-        
-        with st.expander(f"📅 {week} ({len(courses)} courses)", expanded=i == 1):
-            st.write("**📚 Courses this week:**")
-            for j, course in enumerate(courses, 1):
-                st.write(f"{j}. **{course}**")  
 
 
 def show_course_management():
@@ -5449,29 +5388,6 @@ def admin_view(course_code, course_name):
         st.error(f"An error occurred in the admin dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
-def test_database_connection():
-    """Test if database is working properly"""
-    st.sidebar.subheader("🔧 Database Test")
-    if st.sidebar.button("Test Database"):
-        if init_course_db() and check_database_schema():
-            st.sidebar.success("✅ Database is working correctly!")
-        else:
-            st.sidebar.error("❌ Database has issues!")
-            
-        # Show current schema
-        try:
-            conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-            c = conn.cursor()
-            c.execute("PRAGMA table_info(weekly_courses)")
-            columns = c.fetchall()
-            conn.close()
-            
-            st.sidebar.write("Current Schema:")
-            for col in columns:
-                st.sidebar.write(f"- {col[1]} ({col[2]})")
-        except Exception as e:
-            st.sidebar.error(f"Schema check failed: {e}")
-
 
 
 # 🚀 UPDATE MAIN APPLICATION
@@ -5479,9 +5395,7 @@ def test_database_connection():
 
 def main():
     """Main application with System Admin role"""
-     # ... your existing main code ...
-    test_database_connection()  # Add this line
-# ================================================
+   
     # Application Header
     st.subheader("Multi-Course Learning Management System")
     st.title("🎓 University Course Portal")
@@ -5564,6 +5478,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
