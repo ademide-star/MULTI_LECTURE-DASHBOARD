@@ -4249,8 +4249,6 @@ def admin_view(course_code, course_name):
         
         ensure_directories()
         
-        st.title("👩‍🏫 Admin Dashboard")
-        
         # Create tabs for better organization - INCLUDING COURSE MANAGER
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "📚 Course Manager",  # NEW TAB ADDED
@@ -5257,6 +5255,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
