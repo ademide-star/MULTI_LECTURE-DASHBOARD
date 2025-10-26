@@ -4191,14 +4191,14 @@ def show_course_manager(course_code, course_name):
         with col1:
             week_name = st.text_input(
                 "**Module/Week Name** (e.g., 'Week 1: Introduction', 'Module 2: Advanced Topics'):", 
-                key=f"week_name_input_{course_code}_{id}"
+                key=f"week_name_input_{course_code}"
             )
         
         with col2:
             module_type = st.selectbox(
                 "**Module Type**:",
                 ["Lecture", "Practical", "Tutorial", "Assignment", "Project", "Review", "Exam Prep"],
-                key=f"module_type_select_{course_code}_{id}"
+                key=f"module_type_select_{course_code}"
             )
         
         # Show available courses for this specific course
@@ -4220,7 +4220,7 @@ def show_course_manager(course_code, course_name):
             selected_courses = st.multiselect(
                 "Choose course components to include in this module:",
                 options=available_courses,
-                key=f"course_multiselect_{course_code}_{id}",
+                key=f"course_multiselect_{course_code}",
                 help="Select the course topics you want to include in this weekly module"
             )
             
@@ -4233,14 +4233,14 @@ def show_course_manager(course_code, course_name):
                 module_duration = st.selectbox(
                     "Estimated Duration:",
                     ["1-2 hours", "2-3 hours", "3-4 hours", "4-5 hours", "5+ hours"],
-                    key=f"duration_select_{course_code}_{id}"
+                    key=f"duration_select_{course_code}"
                 )
             
             with col2:
                 difficulty_level = st.selectbox(
                     "Difficulty Level:",
                     ["Beginner", "Intermediate", "Advanced"],
-                    key=f"difficulty_select_{course_code}_{id}"
+                    key=f"difficulty_select_{course_code}"
                 )
             
             # Learning objectives
@@ -4248,7 +4248,7 @@ def show_course_manager(course_code, course_name):
                 "Learning Objectives (optional):",
                 height=80,
                 placeholder="What should students be able to do after completing this module?",
-                key=f"objectives_text_{course_code}_{id}"
+                key=f"objectives_text_{course_code}"
             )
             
             # Additional resources
@@ -4256,14 +4256,14 @@ def show_course_manager(course_code, course_name):
                 "Additional Notes/Resources (optional):",
                 height=60,
                 placeholder="Any additional materials, readings, or resources...",
-                key=f"notes_text_{course_code}_{id}"
+                key=f"notes_text_{course_code}"
             )
             
             # Save module button
             col1, col2 = st.columns([2, 1])
             
             with col1:
-                if st.button("💾 Create Learning Module", type="primary", key=f"save_module_btn_{course_code}_{id}"):
+                if st.button("💾 Create Learning Module", type="primary", key=f"save_module_btn_{course_code}"):
                     if week_name and selected_courses:
                         saved_count = 0
                         
@@ -4319,7 +4319,7 @@ def show_course_manager(course_code, course_name):
                         st.error("❌ Please provide both module name and select at least one course component.")
             
             with col2:
-                if st.button("🔄 Clear Form", key=f"clear_module_btn_{course_code}_{id}"):
+                if st.button("🔄 Clear Form", key=f"clear_module_btn_{course_code}"):
                     st.rerun()
                     
         else:
@@ -4444,103 +4444,7 @@ def show_course_manager(course_code, course_name):
         except Exception as e:
             st.error(f"❌ Error accessing module data: {e}")
 
-# Helper functions for module management
-def get_weeks_for_course_from_db(course_code):
-    """Get all unique weeks/modules for a specific course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        # Check if course_code column exists
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' in columns:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
-                     (course_code,))
-        else:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
-        
-        weeks = [row[0] for row in c.fetchall()]
-        conn.close()
-        return weeks
-    except:
-        return []
-
-def get_module_details(week_name, course_code):
-    """Get detailed information about a specific module"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        # Check if additional columns exist
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' in columns and 'module_type' in columns:
-            c.execute('''
-                SELECT course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at 
-                FROM weekly_courses 
-                WHERE week_name = ? AND course_code = ? 
-                ORDER BY id
-            ''', (week_name, course_code))
-        else:
-            c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
-        
-        results = []
-        for row in c.fetchall():
-            module_info = {
-                'course_name': row[0],
-                'course_code': row[1]
-            }
-            # Add additional fields if they exist
-            if len(row) > 2:
-                module_info.update({
-                    'module_type': row[2],
-                    'duration': row[3],
-                    'difficulty': row[4],
-                    'objectives': row[5],
-                    'notes': row[6],
-                    'created_at': row[7]
-                })
-            results.append(module_info)
-        
-        conn.close()
-        return results
-    except Exception as e:
-        st.error(f"Error getting module details: {e}")
-        return []
-
-def show_course_manager(course_code=None, course_name=None):
-    """Course manager that can work with or without specific course context"""
-    
-    # If no course code/name provided, try to get from session state or use defaults
-    if course_code is None or course_name is None:
-        # Try to get from session state (if set by admin_view)
-        if hasattr(st.session_state, 'current_course_code'):
-            course_code = st.session_state.current_course_code
-            course_name = st.session_state.current_course_name
-        else:
-            # Use default or show course selection
-            courses = load_courses_config()
-            if courses:
-                course_list = list(courses.keys())
-                selected_course = st.selectbox("Select Course:", course_list)
-                course_name = selected_course
-                course_code = courses[selected_course]
-            else:
-                st.error("No courses available. Please contact System Administrator.")
-                return
-    
-    st.header(f"📚 Weekly Course Organizer - {course_name}")
-    
-    # Rest of your existing show_course_manager function...
-    init_course_db()
-    
-    # Create tabs for weekly course management
-    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Schedule", "📋 View Weekly Schedule", "⚙️ Manage Weekly Data"])
-    
-    # ... rest of your existing function code ...
+# Remove the duplicate function definition at the end of the file
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
 # ===============================================================
@@ -5601,6 +5505,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
