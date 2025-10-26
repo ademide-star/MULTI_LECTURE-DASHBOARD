@@ -2058,7 +2058,7 @@ def show_course_manager(course_code, course_name):
                                     objectives=learning_objectives,
                                     notes=additional_notes
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                ))
+                                )
                                 conn.commit()
                                 conn.close()
                                 saved_count += 1
@@ -5805,6 +5805,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
