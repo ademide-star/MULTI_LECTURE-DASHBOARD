@@ -2449,7 +2449,8 @@ def get_courses_for_course_from_db(course_code):
         st.error(f"Database error: {e}")
         return pd.DataFrame()
         
- def show_student_modules(course_code, course_name, student_name, matric_number):
+        
+def show_student_modules(course_code, course_name, student_name, matric_number):
     """Student view of weekly schedules"""
     st.header("📚 Weekly Schedules")
     
@@ -5934,6 +5935,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
