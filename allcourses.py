@@ -379,42 +379,96 @@ def display_mcq_questions(questions):
 # ===============================================================
 
 def init_course_db():
-    """Initialize SQLite database for course storage with proper migration"""
+    """Initialize SQLite database for course storage with proper migration and module support"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
     
-    # Check if table exists and get its structure
-    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_courses'")
-    table_exists = c.fetchone() is not None
-    
-    if table_exists:
-        # Check if course_code column exists
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' not in columns:
-            # Add the missing course_code column
-            c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
-            st.info("📊 Database updated: Added course_code column to existing table")
-    
-    # Create table with all required columns
+    # Create table with all required columns including module metadata
     c.execute('''
         CREATE TABLE IF NOT EXISTS weekly_courses
         (id INTEGER PRIMARY KEY AUTOINCREMENT,
          week_name TEXT NOT NULL,
          course_name TEXT NOT NULL,
          course_code TEXT NOT NULL,
+         module_type TEXT,
+         duration TEXT,
+         difficulty TEXT,
+         objectives TEXT,
+         notes TEXT,
          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
     ''')
+    
+    # Check if we need to migrate existing data
+    c.execute("PRAGMA table_info(weekly_courses)")
+    columns = [column[1] for column in c.fetchall()]
+    
+    # Add missing columns if they don't exist
+    missing_columns = []
+    
+    if 'module_type' not in columns:
+        missing_columns.append('module_type')
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN module_type TEXT')
+    
+    if 'duration' not in columns:
+        missing_columns.append('duration')
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN duration TEXT')
+    
+    if 'difficulty' not in columns:
+        missing_columns.append('difficulty')
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN difficulty TEXT')
+    
+    if 'objectives' not in columns:
+        missing_columns.append('objectives')
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN objectives TEXT')
+    
+    if 'notes' not in columns:
+        missing_columns.append('notes')
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN notes TEXT')
+    
+    if missing_columns:
+        print(f"Added missing columns to weekly_courses: {missing_columns}")
+    
     conn.commit()
     conn.close()
 
-def add_course_to_db(week_name, course_name, course_code):
-    """Add course to database"""
+def add_course_to_db(week_name, course_name, course_code, module_type="Lecture", duration="1-2 hours", difficulty="Beginner", objectives="", notes=""):
+    """Add course to database with module metadata"""
     conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
     c = conn.cursor()
-    c.execute('INSERT INTO weekly_courses (week_name, course_name, course_code) VALUES (?, ?, ?)', 
-              (week_name, course_name, course_code))
+    
+    # Check if the entry already exists to avoid duplicates
+    c.execute('''
+        SELECT id FROM weekly_courses 
+        WHERE week_name = ? AND course_name = ? AND course_code = ?
+    ''', (week_name, course_name, course_code))
+    
+    existing = c.fetchone()
+    
+    if existing:
+        # Update existing entry
+        c.execute('''
+            UPDATE weekly_courses 
+            SET module_type = ?, duration = ?, difficulty = ?, objectives = ?, notes = ?
+            WHERE id = ?
+        ''', (module_type, duration, difficulty, objectives, notes, existing[0]))
+    else:
+        # Insert new entry
+        c.execute('''
+            INSERT INTO weekly_courses 
+            (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            week_name, 
+            course_name, 
+            course_code,
+            module_type,
+            duration,
+            difficulty,
+            objectives,
+            notes,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+    
     conn.commit()
     conn.close()
 
@@ -1982,7 +2036,7 @@ def show_course_manager(course_code, course_name):
                             "components": selected_courses,
                             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         }
-                        
+                           
                         # Save each component as a separate entry with module context
                         for course_component in selected_courses:
                             try:
@@ -1994,14 +2048,15 @@ def show_course_manager(course_code, course_name):
                                     (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ''', (
-                                    week_name, 
-                                    course_component, 
-                                    course_code,
-                                    module_type,
-                                    module_duration,
-                                    difficulty_level,
-                                    learning_objectives,
-                                    additional_notes,
+                                add_course_to_db(
+                                    week_name=week_name,
+                                    course_name=course_component,
+                                    course_code=course_code,
+                                    module_type=module_type,
+                                    duration=module_duration,
+                                    difficulty=difficulty_level,
+                                    objectives=learning_objectives,
+                                    notes=additional_notes
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 ))
                                 conn.commit()
@@ -5624,7 +5679,43 @@ def admin_view(course_code, course_name):
         st.error(f"An error occurred in the admin dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
-
+def migrate_database_schema():
+    """Migrate database to new schema if needed"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        c = conn.cursor()
+        
+        # Check current schema
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        # Add missing columns
+        if 'module_type' not in columns:
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN module_type TEXT')
+            print("Added module_type column")
+        
+        if 'duration' not in columns:
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN duration TEXT')
+            print("Added duration column")
+        
+        if 'difficulty' not in columns:
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN difficulty TEXT')
+            print("Added difficulty column")
+        
+        if 'objectives' not in columns:
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN objectives TEXT')
+            print("Added objectives column")
+        
+        if 'notes' not in columns:
+            c.execute('ALTER TABLE weekly_courses ADD COLUMN notes TEXT')
+            print("Added notes column")
+        
+        conn.commit()
+        conn.close()
+        print("Database migration completed successfully")
+        
+    except Exception as e:
+        print(f"Database migration error: {e}")
 # ===============================================================
 # 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
@@ -5714,6 +5805,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
