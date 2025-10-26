@@ -1873,118 +1873,245 @@ def update_student_functions_with_logging(course_code, student_name, matric):
 # 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
 # ===============================================================
 
-def show_course_manager():
-    """Course management integrated into admin view"""
-    st.header("📚 Course Manager")
+def show_course_manager(course_code, course_name):
+    """Simplified course manager for organizing weekly courses (existing courses only)"""
+    st.header(f"📚 Weekly Course Organizer - {course_name}")
     
-    # Initialize and migrate database
+    # Initialize database
     init_course_db()
-    migrate_old_database()
     
-    # Create tabs for course management
-    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Courses", "📋 View Courses", "⚙️ Manage Data"])
+    # Create tabs for weekly course management
+    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Schedule", "📋 View Weekly Schedule", "⚙️ Manage Weekly Data"])
     
     with cm_tab1:
-        st.subheader("Add Weekly Courses")
+        st.subheader("Create Weekly Schedule")
         
-        week_name = st.text_input("**Week Name** (e.g., 'Week 1', 'Spring Semester Week 1'):", key="week_name_input")
+        st.info(f"💡 Organize existing courses from **{course_name}** into weekly schedules")
         
-        st.subheader("📚 Add Courses for this Week")
-        course_input = st.text_area("**Enter courses** (one per line):", height=200,
-                                   placeholder="MCB 221 – General Microbiology\nBCH 201 – General Biochemistry\nBIO 203 – General Physiology",
-                                   key="course_text_area")
+        week_name = st.text_input("**Week/Session Name** (e.g., 'Week 1', 'Module 1', 'Spring Session'):", 
+                                 key=f"week_name_{course_code}")
         
-        col1, col2 = st.columns(2)
+        # Show available courses for this specific course code
+        all_courses = load_courses_config()
+        current_course_codes = [code for name, code in all_courses.items() if code == course_code]
         
-        with col1:
-            if st.button("💾 Save Courses to Database", type="primary", key="save_courses_btn"):
-                if week_name and course_input:
-                    courses_list = [course.strip() for course in course_input.split('\n') if course.strip()]
-                    saved_count = 0
-                    
-                    # Add each course to database
-                    for course in courses_list:
-                        course_code = COURSES.get(course, "UNKNOWN")
-                        try:
-                            add_course_to_db(week_name, course, course_code)
-                            saved_count += 1
-                        except Exception as e:
-                            st.error(f"Error saving {course}: {e}")
-                    
-                    if saved_count > 0:
-                        st.success(f"✅ Successfully added {saved_count} courses for {week_name}!")
-                        st.balloons()
+        if current_course_codes:
+            st.subheader("Available Courses for This Class")
+            
+            # Multi-select for adding courses to this week
+            available_courses = [name for name, code in all_courses.items() if code == course_code]
+            selected_courses = st.multiselect(
+                "Select courses to add to this week:",
+                options=available_courses,
+                key=f"course_select_{course_code}"
+            )
+            
+            # Manual course entry as backup
+            st.subheader("Or Add Custom Course Entries")
+            custom_courses = st.text_area(
+                "Enter additional course details (one per line):",
+                height=100,
+                placeholder=f"{course_name} - Lecture 1\n{course_name} - Practical Session\n{course_name} - Group Discussion",
+                key=f"custom_courses_{course_code}"
+            )
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("💾 Save Weekly Schedule", type="primary", key=f"save_weekly_{course_code}"):
+                    if week_name:
+                        saved_count = 0
+                        
+                        # Add selected courses from multi-select
+                        for course_name_selected in selected_courses:
+                            try:
+                                add_course_to_db(week_name, course_name_selected, course_code)
+                                saved_count += 1
+                            except Exception as e:
+                                st.error(f"Error saving {course_name_selected}: {e}")
+                        
+                        # Add custom courses
+                        if custom_courses:
+                            custom_list = [course.strip() for course in custom_courses.split('\n') if course.strip()]
+                            for course in custom_list:
+                                try:
+                                    add_course_to_db(week_name, course, course_code)
+                                    saved_count += 1
+                                except Exception as e:
+                                    st.error(f"Error saving {course}: {e}")
+                        
+                        if saved_count > 0:
+                            st.success(f"✅ Successfully created weekly schedule '{week_name}' with {saved_count} items!")
+                            log_lecturer_activity("Admin", course_code, "Created Weekly Schedule", 
+                                                f"Week: {week_name}, Items: {saved_count}")
+                        else:
+                            st.error("❌ No courses were added. Please select courses or enter custom entries.")
                     else:
-                        st.error("❌ No courses were saved. Please check the course names.")
-                else:
-                    st.error("❌ Please provide both week name and courses.")
-        
-        with col2:
-            if st.button("🔄 Clear Form", key="clear_form_btn"):
-                st.rerun()
+                        st.error("❌ Please provide a week/session name.")
+            
+            with col2:
+                if st.button("🔄 Clear Form", key=f"clear_weekly_{course_code}"):
+                    st.rerun()
+        else:
+            st.warning(f"⚠️ No courses found for {course_name}. Please contact System Administrator to add courses.")
     
     with cm_tab2:
-        st.subheader("View All Courses")
+        st.subheader("View Weekly Schedules")
         
-        weeks = get_weeks_from_db()
+        # Get only weeks for this specific course
+        try:
+            conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+            if 'course_code' in pd.read_sql_query("PRAGMA table_info(weekly_courses)", conn)['name'].values:
+                df = pd.read_sql_query(
+                    f'SELECT DISTINCT week_name FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
+                    conn, params=(course_code,)
+                )
+                weeks = df['week_name'].tolist()
+            else:
+                weeks = []
+            conn.close()
+        except:
+            weeks = []
         
         if not weeks:
-            st.info("ℹ️ No courses available. Add some courses first!")
+            st.info("ℹ️ No weekly schedules created yet. Create your first weekly schedule above!")
         else:
-            # Show all weeks in expanders
+            # Show all weeks for this course in expanders
             for week in weeks:
-                courses = get_courses_by_week(week)
-                with st.expander(f"📅 {week} ({len(courses)} courses)"):
+                courses = get_courses_by_week_for_course(week, course_code)
+                with st.expander(f"📅 {week} ({len(courses)} items)"):
                     for i, course in enumerate(courses, 1):
-                        st.write(f"{i}. **{course['name']}** ({course['code']})")
+                        st.write(f"{i}. **{course['name']}**")
+                    
+                    # Quick actions for each week
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("📝 Edit", key=f"edit_week_{week}_{course_code}"):
+                            st.session_state[f"editing_week_{week}"] = True
+                    with col2:
+                        if st.button("🗑️ Delete", key=f"delete_week_{week}_{course_code}"):
+                            delete_week_for_course(week, course_code)
+                            st.success(f"✅ Deleted weekly schedule '{week}'!")
+                            st.rerun()
     
     with cm_tab3:
-        st.subheader("Data Management")
+        st.subheader("Weekly Data Management")
         
-        st.info("💾 Your course data is automatically saved in a local SQLite database that persists across reboots.")
+        st.info("💾 Manage your weekly schedules and export data for this course.")
         
-        # Show database info
+        # Show database info for this course only
         try:
-            df = get_all_courses_from_db()
+            df = get_courses_for_course_from_db(course_code)
             
             if not df.empty:
-                st.subheader("📊 Database Contents")
-                st.dataframe(df)
+                st.subheader("📊 Weekly Schedule Overview")
+                st.dataframe(df[['week_name', 'course_name', 'created_at']])
                 
-                # Statistics
-                total_courses = len(df)
+                # Statistics for this course
                 total_weeks = df['week_name'].nunique()
+                total_items = len(df)
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("Total Weeks", total_weeks)
                 with col2:
-                    st.metric("Total Courses", total_courses)
+                    st.metric("Total Schedule Items", total_items)
                 
-                # Export option
-                st.subheader("📤 Export Data")
+                # Export option for this course
+                st.subheader("📤 Export Weekly Data")
                 csv = df.to_csv(index=False)
                 st.download_button(
-                    label="📥 Download Courses CSV",
+                    label="📥 Download Weekly Schedule (CSV)",
                     data=csv,
-                    file_name="all_courses.csv",
-                    mime="text/csv"
+                    file_name=f"{course_code}_weekly_schedule.csv",
+                    mime="text/csv",
+                    key=f"export_{course_code}"
                 )
                 
-                # Delete option
-                st.subheader("🗑️ Delete Data")
-                weeks_to_delete = st.multiselect("Select weeks to delete:", df['week_name'].unique())
-                if st.button("🚨 Delete Selected Weeks", type="secondary"):
+                # Bulk delete option
+                st.subheader("🗑️ Delete Weekly Schedules")
+                weeks_to_delete = st.multiselect(
+                    "Select weeks to delete:",
+                    df['week_name'].unique(),
+                    key=f"delete_select_{course_code}"
+                )
+                
+                if st.button("🚨 Delete Selected Weeks", type="secondary", key=f"bulk_delete_{course_code}"):
                     for week in weeks_to_delete:
-                        delete_week_from_db(week)
-                    st.success(f"✅ Deleted {len(weeks_to_delete)} weeks!")
+                        delete_week_for_course(week, course_code)
+                    st.success(f"✅ Deleted {len(weeks_to_delete)} weekly schedules!")
+                    log_lecturer_activity("Admin", course_code, "Bulk Deleted Weekly Schedules", 
+                                        f"Weeks deleted: {len(weeks_to_delete)}")
                     st.rerun()
                     
             else:
-                st.info("ℹ️ No data available in the database.")
+                st.info("ℹ️ No weekly schedule data available for this course.")
                 
         except Exception as e:
             st.error(f"❌ Error accessing database: {e}")
+
+# Add these helper functions for course-specific operations
+def get_courses_by_week_for_course(week_name, course_code):
+    """Get all courses for a specific week and course"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    
+    # Check if course_code column exists
+    c.execute("PRAGMA table_info(weekly_courses)")
+    columns = [column[1] for column in c.fetchall()]
+    
+    if 'course_code' in columns:
+        c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? AND course_code = ? ORDER BY id', 
+                 (week_name, course_code))
+    else:
+        c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
+    
+    courses = [{"name": row[0], "code": row[1]} for row in c.fetchall()]
+    conn.close()
+    return courses
+
+def delete_week_for_course(week_name, course_code):
+    """Delete a week and all its courses for a specific course from database"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+    
+    # Check if course_code column exists
+    c.execute("PRAGMA table_info(weekly_courses)")
+    columns = [column[1] for column in c.fetchall()]
+    
+    if 'course_code' in columns:
+        c.execute('DELETE FROM weekly_courses WHERE week_name = ? AND course_code = ?', (week_name, course_code))
+    else:
+        c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
+    
+    conn.commit()
+    conn.close()
+
+def get_courses_for_course_from_db(course_code):
+    """Get all courses from database for a specific course with proper error handling"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        
+        # Check if course_code column exists
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' in columns:
+            df = pd.read_sql_query(
+                'SELECT week_name, course_name, course_code, created_at FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
+                conn, params=(course_code,)
+            )
+        else:
+            # Fallback for older database structure
+            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
+            df['course_code'] = 'UNKNOWN'
+        
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()3
             
 def show_course_management():
     """Course management system for super admin with bulk import"""
@@ -4938,6 +5065,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
