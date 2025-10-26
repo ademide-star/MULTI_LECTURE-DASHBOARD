@@ -4445,9 +4445,6 @@ def show_course_manager(course_code, course_name):
             st.error(f"❌ Error accessing module data: {e}")
 
 # Remove the duplicate function definition at the end of the file
-# ===============================================================
-# 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
-# ===============================================================
 
 def admin_view(course_code, course_name):
     """Admin dashboard view with password management"""
@@ -4482,11 +4479,11 @@ def admin_view(course_code, course_name):
             
             col1, col2 = st.columns(2)
             with col1:
-                new_password = st.text_input("New Password", type="password", key=f"new_pass_admin")
+                new_password = st.text_input("New Password", type="password", key=f"new_pass_admin_{course_code}")
             with col2:
-                confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_admin")
+                confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_admin_{course_code}")
             
-            if st.button("🔄 Change Password", type="primary"):
+            if st.button("🔄 Change Password", type="primary", key=f"change_pass_btn_{course_code}"):
                 if new_password and confirm_password:
                     if new_password == confirm_password:
                         if set_course_password(course_code, new_password):
@@ -4515,9 +4512,9 @@ def admin_view(course_code, course_name):
         
         with tab1:
             # ===============================================================
-            # 📚 COURSE MANAGER (INTEGRATED)
+            # 📚 COURSE MANAGER (INTEGRATED) - FIXED: PASS PARAMETERS
             # ===============================================================
-            show_course_manager()
+            show_course_manager(course_code, course_name)  # ADD PARAMETERS HERE
         
         with tab2:
             # ===============================================================
@@ -5505,6 +5502,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
