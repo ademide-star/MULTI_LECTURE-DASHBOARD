@@ -3838,7 +3838,22 @@ def student_view(course_code, course_name):
         else:
             st.warning("⚠️ Please set your identity above to view your scores and submit work.")
             return
-
+         # Student authentication
+        st.subheader("🔐 Student Access")
+        student_name = st.text_input("Enter Your Full Name", key=f"student_name_{course_code}")
+        matric_number = st.text_input("Enter Your Matric Number", key=f"matric_{course_code}")
+        
+        if not student_name or not matric_number:
+            st.warning("Please enter your name and matric number to continue.")
+            return   
+         # Store student info in session state
+        st.session_state["student_name"] = student_name
+        st.session_state["matric_number"] = matric_number
+        st.session_state["course_code"] = course_code
+        st.session_state["course_name"] = course_name
+        
+        st.success(f"✅ Welcome, {student_name} ({matric_number})!")
+        
         # Week selection in sidebar for consistent navigation
         st.sidebar.header("📅 Week Navigation")
         selected_week = st.sidebar.selectbox(
@@ -5699,6 +5714,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
