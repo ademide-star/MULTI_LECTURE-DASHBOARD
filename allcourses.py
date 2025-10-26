@@ -265,9 +265,6 @@ def load_mcq_questions(course_code, week):
                 questions = json.load(f)
 
                 return questions
-        else:
-            st.write(f"❌ MCQ file not found: {week_file}")  # DEBUG
-            return []
     except Exception as e:
         st.write(f"❌ Error loading MCQ questions: {e}")  # DEBUG
         return []
@@ -2093,7 +2090,7 @@ def show_course_management():
         bulk_courses_text = st.text_area(
             "Paste courses here:",
             height=200,
-            placeholder="CHEM 101 - Organic Chemistry, CHEM101\nMATH 201 - Calculus, MATH201\nPHYS 101 - Physics, PHYS101",
+            placeholder="CHEM 101 - Organic Chemistry,\nMATH 201 - Calculus,\nPHYS 101 - Physics",
             key="bulk_courses_textarea"
         )
         
@@ -2119,7 +2116,7 @@ def show_course_management():
             import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"], key="import_mode")
         
         with col2:
-            skip_duplicates = st.checkbox("Skip duplicate course codes", value=True, key="skip_duplicates")
+            remove_duplicates = st.checkbox("Remove duplicate course code", value=True, key="remove_duplicates")
             auto_generate_codes = st.checkbox("Auto-generate missing codes", key="auto_generate_codes")
         
         if st.button("🚀 Import Courses", type="primary", key="import_courses_btn"):
@@ -4941,6 +4938,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
