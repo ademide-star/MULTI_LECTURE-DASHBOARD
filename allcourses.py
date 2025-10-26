@@ -2111,7 +2111,7 @@ def get_courses_for_course_from_db(course_code):
         return df
     except Exception as e:
         st.error(f"Database error: {e}")
-            return pd.DataFrame()
+        return pd.DataFrame()
             
 def show_course_management():
     """Course management system for super admin with bulk import"""
@@ -5065,6 +5065,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
