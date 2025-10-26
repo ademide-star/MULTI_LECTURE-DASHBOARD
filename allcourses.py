@@ -5708,12 +5708,13 @@ st.markdown("""
     }
     </style>
     <div class="custom-footer">
-        Developed by <b>Mide</b> | © 2025 | Advanced LMS with System Monitoring
+        Developed by <b>Adebimpe-John Omolola</b> | © 2025 | Advanced LMS with System Monitoring
     </div>
 """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
 
 
 
