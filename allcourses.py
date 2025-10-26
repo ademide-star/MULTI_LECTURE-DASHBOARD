@@ -1988,7 +1988,356 @@ def show_course_manager():
                 
         except Exception as e:
             st.error(f"❌ Error accessing database: {e}")
+def show_course_management():
+    """Course management system for super admin with bulk import"""
+    st.header("🏫 Course Management System")
+    
+    # Load current courses
+    courses = load_courses_config()
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords", "📊 System Overview"])
+    
+    with tab1:
+        st.subheader("Add/Remove Courses")
+        
+        # Individual course addition (keep existing functionality)
+        col1, col2 = st.columns(2)
+        with col1:
+            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
+        with col2:
+            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
+        
+        if st.button("➕ Add Course", type="primary"):
+            if new_course_name and new_course_code:
+                if new_course_name in courses:
+                    st.error("❌ Course name already exists!")
+                else:
+                    courses[new_course_name] = new_course_code
+                    if save_courses_config(courses):
+                        st.success(f"✅ Course '{new_course_name}' added successfully!")
+                        st.rerun()
+            else:
+                st.error("❌ Please enter both course name and code.")
+        
+        # Display and manage existing courses
+        st.subheader("Current Courses")
+        if courses:
+            for course_name, course_code in courses.items():
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
+                with col2:
+                    if st.button("✏️", key=f"edit_{course_code}"):
+                        st.session_state[f"editing_{course_code}"] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_{course_code}"):
+                        del courses[course_name]
+                        save_courses_config(courses)
+                        st.success(f"✅ Course '{course_name}' deleted!")
+                        st.rerun()
+                
+                # Edit course
+                if st.session_state.get(f"editing_{course_code}", False):
+                    with st.form(f"edit_form_{course_code}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edited_name = st.text_input("Course Name", value=course_name, key=f"name_{course_code}")
+                        with col2:
+                            edited_code = st.text_input("Course Code", value=course_code, key=f"code_{course_code}").upper()
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save Changes"):
+                                if edited_name and edited_code:
+                                    # Remove old entry and add new one
+                                    del courses[course_name]
+                                    courses[edited_name] = edited_code
+                                    save_courses_config(courses)
+                                    st.session_state[f"editing_{course_code}"] = False
+                                    st.success("✅ Course updated successfully!")
+                                    st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state[f"editing_{course_code}"] = False
+                                st.rerun()
+        else:
+            st.info("No courses added yet. Add courses using the form above or bulk import.")
+    
+    with tab2:
+        st.subheader("📥 Bulk Course Import")
+        
+        st.info("""
+        **Bulk Import Instructions:**
+        - Enter one course per line
+        - Format: `Course Name | Course Code` or `Course Name, Course Code`
+        - You can use comma (,) or pipe (|) as separators
+        - Example formats:
+        ```
+        CHEM 101 - Organic Chemistry, CHEM101
+        MATH 201 - Calculus | MATH201
+        PHYS 101 - Physics | PHYS101
+        ```
+        """)
+        
+        # Bulk course input
+        bulk_courses_text = st.text_area(
+            "Paste courses here:",
+            height=200,
+            placeholder="CHEM 101 - Organic Chemistry, CHEM101\nMATH 201 - Calculus, MATH201\nPHYS 101 - Physics, PHYS101"
+        )
+        
+        # Separator option
+        col1, col2 = st.columns(2)
+        with col1:
+            separator = st.selectbox("Separator", [",", "|", "Tab", "Custom"])
+            if separator == "Custom":
+                custom_sep = st.text_input("Custom separator", value=";")
+                separator = custom_sep
+            elif separator == "Tab":
+                separator = "\t"
+        
+        with col2:
+            st.write("**Preview:**")
+            if bulk_courses_text:
+                lines = [line.strip() for line in bulk_courses_text.split('\n') if line.strip()]
+                st.write(f"Found {len(lines)} courses to import")
+        
+        # Import options
+        col1, col2 = st.columns(2)
+        with col1:
+            import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"])
+        
+        with col2:
+            skip_duplicates = st.checkbox("Skip duplicate course codes", value=True)
+            auto_generate_codes = st.checkbox("Auto-generate missing codes")
+        
+        if st.button("🚀 Import Courses", type="primary"):
+            if bulk_courses_text:
+                results = process_bulk_courses(
+                    bulk_courses_text, 
+                    courses, 
+                    separator, 
+                    import_mode, 
+                    skip_duplicates,
+                    auto_generate_codes
+                )
+                display_import_results(results)
+            else:
+                st.error("❌ Please paste some courses to import!")
+    
+    with tab3:
+        st.subheader("Manage Admin Passwords")
+        
+        passwords = load_admin_passwords()
+        courses = load_courses_config()
+        
+        if courses:
+            # Bulk password reset
+            st.write("**Bulk Password Operations:**")
+            col1, col2 = st.columns(2)
             
+            with col1:
+                new_bulk_password = st.text_input("Set same password for all courses", type="password")
+                if st.button("🔑 Apply to All Courses"):
+                    if new_bulk_password:
+                        for course_code in courses.values():
+                            set_course_password(course_code, new_bulk_password)
+                        st.success("✅ Password applied to all courses!")
+                        st.rerun()
+            
+            with col2:
+                if st.button("🔄 Reset All to Default"):
+                    for course_code in courses.values():
+                        set_course_password(course_code, DEFAULT_ADMIN_PASSWORD)
+                    st.success("✅ All passwords reset to default!")
+                    st.rerun()
+            
+            st.divider()
+            
+            # Individual course passwords
+            for course_name, course_code in courses.items():
+                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
+                
+                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
+                    st.info(f"Current password: **{current_password}**")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{course_code}")
+                    with col2:
+                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{course_code}")
+                    
+                    if st.button("🔄 Change Password", key=f"change_{course_code}"):
+                        if new_password and confirm_password:
+                            if new_password == confirm_password:
+                                if set_course_password(course_code, new_password):
+                                    st.success("✅ Password changed successfully!")
+                                    st.rerun()
+                            else:
+                                st.error("❌ Passwords don't match!")
+                        else:
+                            st.error("❌ Please enter and confirm new password!")
+        else:
+            st.info("No courses available. Add courses first.")
+    
+    with tab4:
+        st.subheader("System Overview")
+        
+        courses = load_courses_config()
+        passwords = load_admin_passwords()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Courses", len(courses))
+        with col2:
+            custom_passwords = len([code for code in courses.values() if code in passwords])
+            st.metric("Custom Passwords", custom_passwords)
+        with col3:
+            default_passwords = len(courses) - custom_passwords
+            st.metric("Default Passwords", default_passwords)
+        
+        # Course statistics
+        if courses:
+            st.subheader("Course Details")
+            overview_data = []
+            for course_name, course_code in courses.items():
+                course_password = "Custom" if course_code in passwords else "Default"
+                overview_data.append({
+                    "Course Name": course_name,
+                    "Course Code": course_code,
+                    "Password": course_password
+                })
+            
+            overview_df = pd.DataFrame(overview_data)
+            st.dataframe(overview_df, use_container_width=True)
+            
+            # Export courses
+            st.subheader("Export Courses")
+            csv_data = overview_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Export Courses to CSV",
+                data=csv_data,
+                file_name="courses_export.csv",
+                mime="text/csv"
+            )
+
+def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
+    """Process bulk course import"""
+    results = {
+        'success': [],
+        'errors': [],
+        'duplicates': [],
+        'total_processed': 0
+    }
+    
+    lines = [line.strip() for line in bulk_text.split('\n') if line.strip()]
+    results['total_processed'] = len(lines)
+    
+    # If replacing all, clear existing courses first
+    if import_mode == "Replace all courses":
+        existing_courses.clear()
+    
+    for i, line in enumerate(lines, 1):
+        try:
+            # Split the line by separator
+            if separator in line:
+                parts = [part.strip() for part in line.split(separator)]
+            else:
+                # Try to split by common separators
+                if ',' in line:
+                    parts = [part.strip() for part in line.split(',')]
+                elif '|' in line:
+                    parts = [part.strip() for part in line.split('|')]
+                elif '\t' in line:
+                    parts = [part.strip() for part in line.split('\t')]
+                else:
+                    # If no separator, try to extract code from name
+                    parts = [line]
+            
+            # Extract course name and code
+            if len(parts) >= 2:
+                course_name = parts[0]
+                course_code = parts[1].upper()
+            else:
+                course_name = parts[0]
+                if auto_generate_codes:
+                    # Auto-generate code from name (extract uppercase letters and numbers)
+                    code_match = re.findall(r'[A-Z]+\s*\d+', course_name)
+                    if code_match:
+                        course_code = code_match[0].replace(' ', '')
+                    else:
+                        # Generate from first letters
+                        words = course_name.split()
+                        if len(words) >= 2:
+                            course_code = (words[0][0] + words[1][0]).upper() + "101"
+                        else:
+                            course_code = course_name[:6].upper().replace(' ', '')
+                else:
+                    results['errors'].append(f"Line {i}: Cannot extract course code - '{line}'")
+                    continue
+            
+            # Validate
+            if not course_name or not course_code:
+                results['errors'].append(f"Line {i}: Missing course name or code - '{line}'")
+                continue
+            
+            # Check for duplicates
+            if course_name in existing_courses:
+                results['duplicates'].append(f"Line {i}: Course name exists - '{course_name}'")
+                continue
+            
+            if skip_duplicates and course_code in existing_courses.values():
+                results['duplicates'].append(f"Line {i}: Course code exists - '{course_code}'")
+                continue
+            
+            # Add course
+            existing_courses[course_name] = course_code
+            results['success'].append(f"'{course_name}' - {course_code}")
+            
+        except Exception as e:
+            results['errors'].append(f"Line {i}: Error processing - '{line}' - {str(e)}")
+    
+    # Save if we have successful imports
+    if results['success']:
+        save_courses_config(existing_courses)
+    
+    return results
+
+def display_import_results(results):
+    """Display the results of bulk import"""
+    st.subheader("📊 Import Results")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Successful", len(results['success']))
+    
+    with col2:
+        st.metric("Errors", len(results['errors']))
+    
+    with col3:
+        st.metric("Duplicates", len(results['duplicates']))
+    
+    # Show successful imports
+    if results['success']:
+        st.success(f"✅ Successfully imported {len(results['success'])} courses:")
+        for success in results['success']:
+            st.write(f"• {success}")
+    
+    # Show errors
+    if results['errors']:
+        st.error(f"❌ {len(results['errors'])} errors occurred:")
+        for error in results['errors']:
+            st.write(f"• {error}")
+    
+    # Show duplicates
+    if results['duplicates']:
+        st.warning(f"⚠️ {len(results['duplicates'])} duplicates skipped:")
+        for duplicate in results['duplicates']:
+            st.write(f"• {duplicate}")
+    
+    if results['success']:
+        st.rerun()            
 # ===============================================================
 # 📊 SCORES MANAGEMENT
 # ===============================================================
@@ -4579,6 +4928,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
