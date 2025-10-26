@@ -2004,322 +2004,7 @@ def update_student_functions_with_logging(course_code, student_name, matric):
     # - When they download materials
 
 
-# ===============================================================
-# 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN) - SIMPLIFIED VERSION
-# ===============================================================
 
-def show_course_manager(course_code, course_name):
-    """Simplified course organizer - create weekly schedules from existing courses"""
-    st.header(f"📚 Weekly Course Organizer - {course_name}")
-    
-    # Initialize database (simple version)
-    init_simple_course_db()
-    
-    # Create tabs for course management
-    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Courses", "📋 View Weekly Courses", "⚙️ Manage Weekly Data"])
-    
-    with cm_tab1:
-        st.subheader("Add Courses to Weekly Schedule")
-        
-        st.info(f"💡 Organize **{course_name}** courses into weekly schedules")
-        
-        week_name = st.text_input(
-            "**Week Name** (e.g., 'Week 1', 'Module 1', 'Spring Session'):", 
-            key=f"week_name_{course_code}"
-        )
-        
-        # Show available courses for this specific course
-        all_courses = load_courses_config()
-        available_courses = [name for name, code in all_courses.items() if code == course_code]
-        
-        if available_courses:
-            st.subheader("📖 Available Courses")
-            
-            # Display available courses
-            for i, course in enumerate(available_courses, 1):
-                st.write(f"**{i}.** {course}")
-            
-            st.divider()
-            
-            # Course selection
-            st.subheader("Select Courses for This Week")
-            
-            selected_courses = st.multiselect(
-                "Choose courses to include this week:",
-                options=available_courses,
-                key=f"course_select_{course_code}",
-                help="Select the courses you want to schedule for this week"
-            )
-            
-            # Additional notes
-            weekly_notes = st.text_area(
-                "Weekly Notes (optional):",
-                height=60,
-                placeholder="Any additional instructions or resources for this week...",
-                key=f"notes_{course_code}"
-            )
-            
-            # Save button
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                if st.button("💾 Save Weekly Schedule", type="primary", key=f"save_weekly_{course_code}"):
-                    if week_name and selected_courses:
-                        saved_count = 0
-                        errors = []
-                        
-                        for course_component in selected_courses:
-                            try:
-                                success = add_course_simple(
-                                    week_name=week_name,
-                                    course_name=course_component,
-                                    course_code=course_code
-                                )
-                                if success:
-                                    saved_count += 1
-                                else:
-                                    errors.append(f"Failed to save: {course_component}")
-                            except Exception as e:
-                                errors.append(f"Error saving {course_component}: {str(e)}")
-                        
-                        if saved_count > 0:
-                            st.success(f"✅ Successfully added {saved_count} courses to '{week_name}'!")
-                            if errors:
-                                st.warning(f"⚠️ Some courses had issues: {', '.join(errors)}")
-                            st.balloons()
-                            log_lecturer_activity("Admin", course_code, "Created Weekly Schedule", 
-                                                f"Week: {week_name}, Courses: {saved_count}")
-                        else:
-                            st.error("❌ No courses were saved. Please try again.")
-                            if errors:
-                                for error in errors:
-                                    st.error(error)
-                    else:
-                        st.error("❌ Please provide both week name and select at least one course.")
-            
-            with col2:
-                if st.button("🔄 Clear Form", key=f"clear_weekly_{course_code}"):
-                    st.rerun()
-                    
-        else:
-            st.warning(f"⚠️ No courses found for {course_name}. Please contact System Administrator.")
-    
-    with cm_tab2:
-        st.subheader("View Weekly Schedules")
-        
-        # Get weeks for this specific course
-        weeks = get_weeks_simple(course_code)
-        
-        if not weeks:
-            st.info("ℹ️ No weekly schedules created yet. Create your first schedule above!")
-        else:
-            # Show all weeks for this course
-            for i, week in enumerate(weeks):
-                courses = get_courses_by_week_simple(week, course_code)
-                
-                with st.expander(f"📅 {week} ({len(courses)} courses)", expanded=False):
-                    
-                    # Course list
-                    st.write("**📚 Courses this week:**")
-                    for j, course in enumerate(courses, 1):
-                        st.write(f"{j}. **{course}**")
-                    
-                    # Quick actions
-                    st.divider()
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("✏️ Edit", key=f"edit_week_{week}_{course_code}_{i}"):
-                            st.session_state[f"editing_week_{week}"] = True
-                    with col2:
-                        if st.button("🗑️ Delete", key=f"del_week_{week}_{course_code}_{i}"):
-                            delete_week_simple(week, course_code)
-                            st.success(f"✅ Deleted weekly schedule '{week}'!")
-                            st.rerun()
-    
-    with cm_tab3:
-        st.subheader("Weekly Data Management")
-        
-        st.info("💡 Manage your weekly schedules and export data")
-        
-        # Show database info
-        try:
-            df = get_courses_simple(course_code)
-            
-            if not df.empty:
-                # Statistics
-                total_weeks = df['week_name'].nunique()
-                total_courses = len(df)
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Weeks", total_weeks)
-                with col2:
-                    st.metric("Total Course Entries", total_courses)
-                with col3:
-                    avg_courses = total_courses / total_weeks if total_weeks > 0 else 0
-                    st.metric("Avg Courses/Week", f"{avg_courses:.1f}")
-                
-                # Data table
-                st.subheader("📊 Schedule Overview")
-                st.dataframe(df[['week_name', 'course_name', 'created_at']])
-                
-                # Export options
-                st.subheader("📤 Export Schedule Data")
-                csv = df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Schedule Data (CSV)",
-                    data=csv,
-                    file_name=f"{course_code}_weekly_schedule.csv",
-                    mime="text/csv",
-                    key=f"export_schedule_{course_code}"
-                )
-                
-                # Bulk management
-                st.subheader("🗑️ Schedule Management")
-                weeks_to_delete = st.multiselect(
-                    "Select weeks to delete:",
-                    df['week_name'].unique(),
-                    key=f"week_delete_select_{course_code}"
-                )
-                
-                if st.button("🚨 Delete Selected Weeks", type="secondary", key=f"bulk_del_weeks_{course_code}"):
-                    for week_name in weeks_to_delete:
-                        delete_week_simple(week_name, course_code)
-                    st.success(f"✅ Deleted {len(weeks_to_delete)} weekly schedules!")
-                    log_lecturer_activity("Admin", course_code, "Bulk Deleted Weeks", 
-                                        f"Weeks deleted: {len(weeks_to_delete)}")
-                    st.rerun()
-                    
-            else:
-                st.info("ℹ️ No schedule data available for this course.")
-                
-        except Exception as e:
-            st.error(f"❌ Error accessing schedule data: {e}")
-
-# ===============================================================
-# 🔧 SIMPLIFIED DATABASE FUNCTIONS (USING EXISTING SCHEMA)
-# ===============================================================
-
-def init_simple_course_db():
-    """Initialize database with simple schema that matches what we have"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        # Create simple table that matches current schema
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS weekly_courses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                week_name TEXT NOT NULL,
-                course_name TEXT NOT NULL,
-                course_code TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Database init error: {e}")
-        return False
-
-def add_course_simple(week_name, course_name, course_code):
-    """Add course to database - simple version"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        # Simple insert with only the columns we know exist
-        c.execute('''
-            INSERT INTO weekly_courses 
-            (week_name, course_name, course_code, created_at)
-            VALUES (?, ?, ?, ?)
-        ''', (
-            week_name, 
-            course_name, 
-            course_code,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error saving course: {e}")
-        return False
-
-def get_weeks_simple(course_code):
-    """Get all unique weeks for a specific course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        c.execute('''
-            SELECT DISTINCT week_name FROM weekly_courses 
-            WHERE course_code = ? 
-            ORDER BY created_at
-        ''', (course_code,))
-        
-        weeks = [row[0] for row in c.fetchall()]
-        conn.close()
-        return weeks
-    except:
-        return []
-
-def get_courses_by_week_simple(week_name, course_code):
-    """Get all courses for a specific week and course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        c.execute('''
-            SELECT course_name FROM weekly_courses 
-            WHERE week_name = ? AND course_code = ? 
-            ORDER BY id
-        ''', (week_name, course_code))
-        
-        courses = [row[0] for row in c.fetchall()]
-        conn.close()
-        return courses
-    except:
-        return []
-
-def get_courses_simple(course_code):
-    """Get all courses from database for a specific course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        
-        df = pd.read_sql_query('''
-            SELECT week_name, course_name, course_code, created_at 
-            FROM weekly_courses 
-            WHERE course_code = ? 
-            ORDER BY created_at
-        ''', conn, params=(course_code,))
-        
-        conn.close()
-        return df
-    except Exception as e:
-        print(f"Database error: {e}")
-        return pd.DataFrame()
-
-def delete_week_simple(week_name, course_code):
-    """Delete a week and all its courses for a specific course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        
-        c.execute('''
-            DELETE FROM weekly_courses 
-            WHERE week_name = ? AND course_code = ?
-        ''', (week_name, course_code))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error deleting week: {e}")
-        return False
 # Helper functions for module management
 def get_weeks_for_course_from_db(course_code):
     """Get all unique weeks/modules for a specific course"""
@@ -3993,6 +3678,20 @@ def display_classwork_section(course_code, week, student_name, student_matric):
     
     except Exception as e:
         st.error(f"Error displaying classwork section: {e}")
+
+def show_student_course_description(course_code, course_name):
+    """Student view of course description"""
+    st.header(f"📝 {course_name} - Course Information")
+    
+    # Load course description
+    course_info = load_course_description(course_code)
+    
+    if not course_info:
+        st.info("📋 Course description is being prepared by your lecturer. Check back soon!")
+        return
+    
+    # Display the course description using the same preview function
+    display_course_description_preview(course_info)
 # ===============================================================
 # 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
@@ -4060,7 +3759,7 @@ def student_view(course_code, course_name):
         
         # Create tabs for different sections
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "📚 Weekly Modules",  # NEW TAB ADDED
+             "📝 About Course",  # NEW TAB ADDED
             "📖 Lecture & Classwork", 
             "🎥 Video Lectures", 
             "🕒 Attendance",
@@ -4070,9 +3769,9 @@ def student_view(course_code, course_name):
 
         with tab1:
             # ===============================================================
-            # 📚 WEEKLY MODULES (STUDENT VIEW)
+            # 📝 COURSE DESCRIPTION (STUDENT VIEW)
             # ===============================================================
-            show_student_modules(course_code, course_name, student_name, matric_number)
+            show_student_course_description(course_code, course_name)
             
         with tab2:
             # ===============================================================
@@ -4383,475 +4082,405 @@ def student_view(course_code, course_name):
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
         
 
-# ===============================================================
-# 📚 STUDENT MODULE VIEWER
-# ===============================================================
 
-def show_student_modules(course_code, course_name, student_name, matric_number):
-    """Student view of weekly learning modules"""
-    st.header("📚 Weekly Learning Modules")
     
-    # Initialize database
-    init_course_db()
-    
-    # Get modules for this course
-    weeks = get_weeks_for_course_from_db(course_code)
-    
-    if not weeks:
-        st.info("📝 No learning modules have been published yet. Check back later!")
-        st.info("💡 Your lecturer is preparing organized weekly modules for this course.")
-        return
-    
-    st.success(f"✅ Found {len(weeks)} learning modules for {course_name}")
-    
-    # Progress tracking
-    completed_modules = get_student_module_progress(course_code, matric_number)
-    total_modules = len(weeks)
-    
-    if total_modules > 0:
-        progress_percent = (len(completed_modules) / total_modules) * 100
-        st.metric("Module Progress", f"{len(completed_modules)}/{total_modules} completed", f"{progress_percent:.1f}%")
-    
-    # Display modules in chronological order
-    for i, week in enumerate(weeks, 1):
-        module_details = get_module_details(week, course_code)
-        
-        if not module_details:
-            continue
-            
-        # Check if module is completed
-        is_completed = week in completed_modules
-        
-        # Create expander for each module with completion status
-        with st.expander(
-            f"{'✅' if is_completed else '📦'} {week} - {len(module_details)} components", 
-            expanded=i == 1  # Expand first module by default
-        ):
-            
-            # Module header with metadata
-            if module_details and 'module_type' in module_details[0] and module_details[0]['module_type']:
-                module_type = module_details[0]['module_type']
-                duration = module_details[0].get('duration', 'Not specified')
-                difficulty = module_details[0].get('difficulty', 'Not specified')
-                
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.write(f"**Type:** {module_type}")
-                with col2:
-                    st.write(f"**Duration:** {duration}")
-                with col3:
-                    st.write(f"**Level:** {difficulty}")
-                with col4:
-                    status_color = "🟢" if is_completed else "🟡"
-                    st.write(f"**Status:** {status_color} {'Completed' if is_completed else 'In Progress'}")
-            
-            # Learning objectives
-            if module_details and module_details[0].get('objectives'):
-                st.subheader("🎯 Learning Objectives")
-                st.info(module_details[0]['objectives'])
-            
-            # Module components
-            st.subheader("📚 Module Components")
-            for j, component in enumerate(module_details, 1):
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"**{j}. {component['course_name']}**")
-                with col2:
-                    # Mark component as complete/incomplete
-                    component_key = f"{week}_{component['course_name']}"
-                    component_completed = st.checkbox(
-                        "Mark as complete", 
-                        value=component_key in completed_modules,
-                        key=f"complete_{matric_number}_{component_key}"
-                    )
-                    
-                    if component_completed and component_key not in completed_modules:
-                        mark_module_complete(course_code, matric_number, component_key)
-                        st.rerun()
-                    elif not component_completed and component_key in completed_modules:
-                        mark_module_incomplete(course_code, matric_number, component_key)
-                        st.rerun()
-            
-            # Additional resources
-            if module_details and module_details[0].get('notes'):
-                st.subheader("📋 Additional Resources")
-                st.success(module_details[0]['notes'])
-            
-            # Quick actions
-            st.divider()
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("📖 Open Lecture Materials", key=f"lectures_{week}_{matric_number}"):
-                    # This would ideally scroll to or highlight the lecture tab
-                    st.info("Switch to the '📖 Lecture & Classwork' tab to view detailed materials")
-            
-            with col2:
-                if st.button("🎥 Watch Videos", key=f"videos_{week}_{matric_number}"):
-                    st.info("Switch to the '🎥 Video Lectures' tab to access video content")
-    
-    # Module completion statistics
-    if total_modules > 0:
-        st.divider()
-        st.subheader("📈 Module Progress Overview")
-        
-        completed_count = len(completed_modules)
-        remaining_count = total_modules - completed_count
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Modules", total_modules)
-        with col2:
-            st.metric("Completed", completed_count)
-        with col3:
-            st.metric("Remaining", remaining_count)
-        
-        # Progress bar
-        progress = completed_count / total_modules
-        st.progress(progress)
-        st.write(f"Overall progress: {progress:.1%}")
 
 # ===============================================================
-# 🔧 HELPER FUNCTIONS FOR STUDENT MODULE PROGRESS
-# ===============================================================
-
-def get_student_module_progress(course_code, matric_number):
-    """Get list of completed modules for a student"""
-    try:
-        progress_file = get_file(course_code, "module_progress")
-        if os.path.exists(progress_file):
-            df = pd.read_csv(progress_file)
-            student_progress = df[
-                (df['MatricNumber'] == matric_number) & 
-                (df['Completed'] == True)
-            ]['ModuleKey'].tolist()
-            return student_progress
-        return []
-    except:
-        return []
-
-def mark_module_complete(course_code, matric_number, module_key):
-    """Mark a module as completed for a student"""
-    try:
-        progress_file = get_file(course_code, "module_progress")
-        
-        if os.path.exists(progress_file):
-            df = pd.read_csv(progress_file)
-        else:
-            df = pd.DataFrame(columns=['MatricNumber', 'ModuleKey', 'Completed', 'CompletedAt'])
-        
-        # Remove existing entry if any
-        df = df[~((df['MatricNumber'] == matric_number) & (df['ModuleKey'] == module_key))]
-        
-        # Add new entry
-        new_entry = {
-            'MatricNumber': matric_number,
-            'ModuleKey': module_key,
-            'Completed': True,
-            'CompletedAt': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-        
-        df.to_csv(progress_file, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving progress: {e}")
-        return False
-
-def mark_module_incomplete(course_code, matric_number, module_key):
-    """Mark a module as incomplete for a student"""
-    try:
-        progress_file = get_file(course_code, "module_progress")
-        
-        if os.path.exists(progress_file):
-            df = pd.read_csv(progress_file)
-            # Remove the entry
-            df = df[~((df['MatricNumber'] == matric_number) & (df['ModuleKey'] == module_key))]
-            df.to_csv(progress_file, index=False)
-            return True
-        return False
-    except Exception as e:
-        st.error(f"Error updating progress: {e}")
-        return False
-
-    
-# ===============================================================
-# 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
+# 📊 COURSE MANAGER SECTION (SIMPLIFIED - ABOUT COURSE & DATA ONLY)
 # ===============================================================
 
 def show_course_manager(course_code, course_name):
-    """Course module organizer - create weekly modules from existing courses"""
-    st.header(f"📚 Course Module Organizer - {course_name}")
+    """Simplified course manager - only course description and data management"""
+    st.header(f"📚 Course Manager - {course_name}")
     
-    # Initialize database
-    init_course_db()
-    
-    # Create tabs for module management
-    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Create Weekly Modules", "📋 View Weekly Modules", "⚙️ Module Management"])
+    # Create tabs for course management
+    cm_tab1, cm_tab2 = st.tabs(["📝 About Course", "⚙️ Course Data"])
     
     with cm_tab1:
-        st.subheader("Create Weekly Learning Modules")
+        # ===============================================================
+        # 📝 COURSE DESCRIPTION
+        # ===============================================================
+        st.subheader("📝 Course Description & Information")
         
-        st.info(f"💡 Create organized weekly modules for **{course_name}** using existing course materials")
+        # Load existing course description
+        course_info = load_course_description(course_code)
+        
+        with st.form(f"course_description_form_{course_code}"):
+            st.info("💡 Provide comprehensive course information for students")
+            
+            # Course overview
+            course_overview = st.text_area(
+                "**Course Overview & Description**",
+                value=course_info.get('overview', ''),
+                height=120,
+                placeholder="Describe the course objectives, learning outcomes, and what students will achieve...",
+                key=f"overview_{course_code}"
+            )
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Learning objectives
+                learning_outcomes = st.text_area(
+                    "**Learning Outcomes**",
+                    value=course_info.get('outcomes', ''),
+                    height=100,
+                    placeholder="What students will be able to do after completing this course...",
+                    key=f"outcomes_{course_code}"
+                )
+                
+                # Prerequisites
+                prerequisites = st.text_area(
+                    "**Prerequisites**",
+                    value=course_info.get('prerequisites', ''),
+                    height=80,
+                    placeholder="Required knowledge or courses before taking this one...",
+                    key=f"prerequisites_{course_code}"
+                )
+            
+            with col2:
+                # Assessment methods
+                assessment = st.text_area(
+                    "**Assessment Methods**",
+                    value=course_info.get('assessment', ''),
+                    height=100,
+                    placeholder="Exams, assignments, projects, etc...",
+                    key=f"assessment_{course_code}"
+                )
+                
+                # Required materials
+                materials = st.text_area(
+                    "**Required Materials**",
+                    value=course_info.get('materials', ''),
+                    height=80,
+                    placeholder="Textbooks, software, tools needed...",
+                    key=f"materials_{course_code}"
+                )
+            
+            # Course schedule overview
+            schedule_overview = st.text_area(
+                "**Course Schedule Overview**",
+                value=course_info.get('schedule', ''),
+                height=80,
+                placeholder="Brief overview of weekly topics and major milestones...",
+                key=f"schedule_{course_code}"
+            )
+            
+            # Instructor information
+            st.subheader("👨‍🏫 Instructor Information")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                instructor_name = st.text_input(
+                    "Instructor Name",
+                    value=course_info.get('instructor_name', ''),
+                    placeholder="Dr. John Smith",
+                    key=f"instructor_name_{course_code}"
+                )
+                
+                instructor_email = st.text_input(
+                    "Email",
+                    value=course_info.get('instructor_email', ''),
+                    placeholder="john.smith@university.edu",
+                    key=f"instructor_email_{course_code}"
+                )
+            
+            with col2:
+                office_hours = st.text_input(
+                    "Office Hours",
+                    value=course_info.get('office_hours', ''),
+                    placeholder="Monday 2-4 PM, Wednesday 10-12 PM",
+                    key=f"office_hours_{course_code}"
+                )
+                
+                office_location = st.text_input(
+                    "Office Location",
+                    value=course_info.get('office_location', ''),
+                    placeholder="Building A, Room 205",
+                    key=f"office_location_{course_code}"
+                )
+            
+            # Contact policies
+            contact_policy = st.text_area(
+                "**Contact Policy**",
+                value=course_info.get('contact_policy', ''),
+                height=60,
+                placeholder="Best ways to contact you and response times...",
+                key=f"contact_policy_{course_code}"
+            )
+            
+            # Save course description
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if st.form_submit_button("💾 Save Course Description", type="primary", use_container_width=True):
+                    course_data = {
+                        'overview': course_overview,
+                        'outcomes': learning_outcomes,
+                        'prerequisites': prerequisites,
+                        'assessment': assessment,
+                        'materials': materials,
+                        'schedule': schedule_overview,
+                        'instructor_name': instructor_name,
+                        'instructor_email': instructor_email,
+                        'office_hours': office_hours,
+                        'office_location': office_location,
+                        'contact_policy': contact_policy,
+                        'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    
+                    if save_course_description(course_code, course_data):
+                        st.success("✅ Course description saved successfully!")
+                        log_lecturer_activity("Admin", course_code, "Updated Course Description", 
+                                            "Course information updated")
+                    else:
+                        st.error("❌ Failed to save course description")
+            
+            with col2:
+                if st.form_submit_button("🔄 Reset Form", use_container_width=True):
+                    st.rerun()
+        
+        # Preview section
+        st.divider()
+        st.subheader("👁️ Course Description Preview")
+        st.info("This is how students will see the course information:")
+        
+        display_course_description_preview(course_info)
+    
+    with cm_tab2:
+        # ===============================================================
+        # ⚙️ COURSE DATA MANAGEMENT
+        # ===============================================================
+        st.subheader("Course Data Management")
+        
+        st.info("💡 Manage your course information and data")
+        
+        # Course information summary
+        course_info = load_course_description(course_code)
+        if course_info:
+            st.subheader("📊 Course Information Status")
+            
+            # Calculate completeness
+            info_completeness = calculate_info_completeness(course_info)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Description Completeness", f"{info_completeness}%")
+            with col2:
+                # Count filled fields
+                filled_fields = len([v for v in course_info.values() if v])
+                total_fields = len(course_info)
+                st.metric("Fields Completed", f"{filled_fields}/{total_fields}")
+            with col3:
+                last_updated = course_info.get('last_updated', 'Never')
+                st.metric("Last Updated", last_updated.split()[0] if last_updated != 'Never' else 'Never')
+            
+            # Progress bar for completeness
+            st.progress(info_completeness / 100)
+            
+        # Data management options
+        st.subheader("📤 Export Course Data")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            week_name = st.text_input(
-                "**Module/Week Name** (e.g., 'Week 1: Introduction', 'Module 2: Advanced Topics'):", 
-                key=f"week_name_input_{course_code}"
-            )
+            # Export course description as JSON
+            if course_info:
+                json_data = json.dumps(course_info, indent=2)
+                st.download_button(
+                    label="📥 Download Course Info (JSON)",
+                    data=json_data,
+                    file_name=f"{course_code}_course_description.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key=f"export_info_{course_code}"
+                )
+            else:
+                st.button(
+                    "📥 Download Course Info (JSON)",
+                    disabled=True,
+                    help="No course information available to export",
+                    use_container_width=True
+                )
         
         with col2:
-            module_type = st.selectbox(
-                "**Module Type**:",
-                ["Lecture", "Practical", "Tutorial", "Assignment", "Project", "Review", "Exam Prep"],
-                key=f"module_type_select_{course_code}"
-            )
+            # Export course description as CSV
+            if course_info:
+                # Convert to CSV format
+                csv_data = []
+                for key, value in course_info.items():
+                    if key != 'last_updated':  # Skip timestamp for cleaner CSV
+                        csv_data.append(f"{key},{value}")
+                
+                csv_content = "\n".join(csv_data)
+                st.download_button(
+                    label="📥 Download Course Info (CSV)",
+                    data=csv_content,
+                    file_name=f"{course_code}_course_description.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key=f"export_csv_{course_code}"
+                )
+            else:
+                st.button(
+                    "📥 Download Course Info (CSV)",
+                    disabled=True,
+                    help="No course information available to export",
+                    use_container_width=True
+                )
         
-        # Show available courses for this specific course
-        all_courses = load_courses_config()
-        available_courses = [name for name, code in all_courses.items() if code == course_code]
+        # Course data reset options
+        st.subheader("🔄 Data Management")
         
-        if available_courses:
-            st.subheader("📖 Available Course Components")
-            
-            # Display available courses in a clean format
-            for i, course in enumerate(available_courses, 1):
-                st.write(f"**{i}.** {course}")
-            
-            st.divider()
-            
-            # Module content selection
-            st.subheader("Select Content for This Module")
-            
-            selected_courses = st.multiselect(
-                "Choose course components to include in this module:",
-                options=available_courses,
-                key=f"course_multiselect_{course_code}",
-                help="Select the course topics you want to include in this weekly module"
-            )
-            
-            # Additional module details
-            st.subheader("Module Details")
+        with st.expander("Reset Course Information", expanded=False):
+            st.warning("⚠️ This will delete all course description data. This action cannot be undone!")
             
             col1, col2 = st.columns(2)
-            
             with col1:
-                module_duration = st.selectbox(
-                    "Estimated Duration:",
-                    ["1-2 hours", "2-3 hours", "3-4 hours", "4-5 hours", "5+ hours"],
-                    key=f"duration_select_{course_code}"
-                )
-            
-            with col2:
-                difficulty_level = st.selectbox(
-                    "Difficulty Level:",
-                    ["Beginner", "Intermediate", "Advanced"],
-                    key=f"difficulty_select_{course_code}"
-                )
-            
-            # Learning objectives
-            learning_objectives = st.text_area(
-                "Learning Objectives (optional):",
-                height=80,
-                placeholder="What should students be able to do after completing this module?",
-                key=f"objectives_text_{course_code}"
-            )
-            
-            # Additional resources
-            additional_notes = st.text_area(
-                "Additional Notes/Resources (optional):",
-                height=60,
-                placeholder="Any additional materials, readings, or resources...",
-                key=f"notes_text_{course_code}"
-            )
-            
-            # Save module button
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                if st.button("💾 Create Learning Module", type="primary", key=f"save_module_btn_{course_code}"):
-                    if week_name and selected_courses:
-                        saved_count = 0
-                        
-                        # Create a comprehensive module entry
-                        module_data = {
-                            "week_name": week_name,
-                            "module_type": module_type,
-                            "course_code": course_code,
-                            "course_name": course_name,
-                            "duration": module_duration,
-                            "difficulty": difficulty_level,
-                            "objectives": learning_objectives,
-                            "notes": additional_notes,
-                            "components": selected_courses,
-                            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                        
-                        # Save each component as a separate entry with module context
-                        for course_component in selected_courses:
-                            try:
-                                # Store with additional module metadata
-                                conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-                                c = conn.cursor()
-                                c.execute('''
-                                    INSERT INTO weekly_courses 
-                                    (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                ''', (
-                                    week_name, 
-                                    course_component, 
-                                    course_code,
-                                    module_type,
-                                    module_duration,
-                                    difficulty_level,
-                                    learning_objectives,
-                                    additional_notes,
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                ))
-                                conn.commit()
-                                conn.close()
-                                saved_count += 1
-                            except Exception as e:
-                                st.error(f"Error saving {course_component}: {e}")
-                        
-                        if saved_count > 0:
-                            st.success(f"✅ Successfully created module '{week_name}' with {saved_count} components!")
-                            st.balloons()
-                            log_lecturer_activity("Admin", course_code, "Created Learning Module", 
-                                                f"Module: {week_name}, Type: {module_type}, Components: {saved_count}")
-                        else:
-                            st.error("❌ No components were saved. Please try again.")
+                if st.button("🗑️ Reset Course Description", type="secondary", use_container_width=True):
+                    if reset_course_description(course_code):
+                        st.success("✅ Course description reset successfully!")
+                        log_lecturer_activity("Admin", course_code, "Reset Course Description", 
+                                            "All course information cleared")
+                        st.rerun()
                     else:
-                        st.error("❌ Please provide both module name and select at least one course component.")
+                        st.error("❌ Failed to reset course description")
             
             with col2:
-                if st.button("🔄 Clear Form", key=f"clear_module_btn_{course_code}"):
-                    st.rerun()
-                    
-        else:
-            st.warning(f"⚠️ No course components found for {course_name}. Please contact System Administrator.")
-    
-    with cm_tab2:
-        st.subheader("View Weekly Modules")
-        
-        # Get modules for this specific course
-        weeks = get_weeks_for_course_from_db(course_code)
-        
-        if not weeks:
-            st.info("ℹ️ No learning modules created yet. Create your first module above!")
-        else:
-            # Show all modules for this course
-            for i, week in enumerate(weeks):
-                module_details = get_module_details(week, course_code)
-                
-                with st.expander(f"📦 {week} ({len(module_details)} components)", expanded=False):
-                    
-                    # Module header with metadata
-                    if module_details and 'module_type' in module_details[0] and module_details[0]['module_type']:
-                        module_type = module_details[0]['module_type']
-                        duration = module_details[0].get('duration', 'Not specified')
-                        difficulty = module_details[0].get('difficulty', 'Not specified')
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.write(f"**Type:** {module_type}")
-                        with col2:
-                            st.write(f"**Duration:** {duration}")
-                        with col3:
-                            st.write(f"**Level:** {difficulty}")
-                    
-                    # Learning objectives
-                    if module_details and module_details[0].get('objectives'):
-                        st.write("**🎯 Learning Objectives:**")
-                        st.write(module_details[0]['objectives'])
-                    
-                    # Module components
-                    st.write("**📚 Module Components:**")
-                    for j, component in enumerate(module_details, 1):
-                        st.write(f"{j}. **{component['course_name']}**")
-                    
-                    # Additional notes
-                    if module_details and module_details[0].get('notes'):
-                        st.write("**📋 Additional Resources:**")
-                        st.write(module_details[0]['notes'])
-                    
-                    # Quick actions
-                    st.divider()
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("✏️ Edit Module", key=f"edit_mod_btn_{week}_{course_code}_{i}"):
-                            st.session_state[f"editing_module_{week}"] = True
-                    with col2:
-                        if st.button("🗑️ Delete Module", key=f"del_mod_btn_{week}_{course_code}_{i}"):
-                            delete_week_for_course(week, course_code)
-                            st.success(f"✅ Deleted module '{week}'!")
-                            st.rerun()
-    
-    with cm_tab3:
-        st.subheader("Module Management & Analytics")
-        
-        st.info("💡 Manage your learning modules and track student progress")
-        
-        # Show module statistics
-        try:
-            df = get_courses_for_course_from_db(course_code)
-            
-            if not df.empty:
-                # Statistics
-                total_modules = df['week_name'].nunique()
-                total_components = len(df)
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Modules", total_modules, key=f"metric_modules_{course_code}")
-                with col2:
-                    st.metric("Total Components", total_components, key=f"metric_components_{course_code}")
-                with col3:
-                    avg_components = total_components / total_modules if total_modules > 0 else 0
-                    st.metric("Avg Components/Module", f"{avg_components:.1f}", key=f"metric_avg_{course_code}")
-                
-                # Module type distribution
-                st.subheader("📈 Module Type Distribution")
-                if 'module_type' in df.columns:
-                    type_counts = df['module_type'].value_counts()
-                    if not type_counts.empty:
-                        st.bar_chart(type_counts)
-                
-                # Export options
-                st.subheader("📤 Export Module Data")
-                csv = df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Module Data (CSV)",
-                    data=csv,
-                    file_name=f"{course_code}_learning_modules.csv",
-                    mime="text/csv",
-                    key=f"export_modules_btn_{course_code}"
-                )
-                
-                # Bulk management
-                st.subheader("🗑️ Module Management")
-                modules_to_delete = st.multiselect(
-                    "Select modules to delete:",
-                    df['week_name'].unique(),
-                    key=f"module_delete_select_{course_code}"
-                )
-                
-                if st.button("🚨 Delete Selected Modules", type="secondary", key=f"bulk_del_modules_btn_{course_code}"):
-                    for module_name in modules_to_delete:
-                        delete_week_for_course(module_name, course_code)
-                    st.success(f"✅ Deleted {len(modules_to_delete)} modules!")
-                    log_lecturer_activity("Admin", course_code, "Bulk Deleted Modules", 
-                                        f"Modules deleted: {len(modules_to_delete)}")
-                    st.rerun()
-                    
-            else:
-                st.info("ℹ️ No module data available for this course.")
-                
-        except Exception as e:
-            st.error(f"❌ Error accessing module data: {e}")
+                if st.button("📋 View Raw Data", type="secondary", use_container_width=True):
+                    st.json(course_info if course_info else {"message": "No course data available"})
 
+# ===============================================================
+# 🔧 COURSE DESCRIPTION HELPER FUNCTIONS
+# ===============================================================
+
+def load_course_description(course_code):
+    """Load course description from JSON file"""
+    try:
+        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
+        if os.path.exists(desc_file):
+            with open(desc_file, 'r') as f:
+                all_descriptions = json.load(f)
+                return all_descriptions.get(course_code, {})
+        return {}
+    except Exception as e:
+        print(f"Error loading course description: {e}")
+        return {}
+
+def save_course_description(course_code, course_data):
+    """Save course description to JSON file"""
+    try:
+        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
+        
+        # Load existing descriptions
+        if os.path.exists(desc_file):
+            with open(desc_file, 'r') as f:
+                all_descriptions = json.load(f)
+        else:
+            all_descriptions = {}
+        
+        # Update with new data
+        all_descriptions[course_code] = course_data
+        
+        # Save back to file
+        with open(desc_file, 'w') as f:
+            json.dump(all_descriptions, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error saving course description: {e}")
+        return False
+
+def reset_course_description(course_code):
+    """Reset course description to empty"""
+    try:
+        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
+        
+        if os.path.exists(desc_file):
+            with open(desc_file, 'r') as f:
+                all_descriptions = json.load(f)
+            
+            # Remove this course's description
+            if course_code in all_descriptions:
+                del all_descriptions[course_code]
+            
+            # Save back to file
+            with open(desc_file, 'w') as f:
+                json.dump(all_descriptions, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error resetting course description: {e}")
+        return False
+
+def display_course_description_preview(course_info):
+    """Display course description in a student-friendly format"""
+    if not course_info:
+        st.info("No course description available yet. Use the form above to create one.")
+        return
+    
+    # Course Overview
+    if course_info.get('overview'):
+        st.subheader("🎯 Course Overview")
+        st.write(course_info['overview'])
+    
+    # Learning Outcomes
+    if course_info.get('outcomes'):
+        st.subheader("📚 Learning Outcomes")
+        st.write(course_info['outcomes'])
+    
+    # Instructor Information
+    if course_info.get('instructor_name'):
+        st.subheader("👨‍🏫 Instructor Information")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Name:** {course_info['instructor_name']}")
+            if course_info.get('instructor_email'):
+                st.write(f"**Email:** {course_info['instructor_email']}")
+        with col2:
+            if course_info.get('office_hours'):
+                st.write(f"**Office Hours:** {course_info['office_hours']}")
+            if course_info.get('office_location'):
+                st.write(f"**Office Location:** {course_info['office_location']}")
+    
+    # Course Details
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if course_info.get('prerequisites'):
+            st.subheader("📋 Prerequisites")
+            st.write(course_info['prerequisites'])
+        
+        if course_info.get('materials'):
+            st.subheader("📖 Required Materials")
+            st.write(course_info['materials'])
+    
+    with col2:
+        if course_info.get('assessment'):
+            st.subheader("📊 Assessment Methods")
+            st.write(course_info['assessment'])
+        
+        if course_info.get('schedule'):
+            st.subheader("🗓️ Course Schedule")
+            st.write(course_info['schedule'])
+    
+    # Contact Policy
+    if course_info.get('contact_policy'):
+        st.subheader("📞 Contact Policy")
+        st.write(course_info['contact_policy'])
+    
+    # Last updated
+    if course_info.get('last_updated'):
+        st.caption(f"Last updated: {course_info['last_updated']}")
+
+def calculate_info_completeness(course_info):
+    """Calculate how complete the course information is"""
+    if not course_info:
+        return 0
+    
+    required_fields = ['overview', 'outcomes', 'instructor_name', 'assessment']
+    filled_fields = [field for field in required_fields if course_info.get(field)]
+    return int((len(filled_fields) / len(required_fields)) * 100)
 # Remove the duplicate function definition at the end of the file
 
 def admin_view(course_code, course_name):
@@ -5935,6 +5564,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
