@@ -1352,8 +1352,9 @@ def show_system_admin_dashboard():
     init_system_logs()
     
     # Create tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📊 System Overview", 
+        "🏫 Course Management", # NEW TAB ADDED HERE
         "👩‍🏫 Lecturer Activity", 
         "🎓 Student Activity",
         "📈 Analytics",
@@ -1365,18 +1366,21 @@ def show_system_admin_dashboard():
         show_system_overview()
     
     with tab2:
+        show_course_management()
+        
+    with tab3:
         show_lecturer_activity()
     
-    with tab3:
+    with tab4:
         show_student_activity()
     
-    with tab4:
+    with tab5:
         show_analytics()
     
-    with tab5:
+    with tab6:
         show_system_settings()
     
-    with tab6:
+    with tab7:
         show_alert_center()
 
 def show_system_overview():
@@ -4536,6 +4540,20 @@ def main():
         else:
             st.warning("👆 Please select your role from the sidebar to continue.")
 
+    
+    # Add CSS for course cards
+st.markdown("""
+    <style>
+    .course-card {
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 4px solid #4CAF50;
+        margin: 5px 0;
+        }
+    </style>
+""", unsafe_allow_html=True)
+    
 # Footer
 st.markdown("""
     <style>
@@ -4561,6 +4579,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
