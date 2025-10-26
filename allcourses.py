@@ -3848,7 +3848,8 @@ def student_view(course_code, course_name):
         )
         
         # Create tabs for different sections
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📚 Weekly Modules",  # NEW TAB ADDED
             "📖 Lecture & Classwork", 
             "🎥 Video Lectures", 
             "🕒 Attendance",
@@ -3857,6 +3858,12 @@ def student_view(course_code, course_name):
         ])
 
         with tab1:
+            # ===============================================================
+            # 📚 WEEKLY MODULES (STUDENT VIEW)
+            # ===============================================================
+            show_student_modules(course_code, course_name, student_name, matric_number)
+            
+        with tab2:
             # ===============================================================
             # 📖 LECTURE MATERIALS & CLASSWORK FOR SELECTED WEEK
             # ===============================================================
@@ -3868,7 +3875,7 @@ def student_view(course_code, course_name):
             # Display classwork for selected week
             display_classwork_section(course_code, selected_week, student_name, student_matric)
         
-        with tab2:
+        with tab3:
             # ===============================================================
             # 🎥 VIDEO LECTURES SECTION
             # ===============================================================
@@ -3910,7 +3917,7 @@ def student_view(course_code, course_name):
             else:
                 st.info("No video lectures available yet. Check back later for uploaded content.")
 
-        with tab3:
+        with tab4:
             # ===============================================================
             # 🕒 ATTENDANCE SECTION
             # ===============================================================
@@ -3952,7 +3959,7 @@ def student_view(course_code, course_name):
                         else:
                             st.error("⚠️ Failed to record attendance. Try again later.")
 
-        with tab4:
+        with tab5:
             # ===============================================================
             # 📤 STUDENT SUBMISSIONS SECTION
             # ===============================================================
@@ -4020,10 +4027,9 @@ def student_view(course_code, course_name):
                             if file_path:
                                 log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
                                 st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
-                            
-                                    
+                   
 
-        with tab5:
+        with tab6:
             # ===============================================================
             # 📊 SCORES VIEWING SECTION - FIXED VERSION
             # ===============================================================
@@ -4165,6 +4171,197 @@ def student_view(course_code, course_name):
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
         
+
+# ===============================================================
+# 📚 STUDENT MODULE VIEWER
+# ===============================================================
+
+def show_student_modules(course_code, course_name, student_name, matric_number):
+    """Student view of weekly learning modules"""
+    st.header("📚 Weekly Learning Modules")
+    
+    # Initialize database
+    init_course_db()
+    
+    # Get modules for this course
+    weeks = get_weeks_for_course_from_db(course_code)
+    
+    if not weeks:
+        st.info("📝 No learning modules have been published yet. Check back later!")
+        st.info("💡 Your lecturer is preparing organized weekly modules for this course.")
+        return
+    
+    st.success(f"✅ Found {len(weeks)} learning modules for {course_name}")
+    
+    # Progress tracking
+    completed_modules = get_student_module_progress(course_code, matric_number)
+    total_modules = len(weeks)
+    
+    if total_modules > 0:
+        progress_percent = (len(completed_modules) / total_modules) * 100
+        st.metric("Module Progress", f"{len(completed_modules)}/{total_modules} completed", f"{progress_percent:.1f}%")
+    
+    # Display modules in chronological order
+    for i, week in enumerate(weeks, 1):
+        module_details = get_module_details(week, course_code)
+        
+        if not module_details:
+            continue
+            
+        # Check if module is completed
+        is_completed = week in completed_modules
+        
+        # Create expander for each module with completion status
+        with st.expander(
+            f"{'✅' if is_completed else '📦'} {week} - {len(module_details)} components", 
+            expanded=i == 1  # Expand first module by default
+        ):
+            
+            # Module header with metadata
+            if module_details and 'module_type' in module_details[0] and module_details[0]['module_type']:
+                module_type = module_details[0]['module_type']
+                duration = module_details[0].get('duration', 'Not specified')
+                difficulty = module_details[0].get('difficulty', 'Not specified')
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.write(f"**Type:** {module_type}")
+                with col2:
+                    st.write(f"**Duration:** {duration}")
+                with col3:
+                    st.write(f"**Level:** {difficulty}")
+                with col4:
+                    status_color = "🟢" if is_completed else "🟡"
+                    st.write(f"**Status:** {status_color} {'Completed' if is_completed else 'In Progress'}")
+            
+            # Learning objectives
+            if module_details and module_details[0].get('objectives'):
+                st.subheader("🎯 Learning Objectives")
+                st.info(module_details[0]['objectives'])
+            
+            # Module components
+            st.subheader("📚 Module Components")
+            for j, component in enumerate(module_details, 1):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"**{j}. {component['course_name']}**")
+                with col2:
+                    # Mark component as complete/incomplete
+                    component_key = f"{week}_{component['course_name']}"
+                    component_completed = st.checkbox(
+                        "Mark as complete", 
+                        value=component_key in completed_modules,
+                        key=f"complete_{matric_number}_{component_key}"
+                    )
+                    
+                    if component_completed and component_key not in completed_modules:
+                        mark_module_complete(course_code, matric_number, component_key)
+                        st.rerun()
+                    elif not component_completed and component_key in completed_modules:
+                        mark_module_incomplete(course_code, matric_number, component_key)
+                        st.rerun()
+            
+            # Additional resources
+            if module_details and module_details[0].get('notes'):
+                st.subheader("📋 Additional Resources")
+                st.success(module_details[0]['notes'])
+            
+            # Quick actions
+            st.divider()
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("📖 Open Lecture Materials", key=f"lectures_{week}_{matric_number}"):
+                    # This would ideally scroll to or highlight the lecture tab
+                    st.info("Switch to the '📖 Lecture & Classwork' tab to view detailed materials")
+            
+            with col2:
+                if st.button("🎥 Watch Videos", key=f"videos_{week}_{matric_number}"):
+                    st.info("Switch to the '🎥 Video Lectures' tab to access video content")
+    
+    # Module completion statistics
+    if total_modules > 0:
+        st.divider()
+        st.subheader("📈 Module Progress Overview")
+        
+        completed_count = len(completed_modules)
+        remaining_count = total_modules - completed_count
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Modules", total_modules)
+        with col2:
+            st.metric("Completed", completed_count)
+        with col3:
+            st.metric("Remaining", remaining_count)
+        
+        # Progress bar
+        progress = completed_count / total_modules
+        st.progress(progress)
+        st.write(f"Overall progress: {progress:.1%}")
+
+# ===============================================================
+# 🔧 HELPER FUNCTIONS FOR STUDENT MODULE PROGRESS
+# ===============================================================
+
+def get_student_module_progress(course_code, matric_number):
+    """Get list of completed modules for a student"""
+    try:
+        progress_file = get_file(course_code, "module_progress")
+        if os.path.exists(progress_file):
+            df = pd.read_csv(progress_file)
+            student_progress = df[
+                (df['MatricNumber'] == matric_number) & 
+                (df['Completed'] == True)
+            ]['ModuleKey'].tolist()
+            return student_progress
+        return []
+    except:
+        return []
+
+def mark_module_complete(course_code, matric_number, module_key):
+    """Mark a module as completed for a student"""
+    try:
+        progress_file = get_file(course_code, "module_progress")
+        
+        if os.path.exists(progress_file):
+            df = pd.read_csv(progress_file)
+        else:
+            df = pd.DataFrame(columns=['MatricNumber', 'ModuleKey', 'Completed', 'CompletedAt'])
+        
+        # Remove existing entry if any
+        df = df[~((df['MatricNumber'] == matric_number) & (df['ModuleKey'] == module_key))]
+        
+        # Add new entry
+        new_entry = {
+            'MatricNumber': matric_number,
+            'ModuleKey': module_key,
+            'Completed': True,
+            'CompletedAt': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        
+        df.to_csv(progress_file, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving progress: {e}")
+        return False
+
+def mark_module_incomplete(course_code, matric_number, module_key):
+    """Mark a module as incomplete for a student"""
+    try:
+        progress_file = get_file(course_code, "module_progress")
+        
+        if os.path.exists(progress_file):
+            df = pd.read_csv(progress_file)
+            # Remove the entry
+            df = df[~((df['MatricNumber'] == matric_number) & (df['ModuleKey'] == module_key))]
+            df.to_csv(progress_file, index=False)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Error updating progress: {e}")
+        return False
 
     
 # ===============================================================
@@ -5502,6 +5699,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
