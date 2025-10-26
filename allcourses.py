@@ -5660,7 +5660,7 @@ def test_database_connection():
             st.sidebar.error(f"Schema check failed: {e}")
 
 
-   ===============
+
 # 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
 
@@ -5751,6 +5751,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
