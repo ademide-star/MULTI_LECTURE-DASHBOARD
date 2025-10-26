@@ -985,6 +985,23 @@ def upload_video(course_code, uploaded_video):
     except Exception as e:
         return False, f"❌ Error uploading video: {str(e)}"
 
+
+
+import streamlit as st
+import pandas as pd
+import sqlite3
+import os
+import re
+import json
+import base64
+from datetime import datetime, date, timedelta, time
+from streamlit_autorefresh import st_autorefresh
+
+# ===============================================================
+# 🎯 SYSTEM ADMIN CONFIGURATION
+# ===============================================================
+
+SYSTEM_ADMIN_PASSWORD = "systemadmin2025"  # Master system admin password
 # ===============================================================
 # 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
 # ===============================================================
@@ -1216,23 +1233,7 @@ def show_course_management():
             
             overview_df = pd.DataFrame(overview_data)
             st.dataframe(overview_df, use_container_width=True)
-
-import streamlit as st
-import pandas as pd
-import sqlite3
-import os
-import re
-import json
-import base64
-from datetime import datetime, date, timedelta, time
-from streamlit_autorefresh import st_autorefresh
-
-# ===============================================================
-# 🎯 SYSTEM ADMIN CONFIGURATION
-# ===============================================================
-
-SYSTEM_ADMIN_PASSWORD = "systemadmin2025"  # Master system admin password
-
+            
 def get_system_logs_file():
     """Get system logs file path"""
     return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
@@ -4560,6 +4561,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
