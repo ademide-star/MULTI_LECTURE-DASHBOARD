@@ -4167,7 +4167,349 @@ def student_view(course_code, course_name):
         
 
     
-    # ... rest of your existing function code ...
+# ===============================================================
+# 📊 COURSE MANAGER SECTION (INTEGRATED INTO ADMIN)
+# ===============================================================
+
+def show_course_manager(course_code, course_name):
+    """Course module organizer - create weekly modules from existing courses"""
+    st.header(f"📚 Course Module Organizer - {course_name}")
+    
+    # Initialize database
+    init_course_db()
+    
+    # Create tabs for module management
+    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Create Weekly Modules", "📋 View Weekly Modules", "⚙️ Module Management"])
+    
+    with cm_tab1:
+        st.subheader("Create Weekly Learning Modules")
+        
+        st.info(f"💡 Create organized weekly modules for **{course_name}** using existing course materials")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            week_name = st.text_input(
+                "**Module/Week Name** (e.g., 'Week 1: Introduction', 'Module 2: Advanced Topics'):", 
+                key=f"week_name_input_{course_code}_{id}"
+            )
+        
+        with col2:
+            module_type = st.selectbox(
+                "**Module Type**:",
+                ["Lecture", "Practical", "Tutorial", "Assignment", "Project", "Review", "Exam Prep"],
+                key=f"module_type_select_{course_code}_{id}"
+            )
+        
+        # Show available courses for this specific course
+        all_courses = load_courses_config()
+        available_courses = [name for name, code in all_courses.items() if code == course_code]
+        
+        if available_courses:
+            st.subheader("📖 Available Course Components")
+            
+            # Display available courses in a clean format
+            for i, course in enumerate(available_courses, 1):
+                st.write(f"**{i}.** {course}")
+            
+            st.divider()
+            
+            # Module content selection
+            st.subheader("Select Content for This Module")
+            
+            selected_courses = st.multiselect(
+                "Choose course components to include in this module:",
+                options=available_courses,
+                key=f"course_multiselect_{course_code}_{id}",
+                help="Select the course topics you want to include in this weekly module"
+            )
+            
+            # Additional module details
+            st.subheader("Module Details")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                module_duration = st.selectbox(
+                    "Estimated Duration:",
+                    ["1-2 hours", "2-3 hours", "3-4 hours", "4-5 hours", "5+ hours"],
+                    key=f"duration_select_{course_code}_{id}"
+                )
+            
+            with col2:
+                difficulty_level = st.selectbox(
+                    "Difficulty Level:",
+                    ["Beginner", "Intermediate", "Advanced"],
+                    key=f"difficulty_select_{course_code}_{id}"
+                )
+            
+            # Learning objectives
+            learning_objectives = st.text_area(
+                "Learning Objectives (optional):",
+                height=80,
+                placeholder="What should students be able to do after completing this module?",
+                key=f"objectives_text_{course_code}_{id}"
+            )
+            
+            # Additional resources
+            additional_notes = st.text_area(
+                "Additional Notes/Resources (optional):",
+                height=60,
+                placeholder="Any additional materials, readings, or resources...",
+                key=f"notes_text_{course_code}_{id}"
+            )
+            
+            # Save module button
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                if st.button("💾 Create Learning Module", type="primary", key=f"save_module_btn_{course_code}_{id}"):
+                    if week_name and selected_courses:
+                        saved_count = 0
+                        
+                        # Create a comprehensive module entry
+                        module_data = {
+                            "week_name": week_name,
+                            "module_type": module_type,
+                            "course_code": course_code,
+                            "course_name": course_name,
+                            "duration": module_duration,
+                            "difficulty": difficulty_level,
+                            "objectives": learning_objectives,
+                            "notes": additional_notes,
+                            "components": selected_courses,
+                            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        
+                        # Save each component as a separate entry with module context
+                        for course_component in selected_courses:
+                            try:
+                                # Store with additional module metadata
+                                conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+                                c = conn.cursor()
+                                c.execute('''
+                                    INSERT INTO weekly_courses 
+                                    (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ''', (
+                                    week_name, 
+                                    course_component, 
+                                    course_code,
+                                    module_type,
+                                    module_duration,
+                                    difficulty_level,
+                                    learning_objectives,
+                                    additional_notes,
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                ))
+                                conn.commit()
+                                conn.close()
+                                saved_count += 1
+                            except Exception as e:
+                                st.error(f"Error saving {course_component}: {e}")
+                        
+                        if saved_count > 0:
+                            st.success(f"✅ Successfully created module '{week_name}' with {saved_count} components!")
+                            st.balloons()
+                            log_lecturer_activity("Admin", course_code, "Created Learning Module", 
+                                                f"Module: {week_name}, Type: {module_type}, Components: {saved_count}")
+                        else:
+                            st.error("❌ No components were saved. Please try again.")
+                    else:
+                        st.error("❌ Please provide both module name and select at least one course component.")
+            
+            with col2:
+                if st.button("🔄 Clear Form", key=f"clear_module_btn_{course_code}_{id}"):
+                    st.rerun()
+                    
+        else:
+            st.warning(f"⚠️ No course components found for {course_name}. Please contact System Administrator.")
+    
+    with cm_tab2:
+        st.subheader("View Weekly Modules")
+        
+        # Get modules for this specific course
+        weeks = get_weeks_for_course_from_db(course_code)
+        
+        if not weeks:
+            st.info("ℹ️ No learning modules created yet. Create your first module above!")
+        else:
+            # Show all modules for this course
+            for i, week in enumerate(weeks):
+                module_details = get_module_details(week, course_code)
+                
+                with st.expander(f"📦 {week} ({len(module_details)} components)", expanded=False):
+                    
+                    # Module header with metadata
+                    if module_details and 'module_type' in module_details[0] and module_details[0]['module_type']:
+                        module_type = module_details[0]['module_type']
+                        duration = module_details[0].get('duration', 'Not specified')
+                        difficulty = module_details[0].get('difficulty', 'Not specified')
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.write(f"**Type:** {module_type}")
+                        with col2:
+                            st.write(f"**Duration:** {duration}")
+                        with col3:
+                            st.write(f"**Level:** {difficulty}")
+                    
+                    # Learning objectives
+                    if module_details and module_details[0].get('objectives'):
+                        st.write("**🎯 Learning Objectives:**")
+                        st.write(module_details[0]['objectives'])
+                    
+                    # Module components
+                    st.write("**📚 Module Components:**")
+                    for j, component in enumerate(module_details, 1):
+                        st.write(f"{j}. **{component['course_name']}**")
+                    
+                    # Additional notes
+                    if module_details and module_details[0].get('notes'):
+                        st.write("**📋 Additional Resources:**")
+                        st.write(module_details[0]['notes'])
+                    
+                    # Quick actions
+                    st.divider()
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✏️ Edit Module", key=f"edit_mod_btn_{week}_{course_code}_{i}"):
+                            st.session_state[f"editing_module_{week}"] = True
+                    with col2:
+                        if st.button("🗑️ Delete Module", key=f"del_mod_btn_{week}_{course_code}_{i}"):
+                            delete_week_for_course(week, course_code)
+                            st.success(f"✅ Deleted module '{week}'!")
+                            st.rerun()
+    
+    with cm_tab3:
+        st.subheader("Module Management & Analytics")
+        
+        st.info("💡 Manage your learning modules and track student progress")
+        
+        # Show module statistics
+        try:
+            df = get_courses_for_course_from_db(course_code)
+            
+            if not df.empty:
+                # Statistics
+                total_modules = df['week_name'].nunique()
+                total_components = len(df)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Modules", total_modules, key=f"metric_modules_{course_code}")
+                with col2:
+                    st.metric("Total Components", total_components, key=f"metric_components_{course_code}")
+                with col3:
+                    avg_components = total_components / total_modules if total_modules > 0 else 0
+                    st.metric("Avg Components/Module", f"{avg_components:.1f}", key=f"metric_avg_{course_code}")
+                
+                # Module type distribution
+                st.subheader("📈 Module Type Distribution")
+                if 'module_type' in df.columns:
+                    type_counts = df['module_type'].value_counts()
+                    if not type_counts.empty:
+                        st.bar_chart(type_counts)
+                
+                # Export options
+                st.subheader("📤 Export Module Data")
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Module Data (CSV)",
+                    data=csv,
+                    file_name=f"{course_code}_learning_modules.csv",
+                    mime="text/csv",
+                    key=f"export_modules_btn_{course_code}"
+                )
+                
+                # Bulk management
+                st.subheader("🗑️ Module Management")
+                modules_to_delete = st.multiselect(
+                    "Select modules to delete:",
+                    df['week_name'].unique(),
+                    key=f"module_delete_select_{course_code}"
+                )
+                
+                if st.button("🚨 Delete Selected Modules", type="secondary", key=f"bulk_del_modules_btn_{course_code}"):
+                    for module_name in modules_to_delete:
+                        delete_week_for_course(module_name, course_code)
+                    st.success(f"✅ Deleted {len(modules_to_delete)} modules!")
+                    log_lecturer_activity("Admin", course_code, "Bulk Deleted Modules", 
+                                        f"Modules deleted: {len(modules_to_delete)}")
+                    st.rerun()
+                    
+            else:
+                st.info("ℹ️ No module data available for this course.")
+                
+        except Exception as e:
+            st.error(f"❌ Error accessing module data: {e}")
+
+# Helper functions for module management
+def get_weeks_for_course_from_db(course_code):
+    """Get all unique weeks/modules for a specific course"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        c = conn.cursor()
+        
+        # Check if course_code column exists
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' in columns:
+            c.execute('SELECT DISTINCT week_name FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
+                     (course_code,))
+        else:
+            c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
+        
+        weeks = [row[0] for row in c.fetchall()]
+        conn.close()
+        return weeks
+    except:
+        return []
+
+def get_module_details(week_name, course_code):
+    """Get detailed information about a specific module"""
+    try:
+        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+        c = conn.cursor()
+        
+        # Check if additional columns exist
+        c.execute("PRAGMA table_info(weekly_courses)")
+        columns = [column[1] for column in c.fetchall()]
+        
+        if 'course_code' in columns and 'module_type' in columns:
+            c.execute('''
+                SELECT course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at 
+                FROM weekly_courses 
+                WHERE week_name = ? AND course_code = ? 
+                ORDER BY id
+            ''', (week_name, course_code))
+        else:
+            c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
+        
+        results = []
+        for row in c.fetchall():
+            module_info = {
+                'course_name': row[0],
+                'course_code': row[1]
+            }
+            # Add additional fields if they exist
+            if len(row) > 2:
+                module_info.update({
+                    'module_type': row[2],
+                    'duration': row[3],
+                    'difficulty': row[4],
+                    'objectives': row[5],
+                    'notes': row[6],
+                    'created_at': row[7]
+                })
+            results.append(module_info)
+        
+        conn.close()
+        return results
+    except Exception as e:
+        st.error(f"Error getting module details: {e}")
+        return []
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
 # ===============================================================
@@ -5228,6 +5570,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
