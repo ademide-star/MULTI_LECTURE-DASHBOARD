@@ -1988,6 +1988,7 @@ def show_course_manager():
                 
         except Exception as e:
             st.error(f"❌ Error accessing database: {e}")
+            
 def show_course_management():
     """Course management system for super admin with bulk import"""
     st.header("🏫 Course Management System")
@@ -2007,7 +2008,7 @@ def show_course_management():
         with col2:
             new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
         
-        if st.button("➕ Add Course", type="primary"):
+        if st.button("➕ Add Course", type="primary", key="add_course_btn"):
             if new_course_name and new_course_code:
                 if new_course_name in courses:
                     st.error("❌ Course name already exists!")
@@ -2022,44 +2023,53 @@ def show_course_management():
         # Display and manage existing courses
         st.subheader("Current Courses")
         if courses:
-            for course_name, course_code in courses.items():
-                col1, col2, col3 = st.columns([3, 1, 1])
-                with col1:
-                    st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
-                with col2:
-                    if st.button("✏️", key=f"edit_{course_code}"):
-                        st.session_state[f"editing_{course_code}"] = True
-                with col3:
-                    if st.button("🗑️", key=f"delete_{course_code}"):
-                        del courses[course_name]
-                        save_courses_config(courses)
-                        st.success(f"✅ Course '{course_name}' deleted!")
-                        st.rerun()
-                
-                # Edit course
-                if st.session_state.get(f"editing_{course_code}", False):
-                    with st.form(f"edit_form_{course_code}"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            edited_name = st.text_input("Course Name", value=course_name, key=f"name_{course_code}")
-                        with col2:
-                            edited_code = st.text_input("Course Code", value=course_code, key=f"code_{course_code}").upper()
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("💾 Save Changes"):
-                                if edited_name and edited_code:
-                                    # Remove old entry and add new one
-                                    del courses[course_name]
-                                    courses[edited_name] = edited_code
-                                    save_courses_config(courses)
-                                    st.session_state[f"editing_{course_code}"] = False
-                                    st.success("✅ Course updated successfully!")
+            # Convert to list with indices to ensure unique keys
+            course_list = list(courses.items())
+            
+            for idx, (course_name, course_code) in enumerate(course_list):
+                # Create a unique container for each course
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
+                    with col2:
+                        # Use unique key with index and course_name
+                        edit_key = f"edit_{idx}_{course_name.replace(' ', '_')}"
+                        if st.button("✏️", key=edit_key):
+                            st.session_state[edit_key] = True
+                    with col3:
+                        # Use unique key with index and course_name
+                        delete_key = f"delete_{idx}_{course_name.replace(' ', '_')}"
+                        if st.button("🗑️", key=delete_key):
+                            del courses[course_name]
+                            save_courses_config(courses)
+                            st.success(f"✅ Course '{course_name}' deleted!")
+                            st.rerun()
+                    
+                    # Edit course - use the same unique key
+                    if st.session_state.get(edit_key, False):
+                        with st.form(f"edit_form_{idx}_{course_name.replace(' ', '_')}"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                edited_name = st.text_input("Course Name", value=course_name, key=f"name_{idx}_{course_code}")
+                            with col2:
+                                edited_code = st.text_input("Course Code", value=course_code, key=f"code_{idx}_{course_code}").upper()
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.form_submit_button("💾 Save Changes", key=f"save_{idx}_{course_code}"):
+                                    if edited_name and edited_code:
+                                        # Remove old entry and add new one
+                                        del courses[course_name]
+                                        courses[edited_name] = edited_code
+                                        save_courses_config(courses)
+                                        st.session_state[edit_key] = False
+                                        st.success("✅ Course updated successfully!")
+                                        st.rerun()
+                            with col2:
+                                if st.form_submit_button("❌ Cancel", key=f"cancel_{idx}_{course_code}"):
+                                    st.session_state[edit_key] = False
                                     st.rerun()
-                        with col2:
-                            if st.form_submit_button("❌ Cancel"):
-                                st.session_state[f"editing_{course_code}"] = False
-                                st.rerun()
         else:
             st.info("No courses added yet. Add courses using the form above or bulk import.")
     
@@ -2083,15 +2093,16 @@ def show_course_management():
         bulk_courses_text = st.text_area(
             "Paste courses here:",
             height=200,
-            placeholder="CHEM 101 - Organic Chemistry, CHEM101\nMATH 201 - Calculus, MATH201\nPHYS 101 - Physics, PHYS101"
+            placeholder="CHEM 101 - Organic Chemistry, CHEM101\nMATH 201 - Calculus, MATH201\nPHYS 101 - Physics, PHYS101",
+            key="bulk_courses_textarea"
         )
         
         # Separator option
         col1, col2 = st.columns(2)
         with col1:
-            separator = st.selectbox("Separator", [",", "|", "Tab", "Custom"])
+            separator = st.selectbox("Separator", [",", "|", "Tab", "Custom"], key="separator_select")
             if separator == "Custom":
-                custom_sep = st.text_input("Custom separator", value=";")
+                custom_sep = st.text_input("Custom separator", value=";", key="custom_sep")
                 separator = custom_sep
             elif separator == "Tab":
                 separator = "\t"
@@ -2105,13 +2116,13 @@ def show_course_management():
         # Import options
         col1, col2 = st.columns(2)
         with col1:
-            import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"])
+            import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"], key="import_mode")
         
         with col2:
-            skip_duplicates = st.checkbox("Skip duplicate course codes", value=True)
-            auto_generate_codes = st.checkbox("Auto-generate missing codes")
+            skip_duplicates = st.checkbox("Skip duplicate course codes", value=True, key="skip_duplicates")
+            auto_generate_codes = st.checkbox("Auto-generate missing codes", key="auto_generate_codes")
         
-        if st.button("🚀 Import Courses", type="primary"):
+        if st.button("🚀 Import Courses", type="primary", key="import_courses_btn"):
             if bulk_courses_text:
                 results = process_bulk_courses(
                     bulk_courses_text, 
@@ -2137,8 +2148,8 @@ def show_course_management():
             col1, col2 = st.columns(2)
             
             with col1:
-                new_bulk_password = st.text_input("Set same password for all courses", type="password")
-                if st.button("🔑 Apply to All Courses"):
+                new_bulk_password = st.text_input("Set same password for all courses", type="password", key="bulk_password")
+                if st.button("🔑 Apply to All Courses", key="apply_bulk_password"):
                     if new_bulk_password:
                         for course_code in courses.values():
                             set_course_password(course_code, new_bulk_password)
@@ -2146,7 +2157,7 @@ def show_course_management():
                         st.rerun()
             
             with col2:
-                if st.button("🔄 Reset All to Default"):
+                if st.button("🔄 Reset All to Default", key="reset_all_passwords"):
                     for course_code in courses.values():
                         set_course_password(course_code, DEFAULT_ADMIN_PASSWORD)
                     st.success("✅ All passwords reset to default!")
@@ -2155,7 +2166,8 @@ def show_course_management():
             st.divider()
             
             # Individual course passwords
-            for course_name, course_code in courses.items():
+            course_list = list(courses.items())
+            for idx, (course_name, course_code) in enumerate(course_list):
                 current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
                 
                 with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
@@ -2163,11 +2175,11 @@ def show_course_management():
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{course_code}")
+                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{idx}_{course_code}")
                     with col2:
-                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{course_code}")
+                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{idx}_{course_code}")
                     
-                    if st.button("🔄 Change Password", key=f"change_{course_code}"):
+                    if st.button("🔄 Change Password", key=f"change_{idx}_{course_code}"):
                         if new_password and confirm_password:
                             if new_password == confirm_password:
                                 if set_course_password(course_code, new_password):
@@ -2218,7 +2230,8 @@ def show_course_management():
                 label="📥 Export Courses to CSV",
                 data=csv_data,
                 file_name="courses_export.csv",
-                mime="text/csv"
+                mime="text/csv",
+                key="export_courses_btn"
             )
 
 def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
@@ -4928,6 +4941,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
