@@ -2023,31 +2023,10 @@ def show_course_manager(course_code, course_name):
                     if week_name and selected_courses:
                         saved_count = 0
                         
-                        # Create a comprehensive module entry
-                        module_data = {
-                            "week_name": week_name,
-                            "module_type": module_type,
-                            "course_code": course_code,
-                            "course_name": course_name,
-                            "duration": module_duration,
-                            "difficulty": difficulty_level,
-                            "objectives": learning_objectives,
-                            "notes": additional_notes,
-                            "components": selected_courses,
-                            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                           
                         # Save each component as a separate entry with module context
                         for course_component in selected_courses:
                             try:
-                                # Store with additional module metadata
-                                conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-                                c = conn.cursor()
-                                c.execute('''
-                                    INSERT INTO weekly_courses 
-                                    (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                ''', )
+                                # Use the add_course_to_db function with all module metadata
                                 add_course_to_db(
                                     week_name=week_name,
                                     course_name=course_component,
@@ -2056,11 +2035,8 @@ def show_course_manager(course_code, course_name):
                                     duration=module_duration,
                                     difficulty=difficulty_level,
                                     objectives=learning_objectives,
-                                    notes=additional_notes,
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    notes=additional_notes
                                 )
-                                conn.commit()
-                                conn.close()
                                 saved_count += 1
                             except Exception as e:
                                 st.error(f"Error saving {course_component}: {e}")
@@ -2092,7 +2068,7 @@ def show_course_manager(course_code, course_name):
             st.info("ℹ️ No learning modules created yet. Create your first module above!")
         else:
             # Show all modules for this course
-            for week in weeks:
+            for i, week in enumerate(weeks):
                 module_details = get_module_details(week, course_code)
                 
                 with st.expander(f"📦 {week} ({len(module_details)} components)", expanded=False):
@@ -2118,8 +2094,8 @@ def show_course_manager(course_code, course_name):
                     
                     # Module components
                     st.write("**📚 Module Components:**")
-                    for i, component in enumerate(module_details, 1):
-                        st.write(f"{i}. **{component['course_name']}**")
+                    for j, component in enumerate(module_details, 1):
+                        st.write(f"{j}. **{component['course_name']}**")
                     
                     # Additional notes
                     if module_details and module_details[0].get('notes'):
@@ -2130,10 +2106,10 @@ def show_course_manager(course_code, course_name):
                     st.divider()
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✏️ Edit Module", key=f"edit_mod_{week}_{course_code}"):
+                        if st.button("✏️ Edit Module", key=f"edit_mod_{week}_{course_code}_{i}"):
                             st.session_state[f"editing_module_{week}"] = True
                     with col2:
-                        if st.button("🗑️ Delete Module", key=f"del_mod_{week}_{course_code}"):
+                        if st.button("🗑️ Delete Module", key=f"del_mod_{week}_{course_code}_{i}"):
                             delete_week_for_course(week, course_code)
                             st.success(f"✅ Deleted module '{week}'!")
                             st.rerun()
@@ -2154,12 +2130,12 @@ def show_course_manager(course_code, course_name):
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Total Modules", total_modules)
+                    st.metric("Total Modules", total_modules, key=f"metric_modules_{course_code}")
                 with col2:
-                    st.metric("Total Components", total_components)
+                    st.metric("Total Components", total_components, key=f"metric_components_{course_code}")
                 with col3:
                     avg_components = total_components / total_modules if total_modules > 0 else 0
-                    st.metric("Avg Components/Module", f"{avg_components:.1f}")
+                    st.metric("Avg Components/Module", f"{avg_components:.1f}", key=f"metric_avg_{course_code}")
                 
                 # Module type distribution
                 st.subheader("📈 Module Type Distribution")
@@ -2200,7 +2176,6 @@ def show_course_manager(course_code, course_name):
                 
         except Exception as e:
             st.error(f"❌ Error accessing module data: {e}")
-
 # Helper functions for module management
 def get_weeks_for_course_from_db(course_code):
     """Get all unique weeks/modules for a specific course"""
@@ -5805,6 +5780,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
