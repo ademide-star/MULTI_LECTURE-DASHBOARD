@@ -2056,7 +2056,7 @@ def show_course_manager(course_code, course_name):
                                     duration=module_duration,
                                     difficulty=difficulty_level,
                                     objectives=learning_objectives,
-                                    notes=additional_notes
+                                    notes=additional_notes,
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 )
                                 conn.commit()
@@ -5805,6 +5805,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
