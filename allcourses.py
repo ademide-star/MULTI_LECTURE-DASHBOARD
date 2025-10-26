@@ -4002,7 +4002,37 @@ def student_view(course_code, course_name):
     except Exception as e:
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
-
+        
+def show_course_manager(course_code=None, course_name=None):
+    """Course manager that can work with or without specific course context"""
+    
+    # If no course code/name provided, try to get from session state or use defaults
+    if course_code is None or course_name is None:
+        # Try to get from session state (if set by admin_view)
+        if hasattr(st.session_state, 'current_course_code'):
+            course_code = st.session_state.current_course_code
+            course_name = st.session_state.current_course_name
+        else:
+            # Use default or show course selection
+            courses = load_courses_config()
+            if courses:
+                course_list = list(courses.keys())
+                selected_course = st.selectbox("Select Course:", course_list)
+                course_name = selected_course
+                course_code = courses[selected_course]
+            else:
+                st.error("No courses available. Please contact System Administrator.")
+                return
+    
+    st.header(f"📚 Weekly Course Organizer - {course_name}")
+    
+    # Rest of your existing show_course_manager function...
+    init_course_db()
+    
+    # Create tabs for weekly course management
+    cm_tab1, cm_tab2, cm_tab3 = st.tabs(["➕ Add Weekly Schedule", "📋 View Weekly Schedule", "⚙️ Manage Weekly Data"])
+    
+    # ... rest of your existing function code ...
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW (WITH INTEGRATED COURSE MANAGER)
 # ===============================================================
@@ -5065,6 +5095,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
