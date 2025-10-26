@@ -2047,7 +2047,7 @@ def show_course_manager(course_code, course_name):
                                     INSERT INTO weekly_courses 
                                     (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                ''', (
+                                ''', )
                                 add_course_to_db(
                                     week_name=week_name,
                                     course_name=course_component,
@@ -5805,6 +5805,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
