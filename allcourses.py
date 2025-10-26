@@ -4598,45 +4598,45 @@ def admin_view(course_code, course_name):
         
                     if question_type == "Multiple Choice (MCQ)":
                         col1, col2 = st.columns(2)
-                    with col1:
-                        option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
-                        option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
-                        option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
-                    with col2:
-                        option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
-                        option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
+                        with col1:
+                            option_a = st.text_input("Option A", placeholder="First option", key=f"option_a_{week}")
+                            option_b = st.text_input("Option B", placeholder="Second option", key=f"option_b_{week}")
+                            option_e = st.text_input("Option E", placeholder="Fifth option", key=f"option_e_{week}")
+                        with col2:
+                            option_c = st.text_input("Option C", placeholder="Third option", key=f"option_c_{week}")
+                            option_d = st.text_input("Option D", placeholder="Fourth option", key=f"option_d_{week}")
             
-                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
-                    options = {
-                        "A": option_a,
-                        "B": option_b, 
-                        "C": option_c,
-                        "D": option_d,
-                        "E": option_e
+                        correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
+                        options = {
+                            "A": option_a,
+                            "B": option_b, 
+                            "C": option_c,
+                            "D": option_d,
+                            "E": option_e
             }
             
-            else:  # Gap Filling
-                correct_answer = st.text_input("Correct Answer(s)", 
+                    else:  # Gap Filling
+                        correct_answer = st.text_input("Correct Answer(s)", 
                             placeholder="For multiple correct answers, separate with | (e.g., Paris|France capital)",
                             key=f"gap_answer_{week}")
-                st.caption("💡 Use | to separate multiple acceptable answers")
-                options = {}
+                        st.caption("💡 Use | to separate multiple acceptable answers")
+                        options = {}
 
-            add_question = st.form_submit_button("➕ Add Question")
+                    add_question = st.form_submit_button("➕ Add Question")
         
-            if add_question and question_text:
-                new_question = {
-                    "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
-                    "question": question_text,
-                    "options": options,
-                    "correct_answer": correct_answer
+                    if add_question and question_text:
+                        new_question = {
+                            "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
+                            "question": question_text,
+                            "options": options,
+                            "correct_answer": correct_answer
             }
             
             # SAFE APPEND - existing_questions is guaranteed to be a list
-                existing_questions.append(new_question)
-                if save_mcq_questions(course_code, week, existing_questions):
-                    st.success("✅ Question added successfully!")
-                    st.rerun()
+                        existing_questions.append(new_question)
+                        if save_mcq_questions(course_code, week, existing_questions):
+                            st.success("✅ Question added successfully!")
+                            st.rerun()
                         
             # Display existing MCQ questions for this week
                             # Display existing MCQ questions for this week
@@ -5480,6 +5480,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
