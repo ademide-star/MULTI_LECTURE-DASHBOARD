@@ -4569,7 +4569,6 @@ def admin_view(course_code, course_name):
                     lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
 
                     st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
-                    st.rerun()
 
                 except Exception as e:
                     st.error(f"❌ Error saving PDF: {str(e)}")
@@ -5484,6 +5483,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
