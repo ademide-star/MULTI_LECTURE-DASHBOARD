@@ -284,46 +284,40 @@ def check_database_schema():
 # 🎯 AUTOMATED MCQ & GAP-FILLING SYSTEM
 # ===============================================================
 
-def get_mcq_file(course_code, week):
-    """Get the MCQ questions file path for a specific course and week"""
-    safe_week = week.replace(" ", "_").replace(":", "")
-    return os.path.join(PERSISTENT_DATA_DIR, "mcq_questions", f"{course_code}_{safe_week}_mcq.json")
-
 def save_mcq_questions(course_code, week, questions):
     """Save MCQ questions for a course and week"""
     try:
-        # Get the MCQ directory
-        mcq_file = get_file(course_code, "mcq")
-        mcq_dir = os.path.dirname(mcq_file)
+        # Use the same function as load_mcq_questions for consistency
+        file_path = get_mcq_file(course_code, week)
         
         # Create directory if it doesn't exist
-        os.makedirs(mcq_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
-        # Save to week-specific file
-        week_file = os.path.join(mcq_dir, f"{week}_questions.json")
-        
-        with open(week_file, 'w') as f:
+        with open(file_path, 'w') as f:
             json.dump(questions, f, indent=2)
         
-        st.write(f"✅ Saved {len(questions)} questions to {week_file}")  # DEBUG
+        st.write(f"✅ Saved {len(questions)} questions to {file_path}")  # DEBUG
         return True
     except Exception as e:
         st.error(f"Error saving MCQ questions: {e}")
         return False
-        
 
 def load_mcq_questions(course_code, week):
     try:
-        file_path = get_file(course_code, "mcq_questions")
+        file_path = get_mcq_file(course_code, week)
         if os.path.exists(file_path):
             with open(file_path, 'r') as f:
-                all_questions = json.load(f)
-            # Return empty list if week not found, not None
-            return all_questions.get(week, [])
+                questions = json.load(f)
+            return questions
         return []  # Return empty list if file doesn't exist
     except Exception as e:
         st.error(f"Error loading MCQ questions: {e}")
         return []  # Always return a list, never None
+
+def get_mcq_file(course_code, week):
+    """Get the MCQ questions file path for a specific course and week"""
+    safe_week = week.replace(" ", "_").replace(":", "")
+    return os.path.join(PERSISTENT_DATA_DIR, "mcq_questions", f"{course_code}_{safe_week}_mcq.json")
 
 def auto_grade_mcq_submission(questions, answers):
     """Automatically grade MCQ submissions and return score"""
@@ -4589,7 +4583,7 @@ def admin_view(course_code, course_name):
             existing_questions = load_mcq_questions(course_code, week)
             if existing_questions is None:
                 existing_questions = []
-
+            st.write(f"DEBUG: Loaded {len(existing_questions)} questions for {week}")  # Debug line
     # MCQ Creation Section
             st.markdown("#### Create Automated MCQ/Gap-Filling Questions")
             with st.container():
@@ -5491,6 +5485,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
