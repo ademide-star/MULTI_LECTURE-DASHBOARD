@@ -3913,7 +3913,7 @@ def student_view(course_code, course_name):
                         file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
                         if file_path:
                             log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
-                                st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
+                            st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
 
 # Seminar submission
             st.subheader("📊 Seminar Submission")
@@ -3934,7 +3934,7 @@ def student_view(course_code, course_name):
                             file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
                             if file_path:
                                 log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
-                                    st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
+                                st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
 
         with tab6:
             # ===============================================================
@@ -5550,6 +5550,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
