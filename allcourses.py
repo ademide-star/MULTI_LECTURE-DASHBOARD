@@ -4584,7 +4584,7 @@ def admin_view(course_code, course_name):
             existing_questions = load_mcq_questions(course_code, week)
             if existing_questions is None:
                 existing_questions = []
-            st.write(f"DEBUG: Loaded {len(existing_questions)} questions for {week}")  # Debug line
+           
     # MCQ Creation Section
             st.markdown("#### Create Automated MCQ/Gap-Filling Questions")
             with st.container():
@@ -4640,9 +4640,7 @@ def admin_view(course_code, course_name):
     # ===============================================================
     # DISPLAY EXISTING QUESTIONS
     # ===============================================================
-            st.write("Debug - existing_questions:", existing_questions)
-            st.write("Debug - Type:", type(existing_questions))
-            st.write("Debug - Length:", len(existing_questions) if existing_questions is not None else "None")
+        
             if existing_questions:
                 st.write(f"**Existing Questions for {week}:**")
                 for i, question in enumerate(existing_questions):
@@ -5486,6 +5484,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
