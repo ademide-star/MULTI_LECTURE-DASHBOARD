@@ -999,7 +999,7 @@ def show_classwork_control(course_code):
         try:
             open_time = datetime.fromisoformat(current_status["open_time"])
             elapsed = (datetime.now() - open_time).total_seconds()
-            remaining = max(0, 1200 - elapsed)  # 20 minutes
+            remaining = max(0, 600 - elapsed)  # 20 minutes
             
             if remaining <= 0:
                 set_classwork_status(course_code, selected_week, False)
@@ -1067,6 +1067,69 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
     else:
         updated = new_entry
     updated.to_csv(log_file, index=False)
+
+def check_existing_submission(course_code, week, student_id):
+    """Check if a student has already submitted an assignment for a specific week"""
+    try:
+        # Get the submission file path
+        submission_file = get_submission_file(course_code, week, student_id)
+        
+        # Check if file exists and has content
+        if os.path.exists(submission_file):
+            with open(submission_file, 'r') as f:
+                submission_data = json.load(f)
+            
+            # Check if submission has meaningful content
+            if submission_data.get('submission_text') or submission_data.get('submission_file'):
+                return True, submission_data
+            else:
+                return False, None
+        else:
+            return False, None
+            
+    except Exception as e:
+        st.error(f"Error checking existing submission: {e}")
+        return False, None
+
+def get_submission_file(course_code, week, student_id):
+    """Get the file path for a student's submission"""
+    safe_week = week.replace(" ", "_").replace(":", "").lower()
+    safe_student_id = student_id.replace(" ", "_").replace(":", "").lower()
+    
+    # Create submissions directory structure
+    submissions_dir = os.path.join("data", "courses", course_code, "submissions", safe_week)
+    os.makedirs(submissions_dir, exist_ok=True)
+    
+    filename = f"{safe_student_id}_submission.json"
+    return os.path.join(submissions_dir, filename)
+
+def save_submission(course_code, week, student_id, submission_data):
+    """Save a student's submission"""
+    try:
+        submission_file = get_submission_file(course_code, week, student_id)
+        
+        # Add metadata
+        submission_data['submission_time'] = datetime.now().isoformat()
+        submission_data['student_id'] = student_id
+        submission_data['week'] = week
+        submission_data['course_code'] = course_code
+        
+        with open(submission_file, 'w') as f:
+            json.dump(submission_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error saving submission: {e}")
+        return False
+
+def get_submission_status(course_code, week, student_id):
+    """Get simple submission status"""
+    has_submission, _ = check_existing_submission(course_code, week, student_id)
+    return "Submitted" if has_submission else "Not Submitted"
+
+# Usage example
+status = get_submission_status(current_course, selected_week, student_id)
+st.write(f"**Submission Status:** {status}")
 
 # ===============================================================
 # 🎥 VIDEO MANAGEMENT
@@ -3480,7 +3543,7 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                     try:
                         open_time = datetime.fromisoformat(current_status["open_time"])
                         elapsed = (datetime.now() - open_time).total_seconds()
-                        remaining = max(0, 1200 - elapsed)  # 20 minutes
+                        remaining = max(0, 600 - elapsed)  # 10 minutes
                         
                         if remaining > 0:
                             mins = int(remaining // 60)
@@ -5483,6 +5546,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
