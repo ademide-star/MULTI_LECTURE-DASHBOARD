@@ -4645,6 +4645,9 @@ def admin_view(course_code, course_name):
     # ===============================================================
     # DISPLAY EXISTING QUESTIONS
     # ===============================================================
+            st.write("Debug - existing_questions:", existing_questions)
+            st.write("Debug - Type:", type(existing_questions))
+            st.write("Debug - Length:", len(existing_questions) if existing_questions is not None else "None")
             if existing_questions:
                 st.write(f"**Existing Questions for {week}:**")
                 for i, question in enumerate(existing_questions):
@@ -5397,45 +5400,9 @@ def admin_view(course_code, course_name):
         st.error(f"An error occurred in the admin dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
-    st.write("Debug - existing_questions:", existing_questions)
-        st.write("Debug - Type:", type(existing_questions))
-        st.write("Debug - Length:", len(existing_questions) if existing_questions is not None else "None")
+       
 
-            # Display existing MCQ questions for this week
-            if existing_questions and len(existing_questions) > 0:
-                st.write(f"**Existing Questions for {week}:**")
-                for i, question in enumerate(existing_questions):
-                    # Using container for each question instead of expander
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"**Question {i+1}:** {question['question']}")
-                            st.write(f"*Type:* {question['type'].replace('_', ' ').title()}")
-                    
-                            if question['type'] == 'mcq':
-                                st.write("*Options:*")
-                                for opt, text in question['options'].items():
-                                    if text:  # Only show non-empty options
-                                        st.write(f"  {opt}: {text}")
-                    
-                            st.write(f"*Correct Answer:* {question['correct_answer']}")
-                            st.markdown("---")
-                
-                        with col2:
-                            if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                                existing_questions.pop(i)
-                                save_mcq_questions(course_code, week, existing_questions)
-                                st.success("✅ Question deleted!")
-                                st.rerun()
         
-                # Clear all questions for this week
-                if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-                    if save_mcq_questions(course_code, week, []):
-                        st.success("✅ All questions cleared!")
-                        st.rerun()
-            else:
-                st.info("No MCQ questions added for this week yet.")
-
 # 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
 
@@ -5524,6 +5491,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
