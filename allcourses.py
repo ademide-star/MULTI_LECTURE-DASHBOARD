@@ -846,6 +846,11 @@ def log_submission(course_code, matric, student_name, week, file_name, upload_ty
 def check_existing_submission(course_code, week, student_id):
     """Check if a student has already submitted an assignment for a specific week"""
     try:
+        # Validate inputs
+        if not all([course_code, week, student_id]):
+            st.error("Missing required parameters for submission check")
+            return False, None
+            
         # Get the submission file path
         submission_file = get_submission_file(course_code, week, student_id)
         
@@ -865,7 +870,7 @@ def check_existing_submission(course_code, week, student_id):
     except Exception as e:
         st.error(f"Error checking existing submission: {e}")
         return False, None
-
+        
 def get_submission_file(course_code, week, student_id):
     """Get the file path for a student's submission"""
     safe_week = week.replace(" ", "_").replace(":", "").lower()
@@ -3868,69 +3873,68 @@ def student_view(course_code, course_name):
             # ===============================================================
             st.header("📤 Submit Assignments")
             
-            # Assignment submission
+# Assignment submission
             st.subheader("📝 Assignment Submission")
             with st.form("assignment_upload_form"):
                 st.write(f"**Selected Week:** {selected_week}")
                 assignment_file = st.file_uploader("Upload Assignment File", type=["pdf", "doc", "docx", "txt", "zip"], key="assignment_upload")
                 submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
-                
+    
                 if submit_assignment:
                     if not assignment_file:
                         st.error("❌ Please select a file to upload.")
                     else:
-                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "assignment")
-                        if not existing_check.empty:
+            # FIX: Remove the 4th argument
+                        has_submission, existing_data = check_existing_submission(course_code, selected_week, student_matric)
+                        if has_submission:
                             st.error("❌ Submission already exists! You cannot submit twice.")
                         else:
                             file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
                             if file_path:
                                 log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
                                 st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
-                           
 
-            # Drawing submission
+# Drawing submission
             st.subheader("🎨 Drawing Submission")
             with st.form("drawing_upload_form"):
                 st.write(f"**Selected Week:** {selected_week}")
                 drawing_file = st.file_uploader("Upload Drawing File", type=["jpg", "jpeg", "png", "gif", "pdf"], key="drawing_upload")
                 submit_drawing = st.form_submit_button("📤 Submit Drawing", use_container_width=True)
-                
+    
                 if submit_drawing:
                     if not drawing_file:
                         st.error("❌ Please select a file to upload.")
+                else:
+            # FIX: Remove the 4th argument
+                    has_submission, existing_data = check_existing_submission(course_code, selected_week, student_matric)
+                    if has_submission:
+                        st.error("❌ Submission already exists! You cannot submit twice.")
                     else:
-                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "drawing")
-                        if not existing_check.empty:
-                            st.error("❌ Submission already exists! You cannot submit twice.")
-                        else:
-                            file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
-                            if file_path:
-                                log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
+                        file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
+                        if file_path:
+                            log_submission(course_code, student_matric, student_name, selected_week, drawing_file.name, "drawing")
                                 st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
-                            
 
-            # Seminar submission
+# Seminar submission
             st.subheader("📊 Seminar Submission")
             with st.form("seminar_upload_form"):
                 st.write(f"**Selected Week:** {selected_week}")
                 seminar_file = st.file_uploader("Upload Seminar File", type=["pdf", "ppt", "pptx", "doc", "docx"], key="seminar_upload")
                 submit_seminar = st.form_submit_button("📤 Submit Seminar", use_container_width=True)
-                
+    
                 if submit_seminar:
                     if not seminar_file:
                         st.error("❌ Please select a file to upload.")
                     else:
-                        existing_check = check_existing_submission(course_code, student_matric, selected_week, "seminar")
-                        if not existing_check.empty:
+            # FIX: Remove the 4th argument
+                        has_submission, existing_data = check_existing_submission(course_code, selected_week, student_matric)
+                        if has_submission:
                             st.error("❌ Submission already exists! You cannot submit twice.")
                         else:
                             file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
-                        
                             if file_path:
                                 log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
-                                st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
-                   
+                                    st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
 
         with tab6:
             # ===============================================================
@@ -3991,10 +3995,10 @@ def student_view(course_code, course_name):
                     st.info("""
                     **Grading Breakdown:**
                     - Continuous Assessment (15 weeks average): 30%
-                      - Assignment (8%): Average of 15 weeks
-                      - Test (8%): Average of 15 weeks  
+                      - Assignment (5%): Average of 15 weeks
+                      - Test (10%): Average of 15 weeks  
                       - Practical (5%): Average of 15 weeks
-                      - Classwork (9%): Average of 15 weeks
+                      - Classwork (10%): Average of 15 weeks
                     - Exam (After 15 weeks): 70%
                     """)
                     
@@ -4009,7 +4013,7 @@ def student_view(course_code, course_name):
                     
                     with col2:
                         st.metric("📚 Exam Score", f"{exam_score:.1f}%")
-                        st.metric("📈 Continuous Assessment (30%)", f"{(assignment_avg*0.08 + test_avg*0.08 + practical_avg*0.05 + classwork_avg*0.09):.1f}%")
+                        st.metric("📈 Continuous Assessment (30%)", f"{(assignment_avg*0.05 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.10):.1f}%")
                         st.metric("🎯 Exam Contribution (70%)", f"{(exam_score * 0.70):.1f}%")
                     
                     # Final result
@@ -4018,15 +4022,15 @@ def student_view(course_code, course_name):
                     # Progress bars for visualization
                     st.subheader("📊 Grade Breakdown")
                     
-                    ca_total = assignment_avg*0.08 + test_avg*0.08 + practical_avg*0.05 + classwork_avg*0.09
+                    ca_total = assignment_avg*0.05 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.10
                     exam_contribution = exam_score * 0.70
                     
                     st.write("**Continuous Assessment (30%):**")
                     st.progress(min(ca_total / 30, 1.0))  # Ensure progress doesn't exceed 1.0
-                    st.write(f"Assignment: {assignment_avg:.1f}% × 8% = {assignment_avg*0.08:.1f}%")
-                    st.write(f"Test: {test_avg:.1f}% × 8% = {test_avg*0.08:.1f}%") 
+                    st.write(f"Assignment: {assignment_avg:.1f}% × 5% = {assignment_avg*0.05:.1f}%")
+                    st.write(f"Test: {test_avg:.1f}% × 10% = {test_avg*0.10:.1f}%") 
                     st.write(f"Practical: {practical_avg:.1f}% × 5% = {practical_avg*0.05:.1f}%")
-                    st.write(f"Classwork: {classwork_avg:.1f}% × 9% = {classwork_avg*0.09:.1f}%")
+                    st.write(f"Classwork: {classwork_avg:.1f}% × 10% = {classwork_avg*0.10:.1f}%")
                     
                     st.write("**Exam (70%):**")
                     st.progress(min(exam_contribution / 70, 1.0))  # Ensure progress doesn't exceed 1.0
@@ -5546,6 +5550,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
