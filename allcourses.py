@@ -5403,7 +5403,7 @@ def main():
    
     # Application Header
     st.subheader("Multi-Course Learning Management System")
-    st.title("🎓 University Course Portal")
+    st.title("🎓 Sikiru Adetona College of Education Science and Technology Course Portal")
     
     # Auto-refresh
     st_autorefresh(interval=86_400_000, key="daily_refresh")
@@ -5483,6 +5483,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
