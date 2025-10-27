@@ -820,6 +820,87 @@ def mark_attendance_entry(course_code, name, matric, week):
     except Exception as e:
         st.error(f"⚠️ Error recording attendance: {e}")
         return False
+# =============================================================================
+# HELPER FUNCTIONS FOR SUBMISSIONS
+# =============================================================================
+
+def log_submission(course_code, matric, student_name, week, file_name, upload_type):
+    """Log each upload to CSV file for admin tracking"""
+    log_file = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", f"{course_code}_submissions_log.csv")
+    new_entry = pd.DataFrame([{
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Matric": matric,
+        "Student Name": student_name,
+        "Week": week,
+        "File": file_name,
+        "Type": upload_type
+    }])
+
+    if os.path.exists(log_file):
+        existing = pd.read_csv(log_file)
+        updated = pd.concat([existing, new_entry], ignore_index=True)
+    else:
+        updated = new_entry
+    updated.to_csv(log_file, index=False)
+
+def check_existing_submission(course_code, week, student_id):
+    """Check if a student has already submitted an assignment for a specific week"""
+    try:
+        # Get the submission file path
+        submission_file = get_submission_file(course_code, week, student_id)
+        
+        # Check if file exists and has content
+        if os.path.exists(submission_file):
+            with open(submission_file, 'r') as f:
+                submission_data = json.load(f)
+            
+            # Check if submission has meaningful content
+            if submission_data.get('submission_text') or submission_data.get('submission_file'):
+                return True, submission_data
+            else:
+                return False, None
+        else:
+            return False, None
+            
+    except Exception as e:
+        st.error(f"Error checking existing submission: {e}")
+        return False, None
+
+def get_submission_file(course_code, week, student_id):
+    """Get the file path for a student's submission"""
+    safe_week = week.replace(" ", "_").replace(":", "").lower()
+    safe_student_id = student_id.replace(" ", "_").replace(":", "").lower()
+    
+    # Create submissions directory structure
+    submissions_dir = os.path.join("data", "courses", course_code, "submissions", safe_week)
+    os.makedirs(submissions_dir, exist_ok=True)
+    
+    filename = f"{safe_student_id}_submission.json"
+    return os.path.join(submissions_dir, filename)
+
+def save_submission(course_code, week, student_id, submission_data):
+    """Save a student's submission"""
+    try:
+        submission_file = get_submission_file(course_code, week, student_id)
+        
+        # Add metadata
+        submission_data['submission_time'] = datetime.now().isoformat()
+        submission_data['student_id'] = student_id
+        submission_data['week'] = week
+        submission_data['course_code'] = course_code
+        
+        with open(submission_file, 'w') as f:
+            json.dump(submission_data, f, indent=2)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error saving submission: {e}")
+        return False
+
+def get_submission_status(course_code, week, student_id):
+    """Get simple submission status"""
+    has_submission, _ = check_existing_submission(course_code, week, student_id)
+    return "Submitted" if has_submission else "Not Submitted"
 
 # ===============================================================
 # 📚 LECTURE MANAGEMENT
@@ -1049,87 +1130,6 @@ def save_file(course_code, student_name, week, uploaded_file, folder_name):
         f.write(uploaded_file.getbuffer())
     return file_path
 
-def log_submission(course_code, matric, student_name, week, file_name, upload_type):
-    """Log each upload to CSV file for admin tracking"""
-    log_file = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", f"{course_code}_submissions_log.csv")
-    new_entry = pd.DataFrame([{
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Matric": matric,
-        "Student Name": student_name,
-        "Week": week,
-        "File": file_name,
-        "Type": upload_type
-    }])
-
-    if os.path.exists(log_file):
-        existing = pd.read_csv(log_file)
-        updated = pd.concat([existing, new_entry], ignore_index=True)
-    else:
-        updated = new_entry
-    updated.to_csv(log_file, index=False)
-
-def check_existing_submission(course_code, week, student_id):
-    """Check if a student has already submitted an assignment for a specific week"""
-    try:
-        # Get the submission file path
-        submission_file = get_submission_file(course_code, week, student_id)
-        
-        # Check if file exists and has content
-        if os.path.exists(submission_file):
-            with open(submission_file, 'r') as f:
-                submission_data = json.load(f)
-            
-            # Check if submission has meaningful content
-            if submission_data.get('submission_text') or submission_data.get('submission_file'):
-                return True, submission_data
-            else:
-                return False, None
-        else:
-            return False, None
-            
-    except Exception as e:
-        st.error(f"Error checking existing submission: {e}")
-        return False, None
-
-def get_submission_file(course_code, week, student_id):
-    """Get the file path for a student's submission"""
-    safe_week = week.replace(" ", "_").replace(":", "").lower()
-    safe_student_id = student_id.replace(" ", "_").replace(":", "").lower()
-    
-    # Create submissions directory structure
-    submissions_dir = os.path.join("data", "courses", course_code, "submissions", safe_week)
-    os.makedirs(submissions_dir, exist_ok=True)
-    
-    filename = f"{safe_student_id}_submission.json"
-    return os.path.join(submissions_dir, filename)
-
-def save_submission(course_code, week, student_id, submission_data):
-    """Save a student's submission"""
-    try:
-        submission_file = get_submission_file(course_code, week, student_id)
-        
-        # Add metadata
-        submission_data['submission_time'] = datetime.now().isoformat()
-        submission_data['student_id'] = student_id
-        submission_data['week'] = week
-        submission_data['course_code'] = course_code
-        
-        with open(submission_file, 'w') as f:
-            json.dump(submission_data, f, indent=2)
-        
-        return True
-    except Exception as e:
-        st.error(f"Error saving submission: {e}")
-        return False
-
-def get_submission_status(course_code, week, student_id):
-    """Get simple submission status"""
-    has_submission, _ = check_existing_submission(course_code, week, student_id)
-    return "Submitted" if has_submission else "Not Submitted"
-
-# Usage example
-status = get_submission_status(current_course, selected_week, student_id)
-st.write(f"**Submission Status:** {status}")
 
 # ===============================================================
 # 🎥 VIDEO MANAGEMENT
@@ -5546,6 +5546,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
