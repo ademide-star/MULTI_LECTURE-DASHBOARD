@@ -1284,7 +1284,101 @@ def get_all_courses_from_db():
     except Exception as e:
         st.error(f"Database error: {e}")
         return pd.DataFrame()
+def get_system_logs_file():
+    """Get system logs file path"""
+    return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
 
+def init_system_logs():
+    """Initialize system logs file"""
+    logs_file = get_system_logs_file()
+    if not os.path.exists(logs_file):
+        with open(logs_file, 'w') as f:
+            json.dump({"lecturer_logs": [], "student_logs": []}, f)
+
+def log_lecturer_activity(lecturer_name, course_code, action, details=""):
+    """Log lecturer activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "lecturer_name": lecturer_name,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["lecturer_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries to prevent file from growing too large
+        if len(logs["lecturer_logs"]) > 1000:
+            logs["lecturer_logs"] = logs["lecturer_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging lecturer activity: {e}")
+
+def log_student_activity(student_name, matric, course_code, action, details=""):
+    """Log student activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "student_name": student_name,
+            "matric": matric,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["student_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries
+        if len(logs["student_logs"]) > 1000:
+            logs["student_logs"] = logs["student_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging student activity: {e}")
+
+def get_lecturer_logs():
+    """Get all lecturer logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("lecturer_logs", [])
+        return []
+    except:
+        return []
+
+def get_student_logs():
+    """Get all student logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("student_logs", [])
+        return []
+    except:
+        return []
 # ===============================================================
 # 🏫 COURSE MANAGEMENT SYSTEM
 # ===============================================================
@@ -5435,6 +5529,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
