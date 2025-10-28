@@ -1285,6 +1285,219 @@ def get_all_courses_from_db():
         st.error(f"Database error: {e}")
         return pd.DataFrame()
 
+import os
+import json
+import pandas as pd
+from datetime import datetime, timedelta
+import streamlit as st
+import sqlite3
+import re
+
+# ===============================================================
+# 🔧 SYSTEM CONFIGURATION
+# ===============================================================
+
+# Constants
+PERSISTENT_DATA_DIR = "persistent_data"
+SYSTEM_ADMIN_PASSWORD = "system2025"  # Change this in production
+DEFAULT_ADMIN_PASSWORD = "bimpe2025class"
+
+# Ensure data directory exists
+if not os.path.exists(PERSISTENT_DATA_DIR):
+    os.makedirs(PERSISTENT_DATA_DIR)
+
+# ===============================================================
+# 📁 FILE MANAGEMENT FUNCTIONS
+# ===============================================================
+
+def get_courses_config_file():
+    """Get courses config file path"""
+    return os.path.join(PERSISTENT_DATA_DIR, "courses_config.json")
+
+def get_admin_passwords_file():
+    """Get admin passwords file path"""
+    return os.path.join(PERSISTENT_DATA_DIR, "admin_passwords.json")
+
+def get_system_logs_file():
+    """Get system logs file path"""
+    return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
+
+def load_courses_config():
+    """Load courses configuration"""
+    try:
+        config_file = get_courses_config_file()
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                return json.load(f)
+        return {}
+    except:
+        return {}
+
+def save_courses_config(courses):
+    """Save courses configuration"""
+    try:
+        config_file = get_courses_config_file()
+        with open(config_file, 'w') as f:
+            json.dump(courses, f, indent=2)
+        return True
+    except:
+        return False
+
+def load_admin_passwords():
+    """Load admin passwords"""
+    try:
+        passwords_file = get_admin_passwords_file()
+        if os.path.exists(passwords_file):
+            with open(passwords_file, 'r') as f:
+                return json.load(f)
+        return {}
+    except:
+        return {}
+
+def save_admin_passwords(passwords):
+    """Save admin passwords"""
+    try:
+        passwords_file = get_admin_passwords_file()
+        with open(passwords_file, 'w') as f:
+            json.dump(passwords, f, indent=2)
+        return True
+    except:
+        return False
+
+def set_course_password(course_code, password):
+    """Set password for a course"""
+    passwords = load_admin_passwords()
+    passwords[course_code] = password
+    return save_admin_passwords(passwords)
+
+# ===============================================================
+# 🔄 OPTIMIZED LOGGING SYSTEM
+# ===============================================================
+
+def init_system_logs():
+    """Initialize system logs file"""
+    try:
+        logs_file = get_system_logs_file()
+        log_dir = os.path.dirname(logs_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        if not os.path.exists(logs_file):
+            with open(logs_file, 'w') as f:
+                json.dump({"lecturer_logs": [], "student_logs": []}, f)
+        return True
+    except Exception as e:
+        st.error(f"Error initializing system logs: {e}")
+        return False
+
+def log_lecturer_activity(lecturer_name, course_code, action, details=""):
+    """Log lecturer activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "lecturer_name": lecturer_name,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["lecturer_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries to prevent file from growing too large
+        if len(logs["lecturer_logs"]) > 1000:
+            logs["lecturer_logs"] = logs["lecturer_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging lecturer activity: {e}")
+
+def log_student_activity(student_name, matric, course_code, action, details=""):
+    """Log student activities"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+        else:
+            logs = {"lecturer_logs": [], "student_logs": []}
+        
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "student_name": student_name,
+            "matric": matric,
+            "course_code": course_code,
+            "action": action,
+            "details": details
+        }
+        
+        logs["student_logs"].append(log_entry)
+        
+        # Keep only last 1000 entries
+        if len(logs["student_logs"]) > 1000:
+            logs["student_logs"] = logs["student_logs"][-1000:]
+        
+        with open(logs_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+            
+    except Exception as e:
+        print(f"Error logging student activity: {e}")
+
+# Cache the logs to avoid repeated file reads
+@st.cache_data(ttl=60)  # Cache for 60 seconds
+def get_lecturer_logs_cached():
+    """Get all lecturer logs with caching"""
+    return get_lecturer_logs()
+
+@st.cache_data(ttl=60)  # Cache for 60 seconds  
+def get_student_logs_cached():
+    """Get all student logs with caching"""
+    return get_student_logs()
+
+@st.cache_data(ttl=300)  # Cache courses for 5 minutes
+def load_courses_config_cached():
+    """Load courses with caching"""
+    return load_courses_config()
+
+def get_lecturer_logs():
+    """Get all lecturer logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("lecturer_logs", [])
+        return []
+    except:
+        return []
+
+def get_student_logs():
+    """Get all student logs"""
+    try:
+        logs_file = get_system_logs_file()
+        if os.path.exists(logs_file):
+            with open(logs_file, 'r') as f:
+                logs = json.load(f)
+            return logs.get("student_logs", [])
+        return []
+    except:
+        return []
+
+def is_recent(timestamp, days=1):
+    """Check if timestamp is within the last N days"""
+    try:
+        log_time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        return (datetime.now() - log_time).days <= days
+    except:
+        return False
+
 # ===============================================================
 # 🏫 COURSE MANAGEMENT SYSTEM (OPTIMIZED)
 # ===============================================================
@@ -1426,24 +1639,120 @@ def show_course_management():
             st.dataframe(overview_df, use_container_width=True)
 
 # ===============================================================
-# 🔄 OPTIMIZED LOGGING SYSTEM WITH LAZY LOADING
+# 🏢 OPTIMIZED SYSTEM ADMIN DASHBOARD
 # ===============================================================
 
-# Cache the logs to avoid repeated file reads
-@st.cache_data(ttl=60)  # Cache for 60 seconds
-def get_lecturer_logs_cached():
-    """Get all lecturer logs with caching"""
-    return get_lecturer_logs()
+def show_system_admin_dashboard():
+    """System Admin Dashboard with comprehensive monitoring - OPTIMIZED"""
+    st.title("🏢 System Administration Dashboard")
+    
+    # System Admin Authentication
+    st.sidebar.subheader("🔐 System Admin Access")
+    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
+    
+    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
+        st.warning("Enter the System Admin password to continue")
+        return
+    
+    st.success("✅ Logged in as System Administrator")
+    
+    # Initialize system logs
+    if not init_system_logs():
+        st.error("❌ Failed to initialize system logs")
+        return
+    
+    # Create tabs for different admin functions
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "📊 System Overview", 
+        "🏫 Course Management",
+        "👩‍🏫 Lecturer Activity", 
+        "🎓 Student Activity",
+        "📈 Analytics",
+        "🔧 System Settings",
+        "🚨 Alert Center"
+    ])
+    
+    with tab1:
+        show_system_overview()
+    
+    with tab2:
+        show_course_management()
+        
+    with tab3:
+        show_lecturer_activity_optimized()
+    
+    with tab4:
+        show_student_activity_optimized()
+    
+    with tab5:
+        show_analytics_optimized()
+    
+    with tab6:
+        show_system_settings()
+    
+    with tab7:
+        show_alert_center_optimized()
 
-@st.cache_data(ttl=60)  # Cache for 60 seconds  
-def get_student_logs_cached():
-    """Get all student logs with caching"""
-    return get_student_logs()
-
-@st.cache_data(ttl=300)  # Cache courses for 5 minutes
-def load_courses_config_cached():
-    """Load courses with caching"""
-    return load_courses_config()
+def show_system_overview():
+    """System overview with key metrics"""
+    st.header("📊 System Overview")
+    
+    # Load courses and logs
+    courses = load_courses_config_cached()
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
+    
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Courses", len(courses))
+    
+    with col2:
+        active_lecturers = len(set(log['lecturer_name'] for log in lecturer_logs if is_recent(log['timestamp'], 7)))
+        st.metric("Active Lecturers (7d)", active_lecturers)
+    
+    with col3:
+        active_students = len(set(log['student_name'] for log in student_logs if is_recent(log['timestamp'], 7)))
+        st.metric("Active Students (7d)", active_students)
+    
+    with col4:
+        total_activities = len(lecturer_logs) + len(student_logs)
+        st.metric("Total Activities", total_activities)
+    
+    # Recent activity timeline
+    st.subheader("🕒 Recent Activity Timeline")
+    
+    # Combine and sort recent logs
+    all_logs = []
+    for log in lecturer_logs[-20:]:  # Last 20 lecturer activities
+        log['type'] = 'Lecturer'
+        all_logs.append(log)
+    
+    for log in student_logs[-20:]:  # Last 20 student activities
+        log['type'] = 'Student'
+        all_logs.append(log)
+    
+    # Sort by timestamp
+    all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    if all_logs:
+        for log in all_logs[:10]:  # Show last 10 activities
+            if log['type'] == 'Lecturer':
+                icon = "👩‍🏫"
+                name = log['lecturer_name']
+                action = log['action']
+            else:
+                icon = "🎓"
+                name = log['student_name']
+                action = log['action']
+            
+            st.write(f"{icon} **{name}** - {action} - *{log['timestamp']}*")
+            if log.get('details'):
+                st.caption(f"Details: {log['details']}")
+            st.divider()
+    else:
+        st.info("No recent activity recorded")
 
 def show_lecturer_activity_optimized():
     """OPTIMIZED: Detailed lecturer activity logs with pagination and lazy loading"""
@@ -1723,59 +2032,6 @@ def show_student_activity_optimized():
     else:
         st.info("No student activity matching the filters")
 
-# ===============================================================
-# 🏢 OPTIMIZED SYSTEM ADMIN DASHBOARD
-# ===============================================================
-
-def show_system_admin_dashboard():
-    """System Admin Dashboard with comprehensive monitoring - OPTIMIZED"""
-    st.title("🏢 System Administration Dashboard")
-    
-    # System Admin Authentication
-    st.sidebar.subheader("🔐 System Admin Access")
-    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
-    
-    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
-        st.warning("Enter the System Admin password to continue")
-        return
-    
-    st.success("✅ Logged in as System Administrator")
-    
-    # Initialize system logs
-    init_system_logs()
-    
-    # Create tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 System Overview", 
-        "🏫 Course Management",
-        "👩‍🏫 Lecturer Activity", 
-        "🎓 Student Activity",
-        "📈 Analytics",
-        "🔧 System Settings",
-        "🚨 Alert Center"
-    ])
-    
-    with tab1:
-        show_system_overview()
-    
-    with tab2:
-        show_course_management()
-        
-    with tab3:
-        show_lecturer_activity_optimized()  # Use optimized version
-    
-    with tab4:
-        show_student_activity_optimized()  # Use optimized version
-    
-    with tab5:
-        show_analytics_optimized()  # Use optimized version
-    
-    with tab6:
-        show_system_settings()
-    
-    with tab7:
-        show_alert_center_optimized()  # Use optimized version
-
 def show_analytics_optimized():
     """OPTIMIZED: System analytics and insights with caching"""
     st.header("📈 System Analytics")
@@ -1848,6 +2104,61 @@ def show_analytics_optimized():
         for action, count in sorted(student_actions.items(), key=lambda x: x[1], reverse=True)[:8]:
             st.write(f"• {action}: {count}")
 
+def show_system_settings():
+    """System configuration settings"""
+    st.header("🔧 System Settings")
+    
+    # System information
+    st.subheader("ℹ️ System Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric("System Admin Password", "🔒 Secured")
+        st.metric("Default Lecturer Password", "bimpe2025class")
+    
+    with col2:
+        st.metric("Data Directory", PERSISTENT_DATA_DIR)
+        st.metric("Log Retention", "1000 records per type")
+    
+    # Password management
+    st.subheader("🔐 Password Management")
+    
+    with st.expander("Change System Admin Password"):
+        current_password = st.text_input("Current Password", type="password")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm New Password", type="password")
+        
+        if st.button("Change System Admin Password"):
+            if current_password != SYSTEM_ADMIN_PASSWORD:
+                st.error("❌ Current password is incorrect")
+            elif new_password != confirm_password:
+                st.error("❌ New passwords don't match")
+            elif not new_password:
+                st.error("❌ New password cannot be empty")
+            else:
+                # In a real system, you'd update the password here
+                st.success("✅ System admin password updated successfully!")
+                st.info("Note: In production, this would update the system password")
+    
+    # System maintenance
+    st.subheader("🛠️ System Maintenance")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Clear All Logs", type="secondary"):
+            logs_file = get_system_logs_file()
+            if os.path.exists(logs_file):
+                with open(logs_file, 'w') as f:
+                    json.dump({"lecturer_logs": [], "student_logs": []}, f)
+                st.success("✅ All system logs cleared!")
+    
+    with col2:
+        if st.button("📊 Generate System Report", type="primary"):
+            generate_system_report()
+            st.success("✅ System report generated!")
+
 def show_alert_center_optimized():
     """OPTIMIZED: System alerts and notifications with caching"""
     st.header("🚨 Alert Center")
@@ -1906,7 +2217,31 @@ def show_alert_center_optimized():
                 st.write(f"🎓 **{event['student_name']}** - {event['action']} - *{event['timestamp']}*")
     else:
         st.info("No important events to display")
-        
+
+def generate_system_report():
+    """Generate comprehensive system report"""
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
+    courses = load_courses_config_cached()
+    
+    report = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_courses": len(courses),
+        "total_lecturer_activities": len(lecturer_logs),
+        "total_student_activities": len(student_logs),
+        "active_lecturers": len(set(log['lecturer_name'] for log in lecturer_logs)),
+        "active_students": len(set(log['student_name'] for log in student_logs)),
+        "courses": list(courses.values())
+    }
+    
+    # Save report
+    report_file = os.path.join(PERSISTENT_DATA_DIR, f"system_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_file, 'w') as f:
+        json.dump(report, f, indent=2)
+    
+    return report
+
+
 # ===============================================================
 # 📊 SCORES MANAGEMENT
 # ===============================================================
@@ -4925,12 +5260,13 @@ st.markdown("""
         bottom: 0;
         width: 100%;
         background-color: #f0f2f6;
-        color: #333;
+        color: #030303ff;
         text-align: center;
         padding: 8px;
         font-size: 15px;
+        border-left: 4px solid #4CAF50;
         font-weight: 500;
-        border-top: 1px solid #ccc;
+        border-top: 1px solid #aff807ff;
         margin-top: 2rem;
     }
     </style>
