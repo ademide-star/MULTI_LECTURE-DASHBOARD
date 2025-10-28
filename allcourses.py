@@ -2138,7 +2138,7 @@ def show_course_management():
     # Load current courses
     courses = load_courses_config()
     
-    tab1, tab2, tab3= st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords")
+    tab1, tab2, tab3= st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords"])
     
     with tab1:
         st.subheader("Add/Remove Courses")
@@ -5486,6 +5486,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
