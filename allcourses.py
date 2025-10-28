@@ -525,6 +525,46 @@ def parse_bulk_questions(bulk_text):
             i += 1
     
     return questions
+    
+ def are_answers_released(course_code, week):
+    """Check if answers are released for a specific week's classwork"""
+    status = get_classwork_status(course_code, week)
+    return status.get("answers_released", False)
+
+def set_classwork_answers_released(course_code, week, released):
+    """Set whether answers are released for classwork"""
+    status = get_classwork_status(course_code, week)
+    status["answers_released"] = released
+    
+    status_file = get_classwork_status_file(course_code, week)
+    os.makedirs(os.path.dirname(status_file), exist_ok=True)
+    
+    try:
+        with open(status_file, 'w') as f:
+            json.dump(status, f)
+        return True
+    except Exception as e:
+        st.error(f"Error setting answer release status: {e}")
+        return False
+
+# Update get_classwork_status to include answers_released by default
+def get_classwork_status(course_code, week):
+    """Get classwork status with default answer release status"""
+    status_file = get_classwork_status_file(course_code, week)
+    default_status = {
+        "is_open": False,
+        "open_time": None,
+        "answers_released": False  # Add this default
+    }
+    
+    try:
+        with open(status_file, 'r') as f:
+            loaded_status = json.load(f)
+            # Merge with defaults to ensure all keys exist
+            default_status.update(loaded_status)
+        return default_status
+    except:
+        return default_status   
 # ===============================================================
 # 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
 # ===============================================================
@@ -3637,7 +3677,7 @@ def calculate_final_grade(student_scores):
         return None, None, 0, 0, 0, 0, 0
 
 def display_classwork_section(course_code, week, student_name, student_matric):
-    """Display classwork section for the selected week - PREVENTS DOUBLE SUBMISSION"""
+    """Display classwork section for the selected week - HIDDEN UNTIL RELEASED"""
     try:
         st.markdown("---")
         st.subheader(f"🧩 Classwork - {week}")
@@ -3646,12 +3686,16 @@ def display_classwork_section(course_code, week, student_name, student_matric):
         mcq_questions = load_mcq_questions(course_code, week)
         
         if mcq_questions and len(mcq_questions) > 0:
-            st.markdown("### 🧩 Automated Classwork Questions")
-            
-            # Check if classwork is open
+            # Check if classwork is open AND if answers should be visible
             classwork_status = is_classwork_open(course_code, week)
+            answers_released = are_answers_released(course_code, week)
             close_classwork_after_20min(course_code, week)  # Auto-close check
 
+            # If classwork is completely hidden (not open and answers not released)
+            if not classwork_status and not answers_released:
+                st.info("🔒 Classwork for this week is currently hidden. Your lecturer will make it visible when it's time.")
+                return  # Exit early - don't show anything else
+            
             # Display classwork status
             if classwork_status:
                 st.success("✅ Classwork is OPEN - You can submit your answers")
@@ -3670,6 +3714,8 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                             st.info(f"⏳ Classwork will auto-close in {mins:02d}:{secs:02d}")
                     except:
                         pass
+            elif answers_released:
+                st.info("📚 Classwork is CLOSED - Answers are now available for review")
             else:
                 st.warning("🚫 Classwork is CLOSED - You cannot submit answers at this time")
 
@@ -3698,7 +3744,6 @@ def display_classwork_section(course_code, week, student_name, student_matric):
             # PREVENT DOUBLE SUBMISSION - Show different UI if already submitted
             if already_submitted:
                 st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
-                st.info("📝 You cannot submit again for this week. If you believe this is an error, contact your lecturer.")
                 
                 # Show submission details
                 with st.expander("📋 View Your Submission", expanded=False):
@@ -3707,7 +3752,7 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                     st.write(f"**Score:** {submission_data['Score']}%")
                     st.write(f"**Submitted:** {submission_data['Timestamp']}")
                     
-                    # Show answers if available
+                    # Show answers if available AND answers are released
                     try:
                         answers = json.loads(submission_data['Answers'])
                         st.write("**Your Answers:**")
@@ -3715,12 +3760,15 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                             st.write(f"**Q{i+1}:** {question['question']}")
                             st.write(f"**Your Answer:** {answer}")
                             
-                            # Show correct answer for learning purposes
-                            correct_answer = question['correct_answer']
-                            if question['type'] == 'mcq':
-                                st.write(f"**Correct Answer:** {correct_answer} - {question['options'].get(correct_answer, '')}")
+                            # Show correct answer ONLY if answers are released
+                            if answers_released:
+                                correct_answer = question['correct_answer']
+                                if question['type'] == 'mcq':
+                                    st.write(f"**Correct Answer:** {correct_answer} - {question['options'].get(correct_answer, '')}")
+                                else:
+                                    st.write(f"**Correct Answer(s):** {correct_answer}")
                             else:
-                                st.write(f"**Correct Answer(s):** {correct_answer}")
+                                st.info("🔒 Correct answers will be available after the lecturer releases them.")
                             st.markdown("---")
                     except:
                         st.write("Unable to display answer details")
@@ -3733,7 +3781,6 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                     submit_mcq = st.form_submit_button(
                         "🚀 Submit Classwork Answers", 
                         use_container_width=True,
-                        # Disable button if already submitted (extra safety)
                         disabled=already_submitted
                     )
 
@@ -3743,7 +3790,7 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                         elif any(not str(answer).strip() for answer in answers):
                             st.error("❌ Please answer all questions before submitting.")
                         else:
-                            # DOUBLE CHECK: Ensure no submission exists (race condition protection)
+                            # DOUBLE CHECK: Ensure no submission exists
                             if os.path.exists(classwork_file):
                                 df_check = pd.read_csv(classwork_file)
                                 existing_check = df_check[
@@ -3772,18 +3819,9 @@ def display_classwork_section(course_code, week, student_name, student_matric):
                             else:
                                 st.error("❌ Failed to save your submission. Please try again.")
             else:
-                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it.")
+                # Classwork is closed but answers aren't released yet
+                st.info("⏳ Classwork for this week is currently closed. Please wait for your lecturer to open it or release answers.")
                 
-                # Show questions in read-only mode when closed
-                st.markdown("---")
-                st.write("**Questions Preview (Read-only):**")
-                for i, question in enumerate(mcq_questions):
-                    st.write(f"**Q{i+1}: {question['question']}**")
-                    if question['type'] == 'mcq':
-                        st.write("Options:")
-                        for opt, text in question['options'].items():
-                            st.write(f"- {opt}: {text}")
-                    st.write("")  # Add spacing
         else:
             st.info(f"No automated classwork assigned for {week} yet.")
             st.write("💡 *If you believe there should be classwork, please ask your lecturer to check the Admin dashboard.*")
@@ -5101,20 +5139,40 @@ def admin_view(course_code, course_name):
 
         with tab6:
             # ===============================================================
-            # 🧩 CLASSWORK CONTROL
-            # ===============================================================
+# 🧩 CLASSWORK CONTROL
+# ===============================================================
             st.header("🎛 Classwork Control")
-            
+
             classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)], key=f"{course_code}_classwork_control_week")
-            
+
             current_classwork_status = get_classwork_status(course_code, classwork_week)
             is_classwork_open = current_classwork_status.get("is_open", False)
-            
-            if is_classwork_open:
-                st.success(f"✅ Classwork is CURRENTLY OPEN for {course_code} - {classwork_week}")
-            else:
-                st.warning(f"🚫 Classwork is CURRENTLY CLOSED for {course_code} - {classwork_week}")
-            
+            answers_released = current_classwork_status.get("answers_released", False)
+
+# Display current status
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if is_classwork_open:
+                    st.success("✅ Classwork OPEN")
+                else:
+                    st.warning("🚫 Classwork CLOSED")
+        
+            with col2:
+                if answers_released:
+                    st.success("📚 Answers RELEASED")
+                else:
+                    st.info("🔒 Answers HIDDEN")
+
+            with col3:
+    # Show student visibility status
+                if is_classwork_open or answers_released:
+                    st.success("👀 Visible to Students")
+                else:
+                    st.error("🙈 Hidden from Students")
+
+# Control buttons
+            st.subheader("Control Classwork Visibility")
+
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary", key="open_classwork_btn"):
@@ -5122,19 +5180,38 @@ def admin_view(course_code, course_name):
                     if success:
                         st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
                         st.rerun()
+            
             with col2:
                 if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary", key="close_classwork_btn"):
                     success = set_classwork_status(course_code, classwork_week, False)
                     if success:
                         st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
                         st.rerun()
+
+            st.subheader("Control Answer Visibility")
+
+            col3, col4 = st.columns(2)
+            with col3:
+                if st.button("📚 RELEASE Answers", use_container_width=True, type="primary", key="release_answers_btn"):
+                    success = set_classwork_answers_released(course_code, classwork_week, True)
+                    if success:
+                        st.success(f"✅ Answers RELEASED for {course_code} - {classwork_week}")
+                        st.rerun()
             
+            with col4:
+                if st.button("🔒 HIDE Answers", use_container_width=True, type="secondary", key="hide_answers_btn"):
+                    success = set_classwork_answers_released(course_code, classwork_week, False)
+                    if success:
+                        st.warning(f"🔒 Answers HIDDEN for {course_code} - {classwork_week}")
+                        st.rerun()
+
+# Auto-close functionality
             if is_classwork_open and current_classwork_status.get("open_time"):
                 try:
                     open_time = datetime.fromisoformat(current_classwork_status["open_time"])
                     elapsed = (datetime.now() - open_time).total_seconds()
                     remaining = max(0, 1200 - elapsed)
-                    
+        
                     if remaining <= 0:
                         set_classwork_status(course_code, classwork_week, False)
                         st.error(f"⏰ Classwork for {course_code} - {classwork_week} has automatically closed after 20 minutes.")
@@ -5721,6 +5798,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
