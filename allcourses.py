@@ -526,7 +526,7 @@ def parse_bulk_questions(bulk_text):
     
     return questions
     
- def are_answers_released(course_code, week):
+def are_answers_released(course_code, week):
     """Check if answers are released for a specific week's classwork"""
     status = get_classwork_status(course_code, week)
     return status.get("answers_released", False)
@@ -5798,6 +5798,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
