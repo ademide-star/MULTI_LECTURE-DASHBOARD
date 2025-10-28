@@ -2440,7 +2440,7 @@ def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, sk
                 course_name = parts[0]
                 if auto_generate_codes:
                     # Auto-generate code from name (extract uppercase letters and numbers)
-                    code_match = re.findall(r'[A-Z]+\s*\d+', course_name)
+                    code_match = re.findall('[A-Z]+\s*\d+', course_name)
                     if code_match:
                         course_code = code_match[0].replace(' ', '')
                     else:
@@ -5550,6 +5550,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
