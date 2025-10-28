@@ -424,7 +424,107 @@ def display_mcq_questions(questions):
         st.markdown('</div>', unsafe_allow_html=True)
     
     return answers
+def show_bulk_import_example():
+    """Show an example of bulk import format"""
+    example_text = """
+MCQ: What is the capital of France?
+A. London
+B. Berlin
+C. Paris
+D. Madrid
+Correct: C
 
+MCQ: Which programming language is known for its use in data science?
+A. Java
+B. Python
+C. C++
+D. JavaScript
+Correct: B
+
+GAP: The process of finding and fixing errors in code is called ________.
+Correct: debugging
+
+GAP: HTTP stands for ________ Transfer Protocol.
+Correct: HyperText|Hypertext
+"""
+    return example_text.strip()
+# ===============================================================
+# 🎯 BULK MCQ & GAP-FILLING IMPORT SYSTEM
+# ===============================================================
+
+def parse_bulk_questions(bulk_text):
+    """Parse bulk text containing multiple questions and options"""
+    questions = []
+    lines = bulk_text.strip().split('\n')
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # Skip empty lines
+        if not line:
+            i += 1
+            continue
+        
+        # Detect question type and start parsing
+        if line.startswith('MCQ:'):
+            # Parse Multiple Choice Question
+            question_text = line[4:].strip()
+            options = {}
+            correct_answer = None
+            
+            i += 1
+            while i < len(lines):
+                option_line = lines[i].strip()
+                
+                # Check for correct answer marker
+                if option_line.startswith('Correct:'):
+                    correct_answer = option_line[8:].strip()
+                    i += 1
+                    break
+                # Parse options (A, B, C, D, E)
+                elif option_line.startswith(('A.', 'B.', 'C.', 'D.', 'E.')):
+                    option_key = option_line[0]  # A, B, C, etc.
+                    option_value = option_line[2:].strip()
+                    options[option_key] = option_value
+                
+                i += 1
+            
+            if question_text and options and correct_answer:
+                questions.append({
+                    "type": "mcq",
+                    "question": question_text,
+                    "options": options,
+                    "correct_answer": correct_answer
+                })
+        
+        elif line.startswith('GAP:'):
+            # Parse Gap Filling Question
+            question_text = line[4:].strip()
+            correct_answer = None
+            
+            i += 1
+            while i < len(lines):
+                answer_line = lines[i].strip()
+                
+                if answer_line.startswith('Correct:'):
+                    correct_answer = answer_line[8:].strip()
+                    i += 1
+                    break
+                i += 1
+            
+            if question_text and correct_answer:
+                questions.append({
+                    "type": "gap_fill",
+                    "question": question_text,
+                    "options": {},
+                    "correct_answer": correct_answer
+                })
+        
+        else:
+            i += 1
+    
+    return questions
 # ===============================================================
 # 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
 # ===============================================================
@@ -4664,7 +4764,64 @@ def admin_view(course_code, course_name):
             existing_questions = load_mcq_questions(course_code, week)
             if existing_questions is None:
                 existing_questions = []
-           
+                   # ===============================================================
+    # BULK IMPORT SECTION
+    # ===============================================================
+            st.markdown("#### 📥 Bulk Import Questions")
+            with st.expander("Click to expand bulk import"):
+                st.markdown("""
+                **Format your questions like this:**
+        
+                 **For Multiple Choice Questions:**
+                 ```
+                MCQ: What is the capital of France?
+                A. London
+                B. Berlin
+                C. Paris
+                D. Madrid
+                E. Rome
+                Correct: C
+                ```
+        
+                **For Gap-Filling Questions:**
+                ```
+                GAP: The capital of France is ________.
+                Correct: Paris
+                ```
+        
+                **Tips:**
+                - Start each question with `MCQ:` or `GAP:`
+                - Use A., B., C., D., E. for options
+                - Mark correct answer with `Correct:`
+                - Separate questions with empty lines
+                """)
+        
+                bulk_text = st.text_area(
+                "Paste your questions here:",
+                height=300,
+                placeholder="Paste multiple questions in the format shown above...",
+                key=f"bulk_import_{week}"
+        )
+        
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("📥 Import Questions", key=f"import_{week}"):
+                        if bulk_text.strip():
+                            new_questions = parse_bulk_questions(bulk_text)
+                        if new_questions:
+                            existing_questions.extend(new_questions)
+                        if save_mcq_questions(course_code, week, existing_questions):
+                            st.success(f"✅ Successfully imported {len(new_questions)} questions!")
+                            st.rerun()
+                        else:
+                            st.error("❌ No valid questions found. Please check the format.")
+                    else:
+                        st.warning("⚠️ Please paste some questions first.")
+        
+                with col2:
+                    if st.button("🧹 Clear Bulk Text", key=f"clear_bulk_{week}"):
+                        st.session_state[f"bulk_import_{week}"] = ""
+                        st.rerun()
     # MCQ Creation Section
             st.markdown("#### Create Automated MCQ/Gap-Filling Questions")
             with st.container():
@@ -5564,6 +5721,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
