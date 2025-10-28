@@ -2130,8 +2130,6 @@ def get_courses_for_course_from_db(course_code):
         st.error(f"Database error: {e}")
         return pd.DataFrame()
         
-    
-
 
 def show_course_management():
     """Course management system for super admin with bulk import"""
@@ -2140,7 +2138,7 @@ def show_course_management():
     # Load current courses
     courses = load_courses_config()
     
-    tab1, tab2, tab3, tab4 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords", "📊 System Overview"])
+    tab1, tab2, tab3= st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords")
     
     with tab1:
         st.subheader("Add/Remove Courses")
@@ -2336,47 +2334,6 @@ def show_course_management():
         else:
             st.info("No courses available. Add courses first.")
     
-    with tab4:
-        st.subheader("System Overview")
-        
-        courses = load_courses_config()
-        passwords = load_admin_passwords()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Courses", len(courses))
-        with col2:
-            custom_passwords = len([code for code in courses.values() if code in passwords])
-            st.metric("Custom Passwords", custom_passwords)
-        with col3:
-            default_passwords = len(courses) - custom_passwords
-            st.metric("Default Passwords", default_passwords)
-        
-        # Course statistics
-        if courses:
-            st.subheader("Course Details")
-            overview_data = []
-            for course_name, course_code in courses.items():
-                course_password = "Custom" if course_code in passwords else "Default"
-                overview_data.append({
-                    "Course Name": course_name,
-                    "Course Code": course_code,
-                    "Password": course_password
-                })
-            
-            overview_df = pd.DataFrame(overview_data)
-            st.dataframe(overview_df, use_container_width=True)
-            
-            # Export courses
-            st.subheader("Export Courses")
-            csv_data = overview_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Export Courses to CSV",
-                data=csv_data,
-                file_name="courses_export.csv",
-                mime="text/csv",
-                key="export_courses_btn"
-            )
 
 def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
     """Process bulk course import"""
@@ -5529,6 +5486,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
