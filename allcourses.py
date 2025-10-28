@@ -2161,7 +2161,7 @@ def show_course_management():
     # Load current courses
     courses = load_courses_config()
     
-    tab1, tab2, tab3 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords", "📊 System Overview"])
     
     with tab1:
         st.subheader("Add/Remove Courses")
@@ -2357,8 +2357,7 @@ def show_course_management():
         else:
             st.info("No courses available. Add courses first.")
     
-def show_system_overview():
-    """System overview and export"""
+    with tab4:
         st.subheader("System Overview")
         
         courses = load_courses_config()
