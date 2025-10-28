@@ -1284,6 +1284,23 @@ def get_all_courses_from_db():
     except Exception as e:
         st.error(f"Database error: {e}")
         return pd.DataFrame()
+        
+def migrate_old_database():
+    """Migrate old database structure to new one if needed"""
+    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
+    c = conn.cursor()
+
+    # Check if course_code column exists
+    c.execute("PRAGMA table_info(weekly_courses)")
+    columns = [column[1] for column in c.fetchall()]
+
+    if 'course_code' not in columns:
+        # Add the missing course_code column
+        c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
+
+    conn.commit()
+    conn.close()
+
 def get_system_logs_file():
     """Get system logs file path"""
     return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
@@ -1379,126 +1396,6 @@ def get_student_logs():
         return []
     except:
         return []
-# ===============================================================
-# 🏫 COURSE MANAGEMENT SYSTEM
-# ===============================================================
-
-def show_course_management():
-    """Course management system for super admin"""
-    st.header("🏫 Course Management System")
-    
-    # Load current courses
-    courses = load_courses_config()
-    
-    tab1, tab2 = st.tabs(["📚 Manage Courses", "🔑 Manage Passwords"])
-    
-    with tab1:
-        st.subheader("Add/Remove Courses")
-        
-        # Add new course
-        col1, col2 = st.columns(2)
-        with col1:
-            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
-        with col2:
-            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
-        
-        if st.button("➕ Add Course", type="primary"):
-            if new_course_name and new_course_code:
-                if new_course_name in courses:
-                    st.error("❌ Course name already exists!")
-                else:
-                    courses[new_course_name] = new_course_code
-                    if save_courses_config(courses):
-                        st.success(f"✅ Course '{new_course_name}' added successfully!")
-                        st.rerun()
-            else:
-                st.error("❌ Please enter both course name and code.")
-        
-        # Display and manage existing courses
-        st.subheader("Current Courses")
-        if courses:
-            for course_name, course_code in courses.items():
-                col1, col2, col3 = st.columns([3, 1, 1])
-                with col1:
-                    st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
-                with col2:
-                    if st.button("✏️", key=f"edit_{course_code}"):
-                        st.session_state[f"editing_{course_code}"] = True
-                with col3:
-                    if st.button("🗑️", key=f"delete_{course_code}"):
-                        del courses[course_name]
-                        save_courses_config(courses)
-                        st.success(f"✅ Course '{course_name}' deleted!")
-                        st.rerun()
-                
-                # Edit course
-                if st.session_state.get(f"editing_{course_code}", False):
-                    with st.form(f"edit_form_{course_code}"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            edited_name = st.text_input("Course Name", value=course_name, key=f"name_{course_code}")
-                        with col2:
-                            edited_code = st.text_input("Course Code", value=course_code, key=f"code_{course_code}").upper()
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("💾 Save Changes"):
-                                if edited_name and edited_code:
-                                    # Remove old entry and add new one
-                                    del courses[course_name]
-                                    courses[edited_name] = edited_code
-                                    save_courses_config(courses)
-                                    st.session_state[f"editing_{course_code}"] = False
-                                    st.success("✅ Course updated successfully!")
-                                    st.rerun()
-                        with col2:
-                            if st.form_submit_button("❌ Cancel"):
-                                st.session_state[f"editing_{course_code}"] = False
-                                st.rerun()
-        else:
-            st.info("No courses added yet. Add courses using the form above.")
-    
-    with tab2:
-        st.subheader("Manage Admin Passwords")
-        
-        passwords = load_admin_passwords()
-        courses = load_courses_config()
-        
-        if courses:
-            for course_name, course_code in courses.items():
-                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
-                
-                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
-                    st.info(f"Current password: **{current_password}**")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{course_code}")
-                    with col2:
-                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{course_code}")
-                    
-                    if st.button("🔄 Change Password", key=f"change_{course_code}"):
-                        if new_password and confirm_password:
-                            if new_password == confirm_password:
-                                if set_course_password(course_code, new_password):
-                                    st.success("✅ Password changed successfully!")
-                                    st.rerun()
-                            else:
-                                st.error("❌ Passwords don't match!")
-                        else:
-                            st.error("❌ Please enter and confirm new password!")
-                    
-                    # Reset to default
-                    if st.button("🔄 Reset to Default", key=f"reset_{course_code}"):
-                        if set_course_password(course_code, DEFAULT_ADMIN_PASSWORD):
-                            st.success("✅ Password reset to default!")
-                            st.rerun()
-        else:
-            st.info("No courses available. Add courses first.")
-    
-    
-            
-
 
 # ===============================================================
 # 🏢 SYSTEM ADMIN DASHBOARD
@@ -2130,6 +2027,8 @@ def get_courses_for_course_from_db(course_code):
         st.error(f"Database error: {e}")
         return pd.DataFrame()
         
+    
+
 
 def show_course_management():
     """Course management system for super admin with bulk import"""
@@ -2138,7 +2037,7 @@ def show_course_management():
     # Load current courses
     courses = load_courses_config()
     
-    tab1, tab2, tab3= st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords"])
+    tab1, tab2, tab3 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords"])
     
     with tab1:
         st.subheader("Add/Remove Courses")
@@ -2334,6 +2233,48 @@ def show_course_management():
         else:
             st.info("No courses available. Add courses first.")
     
+def show_system_overview():
+    """System overview and export"""
+        st.subheader("System Overview")
+        
+        courses = load_courses_config()
+        passwords = load_admin_passwords()
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Courses", len(courses))
+        with col2:
+            custom_passwords = len([code for code in courses.values() if code in passwords])
+            st.metric("Custom Passwords", custom_passwords)
+        with col3:
+            default_passwords = len(courses) - custom_passwords
+            st.metric("Default Passwords", default_passwords)
+        
+        # Course statistics
+        if courses:
+            st.subheader("Course Details")
+            overview_data = []
+            for course_name, course_code in courses.items():
+                course_password = "Custom" if course_code in passwords else "Default"
+                overview_data.append({
+                    "Course Name": course_name,
+                    "Course Code": course_code,
+                    "Password": course_password
+                })
+            
+            overview_df = pd.DataFrame(overview_data)
+            st.dataframe(overview_df, use_container_width=True)
+            
+            # Export courses
+            st.subheader("Export Courses")
+            csv_data = overview_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Export Courses to CSV",
+                data=csv_data,
+                file_name="courses_export.csv",
+                mime="text/csv",
+                key="export_courses_btn"
+            )
 
 def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
     """Process bulk course import"""
@@ -5486,9 +5427,6 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
-
-
-
 
 
 
