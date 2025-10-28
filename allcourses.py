@@ -1284,242 +1284,183 @@ def get_all_courses_from_db():
     except Exception as e:
         st.error(f"Database error: {e}")
         return pd.DataFrame()
-        
-def migrate_old_database():
-    """Migrate old database structure to new one if needed"""
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-
-    # Check if course_code column exists
-    c.execute("PRAGMA table_info(weekly_courses)")
-    columns = [column[1] for column in c.fetchall()]
-
-    if 'course_code' not in columns:
-        # Add the missing course_code column
-        c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
-
-    conn.commit()
-    conn.close()
-
-def get_system_logs_file():
-    """Get system logs file path"""
-    return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
-
-def init_system_logs():
-    """Initialize system logs file"""
-    logs_file = get_system_logs_file()
-    if not os.path.exists(logs_file):
-        with open(logs_file, 'w') as f:
-            json.dump({"lecturer_logs": [], "student_logs": []}, f)
-
-def log_lecturer_activity(lecturer_name, course_code, action, details=""):
-    """Log lecturer activities"""
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-        else:
-            logs = {"lecturer_logs": [], "student_logs": []}
-        
-        log_entry = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "lecturer_name": lecturer_name,
-            "course_code": course_code,
-            "action": action,
-            "details": details
-        }
-        
-        logs["lecturer_logs"].append(log_entry)
-        
-        # Keep only last 1000 entries to prevent file from growing too large
-        if len(logs["lecturer_logs"]) > 1000:
-            logs["lecturer_logs"] = logs["lecturer_logs"][-1000:]
-        
-        with open(logs_file, 'w') as f:
-            json.dump(logs, f, indent=2)
-            
-    except Exception as e:
-        print(f"Error logging lecturer activity: {e}")
-
-def log_student_activity(student_name, matric, course_code, action, details=""):
-    """Log student activities"""
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-        else:
-            logs = {"lecturer_logs": [], "student_logs": []}
-        
-        log_entry = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "student_name": student_name,
-            "matric": matric,
-            "course_code": course_code,
-            "action": action,
-            "details": details
-        }
-        
-        logs["student_logs"].append(log_entry)
-        
-        # Keep only last 1000 entries
-        if len(logs["student_logs"]) > 1000:
-            logs["student_logs"] = logs["student_logs"][-1000:]
-        
-        with open(logs_file, 'w') as f:
-            json.dump(logs, f, indent=2)
-            
-    except Exception as e:
-        print(f"Error logging student activity: {e}")
-
-def get_lecturer_logs():
-    """Get all lecturer logs"""
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-            return logs.get("lecturer_logs", [])
-        return []
-    except:
-        return []
-
-def get_student_logs():
-    """Get all student logs"""
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-            return logs.get("student_logs", [])
-        return []
-    except:
-        return []
 
 # ===============================================================
-# 🏢 SYSTEM ADMIN DASHBOARD
+# 🏫 COURSE MANAGEMENT SYSTEM (OPTIMIZED)
 # ===============================================================
 
-def show_system_admin_dashboard():
-    """System Admin Dashboard with comprehensive monitoring"""
-    st.title("🏢 System Administration Dashboard")
+def show_course_management():
+    """Course management system for super admin - OPTIMIZED"""
+    st.header("🏫 Course Management System")
     
-    # System Admin Authentication
-    st.sidebar.subheader("🔐 System Admin Access")
-    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
+    # Load current courses
+    courses = load_courses_config()
     
-    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
-        st.warning("Enter the System Admin password to continue")
-        return
-    
-    st.success("✅ Logged in as System Administrator")
-    
-    # Initialize system logs
-    init_system_logs()
-    
-    # Create tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 System Overview", 
-        "🏫 Course Management", # NEW TAB ADDED HERE
-        "👩‍🏫 Lecturer Activity", 
-        "🎓 Student Activity",
-        "📈 Analytics",
-        "🔧 System Settings",
-        "🚨 Alert Center"
-    ])
+    tab1, tab2, tab3 = st.tabs(["📚 Manage Courses", "🔑 Manage Passwords", "📊 System Overview"])
     
     with tab1:
-        show_system_overview()
+        st.subheader("Add/Remove Courses")
+        
+        # Add new course
+        col1, col2 = st.columns(2)
+        with col1:
+            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
+        with col2:
+            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
+        
+        if st.button("➕ Add Course", type="primary"):
+            if new_course_name and new_course_code:
+                if new_course_name in courses:
+                    st.error("❌ Course name already exists!")
+                else:
+                    courses[new_course_name] = new_course_code
+                    if save_courses_config(courses):
+                        st.success(f"✅ Course '{new_course_name}' added successfully!")
+                        st.rerun()
+            else:
+                st.error("❌ Please enter both course name and code.")
+        
+        # Display and manage existing courses
+        st.subheader("Current Courses")
+        if courses:
+            for course_name, course_code in courses.items():
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
+                with col2:
+                    if st.button("✏️", key=f"edit_{course_code}"):
+                        st.session_state[f"editing_{course_code}"] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_{course_code}"):
+                        del courses[course_name]
+                        save_courses_config(courses)
+                        st.success(f"✅ Course '{course_name}' deleted!")
+                        st.rerun()
+                
+                # Edit course
+                if st.session_state.get(f"editing_{course_code}", False):
+                    with st.form(f"edit_form_{course_code}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edited_name = st.text_input("Course Name", value=course_name, key=f"name_{course_code}")
+                        with col2:
+                            edited_code = st.text_input("Course Code", value=course_code, key=f"code_{course_code}").upper()
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save Changes"):
+                                if edited_name and edited_code:
+                                    # Remove old entry and add new one
+                                    del courses[course_name]
+                                    courses[edited_name] = edited_code
+                                    save_courses_config(courses)
+                                    st.session_state[f"editing_{course_code}"] = False
+                                    st.success("✅ Course updated successfully!")
+                                    st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state[f"editing_{course_code}"] = False
+                                st.rerun()
+        else:
+            st.info("No courses added yet. Add courses using the form above.")
     
     with tab2:
-        show_course_management()
+        st.subheader("Manage Admin Passwords")
         
+        passwords = load_admin_passwords()
+        courses = load_courses_config()
+        
+        if courses:
+            for course_name, course_code in courses.items():
+                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
+                
+                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
+                    st.info(f"Current password: **{current_password}**")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{course_code}")
+                    with col2:
+                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{course_code}")
+                    
+                    if st.button("🔄 Change Password", key=f"change_{course_code}"):
+                        if new_password and confirm_password:
+                            if new_password == confirm_password:
+                                if set_course_password(course_code, new_password):
+                                    st.success("✅ Password changed successfully!")
+                                    st.rerun()
+                            else:
+                                st.error("❌ Passwords don't match!")
+                        else:
+                            st.error("❌ Please enter and confirm new password!")
+                    
+                    # Reset to default
+                    if st.button("🔄 Reset to Default", key=f"reset_{course_code}"):
+                        if set_course_password(course_code, DEFAULT_ADMIN_PASSWORD):
+                            st.success("✅ Password reset to default!")
+                            st.rerun()
+        else:
+            st.info("No courses available. Add courses first.")
+    
     with tab3:
-        show_lecturer_activity()
-    
-    with tab4:
-        show_student_activity()
-    
-    with tab5:
-        show_analytics()
-    
-    with tab6:
-        show_system_settings()
-    
-    with tab7:
-        show_alert_center()
-
-def show_system_overview():
-    """System overview with key metrics"""
-    st.header("📊 System Overview")
-    
-    # Load courses and logs
-    courses = load_courses_config()
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
-    
-    # Key metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
+        st.subheader("System Overview")
+        
+        courses = load_courses_config()
+        passwords = load_admin_passwords()
+        
         st.metric("Total Courses", len(courses))
-    
-    with col2:
-        active_lecturers = len(set(log['lecturer_name'] for log in lecturer_logs if is_recent(log['timestamp'], 7)))
-        st.metric("Active Lecturers (7d)", active_lecturers)
-    
-    with col3:
-        active_students = len(set(log['student_name'] for log in student_logs if is_recent(log['timestamp'], 7)))
-        st.metric("Active Students (7d)", active_students)
-    
-    with col4:
-        total_activities = len(lecturer_logs) + len(student_logs)
-        st.metric("Total Activities", total_activities)
-    
-    # Recent activity timeline
-    st.subheader("🕒 Recent Activity Timeline")
-    
-    # Combine and sort recent logs
-    all_logs = []
-    for log in lecturer_logs[-20:]:  # Last 20 lecturer activities
-        log['type'] = 'Lecturer'
-        all_logs.append(log)
-    
-    for log in student_logs[-20:]:  # Last 20 student activities
-        log['type'] = 'Student'
-        all_logs.append(log)
-    
-    # Sort by timestamp
-    all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
-    
-    if all_logs:
-        for log in all_logs[:10]:  # Show last 10 activities
-            if log['type'] == 'Lecturer':
-                icon = "👩‍🏫"
-                name = log['lecturer_name']
-                action = log['action']
-            else:
-                icon = "🎓"
-                name = log['student_name']
-                action = log['action']
+        
+        # Course statistics
+        if courses:
+            st.subheader("Course Details")
+            overview_data = []
+            for course_name, course_code in courses.items():
+                course_password = passwords.get(course_code, "Default")
+                overview_data.append({
+                    "Course Name": course_name,
+                    "Course Code": course_code,
+                    "Password Set": "Custom" if course_code in passwords else "Default"
+                })
             
-            st.write(f"{icon} **{name}** - {action} - *{log['timestamp']}*")
-            if log.get('details'):
-                st.caption(f"Details: {log['details']}")
-            st.divider()
-    else:
-        st.info("No recent activity recorded")
+            overview_df = pd.DataFrame(overview_data)
+            st.dataframe(overview_df, use_container_width=True)
 
-def show_lecturer_activity():
-    """Detailed lecturer activity logs"""
+# ===============================================================
+# 🔄 OPTIMIZED LOGGING SYSTEM WITH LAZY LOADING
+# ===============================================================
+
+# Cache the logs to avoid repeated file reads
+@st.cache_data(ttl=60)  # Cache for 60 seconds
+def get_lecturer_logs_cached():
+    """Get all lecturer logs with caching"""
+    return get_lecturer_logs()
+
+@st.cache_data(ttl=60)  # Cache for 60 seconds  
+def get_student_logs_cached():
+    """Get all student logs with caching"""
+    return get_student_logs()
+
+@st.cache_data(ttl=300)  # Cache courses for 5 minutes
+def load_courses_config_cached():
+    """Load courses with caching"""
+    return load_courses_config()
+
+def show_lecturer_activity_optimized():
+    """OPTIMIZED: Detailed lecturer activity logs with pagination and lazy loading"""
     st.header("👩‍🏫 Lecturer Activity Monitor")
     
-    lecturer_logs = get_lecturer_logs()
+    # Load logs with caching
+    lecturer_logs = get_lecturer_logs_cached()
     
     if not lecturer_logs:
         st.info("No lecturer activity recorded yet")
         return
+    
+    # Initialize session state for pagination
+    if 'lecturer_page' not in st.session_state:
+        st.session_state.lecturer_page = 0
+    if 'lecturer_filtered_logs' not in st.session_state:
+        st.session_state.lecturer_filtered_logs = []
     
     # Filters
     col1, col2, col3 = st.columns(3)
@@ -1535,45 +1476,77 @@ def show_lecturer_activity():
         actions = sorted(set(log['action'] for log in lecturer_logs))
         action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions)
     
-    # Filter logs
-    filtered_logs = lecturer_logs
-    
-    if date_filter != "All Time":
-        if date_filter == "Last 24 Hours":
-            cutoff = datetime.now() - timedelta(hours=24)
-        elif date_filter == "Last 7 Days":
-            cutoff = datetime.now() - timedelta(days=7)
-        else:  # Last 30 Days
-            cutoff = datetime.now() - timedelta(days=30)
+    # Apply filters only when needed
+    if (st.session_state.get('prev_lecturer_filters') != (date_filter, lecturer_filter, action_filter) or
+        not st.session_state.lecturer_filtered_logs):
         
-        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+        filtered_logs = lecturer_logs
+        
+        if date_filter != "All Time":
+            if date_filter == "Last 24 Hours":
+                cutoff = datetime.now() - timedelta(hours=24)
+            elif date_filter == "Last 7 Days":
+                cutoff = datetime.now() - timedelta(days=7)
+            else:  # Last 30 Days
+                cutoff = datetime.now() - timedelta(days=30)
+            
+            filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+        
+        if lecturer_filter != "All Lecturers":
+            filtered_logs = [log for log in filtered_logs if log['lecturer_name'] == lecturer_filter]
+        
+        if action_filter != "All Actions":
+            filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
+        
+        st.session_state.lecturer_filtered_logs = filtered_logs
+        st.session_state.prev_lecturer_filters = (date_filter, lecturer_filter, action_filter)
+        st.session_state.lecturer_page = 0  # Reset to first page when filters change
     
-    if lecturer_filter != "All Lecturers":
-        filtered_logs = [log for log in filtered_logs if log['lecturer_name'] == lecturer_filter]
+    filtered_logs = st.session_state.lecturer_filtered_logs
     
-    if action_filter != "All Actions":
-        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
-    
-    # Display logs
+    # Display logs with pagination
     if filtered_logs:
         st.subheader(f"📋 Activity Logs ({len(filtered_logs)} records)")
         
+        # Pagination settings
+        ITEMS_PER_PAGE = 50
+        total_pages = max(1, (len(filtered_logs) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+        
+        # Pagination controls
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+        with col2:
+            if st.button("◀ Previous", disabled=st.session_state.lecturer_page == 0):
+                st.session_state.lecturer_page -= 1
+                st.rerun()
+        with col3:
+            if st.button("Next ▶", disabled=st.session_state.lecturer_page >= total_pages - 1):
+                st.session_state.lecturer_page += 1
+                st.rerun()
+        
+        # Show page info
+        st.caption(f"Page {st.session_state.lecturer_page + 1} of {total_pages} - Showing {ITEMS_PER_PAGE} records per page")
+        
+        # Get current page data
+        start_idx = st.session_state.lecturer_page * ITEMS_PER_PAGE
+        end_idx = min(start_idx + ITEMS_PER_PAGE, len(filtered_logs))
+        current_page_logs = filtered_logs[start_idx:end_idx]
+        
         # Convert to DataFrame for better display
         log_data = []
-        for log in filtered_logs:
+        for log in current_page_logs:
             log_data.append({
                 'Timestamp': log['timestamp'],
                 'Lecturer': log['lecturer_name'],
                 'Course': log['course_code'],
                 'Action': log['action'],
-                'Details': log.get('details', '')
+                'Details': log.get('details', '')[:100]  # Limit details length
             })
         
         df = pd.DataFrame(log_data)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, height=400)
         
-        # Download option
-        csv = df.to_csv(index=False)
+        # Download option (full data)
+        csv = pd.DataFrame(filtered_logs).to_csv(index=False)
         st.download_button(
             label="📥 Download Lecturer Logs (CSV)",
             data=csv,
@@ -1581,44 +1554,50 @@ def show_lecturer_activity():
             mime="text/csv"
         )
         
-        # Lecturer statistics
+        # Lecturer statistics (only for current filter)
         st.subheader("📈 Lecturer Statistics")
         
-        # Most active lecturers
-        lecturer_activity = {}
-        for log in filtered_logs:
-            lecturer = log['lecturer_name']
-            lecturer_activity[lecturer] = lecturer_activity.get(lecturer, 0) + 1
+        col1, col2 = st.columns(2)
         
-        if lecturer_activity:
-            col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Most Active Lecturers:**")
+            lecturer_activity = {}
+            for log in filtered_logs:
+                lecturer = log['lecturer_name']
+                lecturer_activity[lecturer] = lecturer_activity.get(lecturer, 0) + 1
             
-            with col1:
-                st.write("**Most Active Lecturers:**")
+            if lecturer_activity:
                 for lecturer, count in sorted(lecturer_activity.items(), key=lambda x: x[1], reverse=True)[:5]:
                     st.write(f"• {lecturer}: {count} activities")
+        
+        with col2:
+            st.write("**Common Actions:**")
+            action_counts = {}
+            for log in filtered_logs:
+                action = log['action']
+                action_counts[action] = action_counts.get(action, 0) + 1
             
-            with col2:
-                st.write("**Common Actions:**")
-                action_counts = {}
-                for log in filtered_logs:
-                    action = log['action']
-                    action_counts[action] = action_counts.get(action, 0) + 1
-                
-                for action, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
-                    st.write(f"• {action}: {count} times")
+            for action, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
+                st.write(f"• {action}: {count} times")
     else:
         st.info("No lecturer activity matching the filters")
 
-def show_student_activity():
-    """Detailed student activity logs"""
+def show_student_activity_optimized():
+    """OPTIMIZED: Detailed student activity logs with pagination and lazy loading"""
     st.header("🎓 Student Activity Monitor")
     
-    student_logs = get_student_logs()
+    # Load logs with caching
+    student_logs = get_student_logs_cached()
     
     if not student_logs:
         st.info("No student activity recorded yet")
         return
+    
+    # Initialize session state for pagination
+    if 'student_page' not in st.session_state:
+        st.session_state.student_page = 0
+    if 'student_filtered_logs' not in st.session_state:
+        st.session_state.student_filtered_logs = []
     
     # Filters
     col1, col2, col3 = st.columns(3)
@@ -1634,46 +1613,78 @@ def show_student_activity():
         actions = sorted(set(log['action'] for log in student_logs))
         action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions, key="student_action_filter")
     
-    # Filter logs
-    filtered_logs = student_logs
-    
-    if date_filter != "All Time":
-        if date_filter == "Last 24 Hours":
-            cutoff = datetime.now() - timedelta(hours=24)
-        elif date_filter == "Last 7 Days":
-            cutoff = datetime.now() - timedelta(days=7)
-        else:  # Last 30 Days
-            cutoff = datetime.now() - timedelta(days=30)
+    # Apply filters only when needed
+    if (st.session_state.get('prev_student_filters') != (date_filter, course_filter, action_filter) or
+        not st.session_state.student_filtered_logs):
         
-        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+        filtered_logs = student_logs
+        
+        if date_filter != "All Time":
+            if date_filter == "Last 24 Hours":
+                cutoff = datetime.now() - timedelta(hours=24)
+            elif date_filter == "Last 7 Days":
+                cutoff = datetime.now() - timedelta(days=7)
+            else:  # Last 30 Days
+                cutoff = datetime.now() - timedelta(days=30)
+            
+            filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
+        
+        if course_filter != "All Courses":
+            filtered_logs = [log for log in filtered_logs if log['course_code'] == course_filter]
+        
+        if action_filter != "All Actions":
+            filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
+        
+        st.session_state.student_filtered_logs = filtered_logs
+        st.session_state.prev_student_filters = (date_filter, course_filter, action_filter)
+        st.session_state.student_page = 0  # Reset to first page when filters change
     
-    if course_filter != "All Courses":
-        filtered_logs = [log for log in filtered_logs if log['course_code'] == course_filter]
+    filtered_logs = st.session_state.student_filtered_logs
     
-    if action_filter != "All Actions":
-        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
-    
-    # Display logs
+    # Display logs with pagination
     if filtered_logs:
         st.subheader(f"📋 Student Activity Logs ({len(filtered_logs)} records)")
         
+        # Pagination settings
+        ITEMS_PER_PAGE = 50
+        total_pages = max(1, (len(filtered_logs) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+        
+        # Pagination controls
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+        with col2:
+            if st.button("◀ Previous", key="student_prev", disabled=st.session_state.student_page == 0):
+                st.session_state.student_page -= 1
+                st.rerun()
+        with col3:
+            if st.button("Next ▶", key="student_next", disabled=st.session_state.student_page >= total_pages - 1):
+                st.session_state.student_page += 1
+                st.rerun()
+        
+        # Show page info
+        st.caption(f"Page {st.session_state.student_page + 1} of {total_pages} - Showing {ITEMS_PER_PAGE} records per page")
+        
+        # Get current page data
+        start_idx = st.session_state.student_page * ITEMS_PER_PAGE
+        end_idx = min(start_idx + ITEMS_PER_PAGE, len(filtered_logs))
+        current_page_logs = filtered_logs[start_idx:end_idx]
+        
         # Convert to DataFrame for better display
         log_data = []
-        for log in filtered_logs:
+        for log in current_page_logs:
             log_data.append({
                 'Timestamp': log['timestamp'],
                 'Student': log['student_name'],
                 'Matric': log['matric'],
                 'Course': log['course_code'],
                 'Action': log['action'],
-                'Details': log.get('details', '')
+                'Details': log.get('details', '')[:100]  # Limit details length
             })
         
         df = pd.DataFrame(log_data)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, height=400)
         
-        # Download option
-        csv = df.to_csv(index=False)
+        # Download option (full data)
+        csv = pd.DataFrame(filtered_logs).to_csv(index=False)
         st.download_button(
             label="📥 Download Student Logs (CSV)",
             data=csv,
@@ -1681,7 +1692,7 @@ def show_student_activity():
             mime="text/csv"
         )
         
-        # Student statistics
+        # Student statistics (only for current filter)
         st.subheader("📈 Student Engagement Statistics")
         
         col1, col2 = st.columns(2)
@@ -1712,36 +1723,95 @@ def show_student_activity():
     else:
         st.info("No student activity matching the filters")
 
-def show_analytics():
-    """System analytics and insights"""
+# ===============================================================
+# 🏢 OPTIMIZED SYSTEM ADMIN DASHBOARD
+# ===============================================================
+
+def show_system_admin_dashboard():
+    """System Admin Dashboard with comprehensive monitoring - OPTIMIZED"""
+    st.title("🏢 System Administration Dashboard")
+    
+    # System Admin Authentication
+    st.sidebar.subheader("🔐 System Admin Access")
+    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
+    
+    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
+        st.warning("Enter the System Admin password to continue")
+        return
+    
+    st.success("✅ Logged in as System Administrator")
+    
+    # Initialize system logs
+    init_system_logs()
+    
+    # Create tabs for different admin functions
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "📊 System Overview", 
+        "🏫 Course Management",
+        "👩‍🏫 Lecturer Activity", 
+        "🎓 Student Activity",
+        "📈 Analytics",
+        "🔧 System Settings",
+        "🚨 Alert Center"
+    ])
+    
+    with tab1:
+        show_system_overview()
+    
+    with tab2:
+        show_course_management()
+        
+    with tab3:
+        show_lecturer_activity_optimized()  # Use optimized version
+    
+    with tab4:
+        show_student_activity_optimized()  # Use optimized version
+    
+    with tab5:
+        show_analytics_optimized()  # Use optimized version
+    
+    with tab6:
+        show_system_settings()
+    
+    with tab7:
+        show_alert_center_optimized()  # Use optimized version
+
+def show_analytics_optimized():
+    """OPTIMIZED: System analytics and insights with caching"""
     st.header("📈 System Analytics")
     
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
-    courses = load_courses_config()
+    # Use cached versions
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
+    courses = load_courses_config_cached()
     
     if not lecturer_logs and not student_logs:
         st.info("No data available for analytics")
         return
     
-    # Activity trends
+    # Activity trends with sampling for large datasets
     st.subheader("📊 Activity Trends")
     
-    # Daily activity for last 7 days
+    # Sample data if too large for performance
+    max_samples = 1000
+    sampled_lecturer_logs = lecturer_logs[-max_samples:] if len(lecturer_logs) > max_samples else lecturer_logs
+    sampled_student_logs = student_logs[-max_samples:] if len(student_logs) > max_samples else student_logs
+    
+    # Daily activity for last 7 days (optimized)
     dates = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
     
     lecturer_daily = {date: 0 for date in dates}
     student_daily = {date: 0 for date in dates}
     
-    for log in lecturer_logs:
-        log_date = log['timestamp'].split()[0]
-        if log_date in lecturer_daily:
-            lecturer_daily[log_date] += 1
+    # Use faster counting with pre-filtered dates
+    lecturer_dates = [log['timestamp'].split()[0] for log in sampled_lecturer_logs if log['timestamp'].split()[0] in lecturer_daily]
+    student_dates = [log['timestamp'].split()[0] for log in sampled_student_logs if log['timestamp'].split()[0] in student_daily]
     
-    for log in student_logs:
-        log_date = log['timestamp'].split()[0]
-        if log_date in student_daily:
-            student_daily[log_date] += 1
+    for date in lecturer_dates:
+        lecturer_daily[date] = lecturer_daily.get(date, 0) + 1
+    
+    for date in student_dates:
+        student_daily[date] = student_daily.get(date, 0) + 1
     
     # Create trend chart data
     trend_data = {
@@ -1759,103 +1829,59 @@ def show_analytics():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**Lecturer Activity Distribution:**")
+        st.write("**Top Lecturer Actions:**")
         lecturer_actions = {}
-        for log in lecturer_logs:
+        for log in sampled_lecturer_logs:
             action = log['action']
             lecturer_actions[action] = lecturer_actions.get(action, 0) + 1
         
-        for action, count in sorted(lecturer_actions.items(), key=lambda x: x[1], reverse=True):
+        for action, count in sorted(lecturer_actions.items(), key=lambda x: x[1], reverse=True)[:8]:
             st.write(f"• {action}: {count}")
     
     with col2:
-        st.write("**Student Activity Distribution:**")
+        st.write("**Top Student Actions:**")
         student_actions = {}
-        for log in student_logs:
+        for log in sampled_student_logs:
             action = log['action']
             student_actions[action] = student_actions.get(action, 0) + 1
         
-        for action, count in sorted(student_actions.items(), key=lambda x: x[1], reverse=True):
+        for action, count in sorted(student_actions.items(), key=lambda x: x[1], reverse=True)[:8]:
             st.write(f"• {action}: {count}")
 
-def show_system_settings():
-    """System configuration settings"""
-    st.header("🔧 System Settings")
-    
-    # System information
-    st.subheader("ℹ️ System Information")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric("System Admin Password", "🔒 Secured")
-        st.metric("Default Lecturer Password", "bimpe2025class")
-    
-    with col2:
-        st.metric("Data Directory", PERSISTENT_DATA_DIR)
-        st.metric("Log Retention", "1000 records per type")
-    
-    # Password management
-    st.subheader("🔐 Password Management")
-    
-    with st.expander("Change System Admin Password"):
-        current_password = st.text_input("Current Password", type="password")
-        new_password = st.text_input("New Password", type="password")
-        confirm_password = st.text_input("Confirm New Password", type="password")
-        
-        if st.button("Change System Admin Password"):
-            if current_password != SYSTEM_ADMIN_PASSWORD:
-                st.error("❌ Current password is incorrect")
-            elif new_password != confirm_password:
-                st.error("❌ New passwords don't match")
-            elif not new_password:
-                st.error("❌ New password cannot be empty")
-            else:
-                # In a real system, you'd update the password here
-                st.success("✅ System admin password updated successfully!")
-                st.info("Note: In production, this would update the system password")
-    
-    # System maintenance
-    st.subheader("🛠️ System Maintenance")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔄 Clear All Logs", type="secondary"):
-            logs_file = get_system_logs_file()
-            if os.path.exists(logs_file):
-                with open(logs_file, 'w') as f:
-                    json.dump({"lecturer_logs": [], "student_logs": []}, f)
-                st.success("✅ All system logs cleared!")
-    
-    with col2:
-        if st.button("📊 Generate System Report", type="primary"):
-            generate_system_report()
-            st.success("✅ System report generated!")
-
-def show_alert_center():
-    """System alerts and notifications"""
+def show_alert_center_optimized():
+    """OPTIMIZED: System alerts and notifications with caching"""
     st.header("🚨 Alert Center")
     
-    # Check for system issues
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
+    # Use cached versions
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
     
     alerts = []
     
-    # Check for no recent activity
-    recent_lecturer = any(is_recent(log['timestamp'], 1) for log in lecturer_logs)
+    # Check for no recent activity (optimized - check only recent logs)
+    recent_cutoff = datetime.now() - timedelta(hours=24)
+    recent_lecturer = any(
+        datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > recent_cutoff 
+        for log in lecturer_logs[-100:]  # Only check last 100 logs
+    )
     if not recent_lecturer:
         alerts.append("⚠️ No lecturer activity in the last 24 hours")
     
-    recent_student = any(is_recent(log['timestamp'], 1) for log in student_logs)
+    recent_student = any(
+        datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > recent_cutoff 
+        for log in student_logs[-100:]  # Only check last 100 logs
+    )
     if not recent_student:
         alerts.append("⚠️ No student activity in the last 24 hours")
     
-    # Check for error patterns
-    error_actions = [log for log in lecturer_logs + student_logs if 'error' in log.get('action', '').lower() or 'fail' in log.get('action', '').lower()]
+    # Check for error patterns (optimized - sample recent logs)
+    recent_logs = lecturer_logs[-200:] + student_logs[-200:]
+    error_actions = [
+        log for log in recent_logs 
+        if any(keyword in log.get('action', '').lower() for keyword in ['error', 'fail', 'failed'])
+    ]
     if error_actions:
-        alerts.append(f"🚨 {len(error_actions)} error/failure actions detected")
+        alerts.append(f"🚨 {len(error_actions)} error/failure actions detected in recent activities")
     
     # Display alerts
     if alerts:
@@ -1864,12 +1890,12 @@ def show_alert_center():
     else:
         st.success("✅ All systems operational - No critical alerts")
     
-    # Recent important events
+    # Recent important events (optimized - limited number)
     st.subheader("📋 Recent Important Events")
     
     important_events = []
-    for log in lecturer_logs[-10:] + student_logs[-10:]:
-        if any(keyword in log.get('action', '').lower() for keyword in ['password', 'login', 'error', 'submit', 'upload']):
+    for log in lecturer_logs[-50:] + student_logs[-50:]:  # Only check last 50 of each
+        if any(keyword in log.get('action', '').lower() for keyword in ['password', 'login', 'error', 'submit', 'upload', 'delete', 'create']):
             important_events.append(log)
     
     if important_events:
@@ -1880,519 +1906,7 @@ def show_alert_center():
                 st.write(f"🎓 **{event['student_name']}** - {event['action']} - *{event['timestamp']}*")
     else:
         st.info("No important events to display")
-
-def generate_system_report():
-    """Generate comprehensive system report"""
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
-    courses = load_courses_config()
-    
-    report = {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "total_courses": len(courses),
-        "total_lecturer_activities": len(lecturer_logs),
-        "total_student_activities": len(student_logs),
-        "active_lecturers": len(set(log['lecturer_name'] for log in lecturer_logs)),
-        "active_students": len(set(log['student_name'] for log in student_logs)),
-        "courses": list(courses.values())
-    }
-    
-    # Save report
-    report_file = os.path.join(PERSISTENT_DATA_DIR, f"system_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-    with open(report_file, 'w') as f:
-        json.dump(report, f, indent=2)
-    
-    return report
-
-def is_recent(timestamp, days=1):
-    """Check if timestamp is within the last N days"""
-    try:
-        log_time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-        return (datetime.now() - log_time).days <= days
-    except:
-        return False
-
-# ===============================================================
-# 🔄 UPDATE EXISTING FUNCTIONS TO INCLUDE LOGGING
-# ===============================================================
-
-def update_admin_functions_with_logging(course_code, course_name):
-    """Update admin functions to log activities"""
-    # Example: When admin logs in
-    log_lecturer_activity("Admin User", course_code, "Admin Login", f"Logged into {course_name}")
-    
-    # Add similar logging calls to other admin actions:
-    # - When they change passwords
-    # - When they upload materials
-    # - When they create MCQ questions
-    # - When they open/close classwork
-
-def update_student_functions_with_logging(course_code, student_name, matric):
-    """Update student functions to log activities"""
-    # Example: When student logs in
-    log_student_activity(student_name, matric, course_code, "Student Login")
-    
-    # Add similar logging calls to other student actions:
-    # - When they submit assignments
-    # - When they mark attendance
-    # - When they submit MCQ answers
-    # - When they download materials
-
-
-
-# Helper functions for module management
-def get_weeks_for_course_from_db(course_code):
-    """Get all unique weeks/modules for a specific course"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
         
-        # Check if course_code column exists
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' in columns:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
-                     (course_code,))
-        else:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
-        
-        weeks = [row[0] for row in c.fetchall()]
-        conn.close()
-        return weeks
-    except:
-        return []
-
-
-# Add these helper functions for course-specific operations
-def get_courses_by_week_for_course(week_name, course_code):
-    """Get all courses for a specific week and course"""
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    
-    # Check if course_code column exists
-    c.execute("PRAGMA table_info(weekly_courses)")
-    columns = [column[1] for column in c.fetchall()]
-    
-    if 'course_code' in columns:
-        c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? AND course_code = ? ORDER BY id', 
-                 (week_name, course_code))
-    else:
-        c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
-    
-    courses = [{"name": row[0], "code": row[1]} for row in c.fetchall()]
-    conn.close()
-    return courses
-
-def delete_week_for_course(week_name, course_code):
-    """Delete a week and all its courses for a specific course from database"""
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    
-    # Check if course_code column exists
-    c.execute("PRAGMA table_info(weekly_courses)")
-    columns = [column[1] for column in c.fetchall()]
-    
-    if 'course_code' in columns:
-        c.execute('DELETE FROM weekly_courses WHERE week_name = ? AND course_code = ?', (week_name, course_code))
-    else:
-        c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
-    
-    conn.commit()
-    conn.close()
-
-def get_courses_for_course_from_db(course_code):
-    """Get all courses from database for a specific course with proper error handling"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        
-        # Check if course_code column exists
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        
-        if 'course_code' in columns:
-            df = pd.read_sql_query(
-                'SELECT week_name, course_name, course_code, created_at FROM weekly_courses WHERE course_code = ? ORDER BY created_at', 
-                conn, params=(course_code,)
-            )
-        else:
-            # Fallback for older database structure
-            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
-            df['course_code'] = 'UNKNOWN'
-        
-        conn.close()
-        return df
-    except Exception as e:
-        st.error(f"Database error: {e}")
-        return pd.DataFrame()
-        
-    
-
-
-def show_course_management():
-    """Course management system for super admin with bulk import"""
-    st.header("🏫 Course Management System")
-    
-    # Load current courses
-    courses = load_courses_config()
-    
-    tab1, tab2, tab3 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords"])
-    
-    with tab1:
-        st.subheader("Add/Remove Courses")
-        
-        # Individual course addition (keep existing functionality)
-        col1, col2 = st.columns(2)
-        with col1:
-            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
-        with col2:
-            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
-        
-        if st.button("➕ Add Course", type="primary", key="add_course_btn"):
-            if new_course_name and new_course_code:
-                if new_course_name in courses:
-                    st.error("❌ Course name already exists!")
-                else:
-                    courses[new_course_name] = new_course_code
-                    if save_courses_config(courses):
-                        st.success(f"✅ Course '{new_course_name}' added successfully!")
-                        st.rerun()
-            else:
-                st.error("❌ Please enter both course name and code.")
-        
-        # Display and manage existing courses
-        st.subheader("Current Courses")
-        if courses:
-            # Convert to list with indices to ensure unique keys
-            course_list = list(courses.items())
-            
-            for idx, (course_name, course_code) in enumerate(course_list):
-                # Create a unique container for each course
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    with col1:
-                        st.markdown(f'<div class="course-card">{course_name} <br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
-                    with col2:
-                        # Use unique key with index and course_name
-                        edit_key = f"edit_{idx}_{course_name.replace(' ', '_')}"
-                        if st.button("✏️", key=edit_key):
-                            st.session_state[edit_key] = True
-                    with col3:
-                        # Use unique key with index and course_name
-                        delete_key = f"delete_{idx}_{course_name.replace(' ', '_')}"
-                        if st.button("🗑️", key=delete_key):
-                            del courses[course_name]
-                            save_courses_config(courses)
-                            st.success(f"✅ Course '{course_name}' deleted!")
-                            st.rerun()
-                    
-                    # Edit course - use the same unique key
-                    if st.session_state.get(edit_key, False):
-                        with st.form(f"edit_form_{idx}_{course_name.replace(' ', '_')}"):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                edited_name = st.text_input("Course Name", value=course_name, key=f"name_{idx}_{course_code}")
-                            with col2:
-                                edited_code = st.text_input("Course Code", value=course_code, key=f"code_{idx}_{course_code}").upper()
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                if st.form_submit_button("💾 Save Changes", key=f"save_{idx}_{course_code}"):
-                                    if edited_name and edited_code:
-                                        # Remove old entry and add new one
-                                        del courses[course_name]
-                                        courses[edited_name] = edited_code
-                                        save_courses_config(courses)
-                                        st.session_state[edit_key] = False
-                                        st.success("✅ Course updated successfully!")
-                                        st.rerun()
-                            with col2:
-                                if st.form_submit_button("❌ Cancel", key=f"cancel_{idx}_{course_code}"):
-                                    st.session_state[edit_key] = False
-                                    st.rerun()
-        else:
-            st.info("No courses added yet. Add courses using the form above or bulk import.")
-    
-    with tab2:
-        st.subheader("📥 Bulk Course Import")
-        
-        st.info("""
-        **Bulk Import Instructions:**
-        - Enter one course per line
-        - Format: `Course Name | Course Code` or `Course Name, Course Code`
-        - You can use comma (,) or pipe (|) as separators
-        - Example formats:
-        ```
-        CHEM 101 - Organic Chemistry, CHEM101
-        MATH 201 - Calculus | MATH201
-        PHYS 101 - Physics | PHYS101
-        ```
-        """)
-        
-        # Bulk course input
-        bulk_courses_text = st.text_area(
-            "Paste courses here:",
-            height=200,
-            placeholder="CHEM 101 - Organic Chemistry,\nMATH 201 - Calculus,\nPHYS 101 - Physics",
-            key="bulk_courses_textarea"
-        )
-        
-        # Separator option
-        col1, col2 = st.columns(2)
-        with col1:
-            separator = st.selectbox("Separator", [",", "|", "Tab", "Custom"], key="separator_select")
-            if separator == "Custom":
-                custom_sep = st.text_input("Custom separator", value=";", key="custom_sep")
-                separator = custom_sep
-            elif separator == "Tab":
-                separator = "\t"
-        
-        with col2:
-            st.write("**Preview:**")
-            if bulk_courses_text:
-                lines = [line.strip() for line in bulk_courses_text.split('\n') if line.strip()]
-                st.write(f"Found {len(lines)} courses to import")
-        
-        # Import options
-        col1, col2 = st.columns(2)
-        with col1:
-            import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"], key="import_mode")
-        
-        with col2:
-            remove_duplicates = st.checkbox("Remove duplicate course code", value=True, key="remove_duplicates")
-            auto_generate_codes = st.checkbox("Auto-generate missing codes", key="auto_generate_codes")
-        
-        if st.button("🚀 Import Courses", type="primary", key="import_courses_btn"):
-            if bulk_courses_text:
-                results = process_bulk_courses(
-                    bulk_courses_text, 
-                    courses, 
-                    separator, 
-                    import_mode, 
-                    remove_duplicates,
-                    auto_generate_codes
-                )
-                display_import_results(results)
-            else:
-                st.error("❌ Please paste some courses to import!")
-    
-    with tab3:
-        st.subheader("Manage Admin Passwords")
-        
-        passwords = load_admin_passwords()
-        courses = load_courses_config()
-        
-        if courses:
-            # Bulk password reset
-            st.write("**Bulk Password Operations:**")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                new_bulk_password = st.text_input("Set same password for all courses", type="password", key="bulk_password")
-                if st.button("🔑 Apply to All Courses", key="apply_bulk_password"):
-                    if new_bulk_password:
-                        for course_code in courses.values():
-                            set_course_password(course_code, new_bulk_password)
-                        st.success("✅ Password applied to all courses!")
-                        st.rerun()
-            
-            with col2:
-                if st.button("🔄 Reset All to Default", key="reset_all_passwords"):
-                    for course_code in courses.values():
-                        set_course_password(course_code, DEFAULT_ADMIN_PASSWORD)
-                    st.success("✅ All passwords reset to default!")
-                    st.rerun()
-            
-            st.divider()
-            
-            # Individual course passwords
-            course_list = list(courses.items())
-            for idx, (course_name, course_code) in enumerate(course_list):
-                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
-                
-                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
-                    st.info(f"Current password: **{current_password}**")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{idx}_{course_code}")
-                    with col2:
-                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{idx}_{course_code}")
-                    
-                    if st.button("🔄 Change Password", key=f"change_{idx}_{course_code}"):
-                        if new_password and confirm_password:
-                            if new_password == confirm_password:
-                                if set_course_password(course_code, new_password):
-                                    st.success("✅ Password changed successfully!")
-                                    st.rerun()
-                            else:
-                                st.error("❌ Passwords don't match!")
-                        else:
-                            st.error("❌ Please enter and confirm new password!")
-        else:
-            st.info("No courses available. Add courses first.")
-    
-def show_system_overview():
-    """System overview and export"""
-    st.subheader("System Overview")
-        
-    courses = load_courses_config()
-    passwords = load_admin_passwords()
-        
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Courses", len(courses))
-    with col2:
-        custom_passwords = len([code for code in courses.values() if code in passwords])
-        st.metric("Custom Passwords", custom_passwords)
-    with col3:
-        default_passwords = len(courses) - custom_passwords
-        st.metric("Default Passwords", default_passwords)
-        
-        # Course statistics
-        if courses:
-            st.subheader("Course Details")
-            overview_data = []
-            for course_name, course_code in courses.items():
-                course_password = "Custom" if course_code in passwords else "Default"
-                overview_data.append({
-                    "Course Name": course_name,
-                    "Course Code": course_code,
-                    "Password": course_password
-                })
-            
-            overview_df = pd.DataFrame(overview_data)
-            st.dataframe(overview_df, use_container_width=True)
-            
-            # Export courses
-            st.subheader("Export Courses")
-            csv_data = overview_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Export Courses to CSV",
-                data=csv_data,
-                file_name="courses_export.csv",
-                mime="text/csv",
-                key="export_courses_btn"
-            )
-
-def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
-    """Process bulk course import"""
-    results = {
-        'success': [],
-        'errors': [],
-        'duplicates': [],
-        'total_processed': 0
-    }
-    
-    lines = [line.strip() for line in bulk_text.split('\n') if line.strip()]
-    results['total_processed'] = len(lines)
-    
-    # If replacing all, clear existing courses first
-    if import_mode == "Replace all courses":
-        existing_courses.clear()
-    
-    for i, line in enumerate(lines, 1):
-        try:
-            # Split the line by separator
-            if separator in line:
-                parts = [part.strip() for part in line.split(separator)]
-            else:
-                # Try to split by common separators
-                if ',' in line:
-                    parts = [part.strip() for part in line.split(',')]
-                elif '|' in line:
-                    parts = [part.strip() for part in line.split('|')]
-                elif '\t' in line:
-                    parts = [part.strip() for part in line.split('\t')]
-                else:
-                    # If no separator, try to extract code from name
-                    parts = [line]
-            
-            # Extract course name and code
-            if len(parts) >= 2:
-                course_name = parts[0]
-                course_code = parts[1].upper()
-            else:
-                course_name = parts[0]
-                if auto_generate_codes:
-                    # Auto-generate code from name (extract uppercase letters and numbers)
-                    code_match = re.findall('[A-Z]+\s*\d+', course_name)
-                    if code_match:
-                        course_code = code_match[0].replace(' ', '')
-                    else:
-                        # Generate from first letters
-                        words = course_name.split()
-                        if len(words) >= 2:
-                            course_code = (words[0][0] + words[1][0]).upper() + "101"
-                        else:
-                            course_code = course_name[:6].upper().replace(' ', '')
-                else:
-                    results['errors'].append(f"Line {i}: Cannot extract course code - '{line}'")
-                    continue
-            
-            # Validate
-            if not course_name or not course_code:
-                results['errors'].append(f"Line {i}: Missing course name or code - '{line}'")
-                continue
-            
-            # Check for duplicates
-            if course_name in existing_courses:
-                results['duplicates'].append(f"Line {i}: Course name exists - '{course_name}'")
-                continue
-            
-            if skip_duplicates and course_code in existing_courses.values():
-                results['duplicates'].append(f"Line {i}: Course code exists - '{course_code}'")
-                continue
-            
-            # Add course
-            existing_courses[course_name] = course_code
-            results['success'].append(f"'{course_name}' - {course_code}")
-            
-        except Exception as e:
-            results['errors'].append(f"Line {i}: Error processing - '{line}' - {str(e)}")
-    
-    # Save if we have successful imports
-    if results['success']:
-        save_courses_config(existing_courses)
-    
-    return results
-
-def display_import_results(results):
-    """Display the results of bulk import"""
-    st.subheader("📊 Import Results")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Successful", len(results['success']))
-    
-    with col2:
-        st.metric("Errors", len(results['errors']))
-    
-    with col3:
-        st.metric("Duplicates", len(results['duplicates']))
-    
-    # Show successful imports
-    if results['success']:
-        st.success(f"✅ Successfully imported {len(results['success'])} courses:")
-        for success in results['success']:
-            st.write(f"• {success}")
-    
-    # Show errors
-    if results['errors']:
-        st.error(f"❌ {len(results['errors'])} errors occurred:")
-        for error in results['errors']:
-            st.write(f"• {error}")
-    
-    # Show duplicates
-    if results['duplicates']:
-        st.warning(f"⚠️ {len(results['duplicates'])} duplicates skipped:")
-        for duplicate in results['duplicates']:
-            st.write(f"• {duplicate}")
-    
-    if results['success']:
-        st.rerun()            
 # ===============================================================
 # 📊 SCORES MANAGEMENT
 # ===============================================================
@@ -5427,7 +4941,6 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
-
 
 
 
