@@ -2235,20 +2235,20 @@ def show_course_management():
     
 def show_system_overview():
     """System overview and export"""
-        st.subheader("System Overview")
+    st.subheader("System Overview")
         
-        courses = load_courses_config()
-        passwords = load_admin_passwords()
+    courses = load_courses_config()
+    passwords = load_admin_passwords()
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Courses", len(courses))
-        with col2:
-            custom_passwords = len([code for code in courses.values() if code in passwords])
-            st.metric("Custom Passwords", custom_passwords)
-        with col3:
-            default_passwords = len(courses) - custom_passwords
-            st.metric("Default Passwords", default_passwords)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Courses", len(courses))
+    with col2:
+        custom_passwords = len([code for code in courses.values() if code in passwords])
+        st.metric("Custom Passwords", custom_passwords)
+    with col3:
+        default_passwords = len(courses) - custom_passwords
+        st.metric("Default Passwords", default_passwords)
         
         # Course statistics
         if courses:
@@ -5427,6 +5427,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
