@@ -1424,7 +1424,21 @@ def show_course_management():
             
             overview_df = pd.DataFrame(overview_data)
             st.dataframe(overview_df, use_container_width=True)
-            
+# Cache the logs to avoid repeated file reads
+@st.cache_data(ttl=60)  # Cache for 60 seconds
+def get_lecturer_logs_cached():
+    """Get all lecturer logs with caching"""
+    return get_lecturer_logs()
+
+@st.cache_data(ttl=60)  # Cache for 60 seconds  
+def get_student_logs_cached():
+    """Get all student logs with caching"""
+    return get_student_logs()
+
+@st.cache_data(ttl=300)  # Cache courses for 5 minutes
+def load_courses_config_cached():
+    """Load courses with caching"""
+    return load_courses_config()            
 def get_system_logs_file():
     """Get system logs file path"""
     return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
@@ -1579,9 +1593,9 @@ def show_system_overview():
     st.header("📊 System Overview")
     
     # Load courses and logs
-    courses = load_courses_config()
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
+    courses = load_courses_config_cached()
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
     
     # Key metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -1639,7 +1653,7 @@ def show_lecturer_activity():
     """Detailed lecturer activity logs"""
     st.header("👩‍🏫 Lecturer Activity Monitor")
     
-    lecturer_logs = get_lecturer_logs()
+    lecturer_logs = get_lecturer_logs_cached()
     
     if not lecturer_logs:
         st.info("No lecturer activity recorded yet")
@@ -1738,7 +1752,7 @@ def show_student_activity():
     """Detailed student activity logs"""
     st.header("🎓 Student Activity Monitor")
     
-    student_logs = get_student_logs()
+    student_logs = get_student_logs_cached()
     
     if not student_logs:
         st.info("No student activity recorded yet")
@@ -1840,9 +1854,9 @@ def show_analytics():
     """System analytics and insights"""
     st.header("📈 System Analytics")
     
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
-    courses = load_courses_config()
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
+    courses = load_courses_config_cached()
     
     if not lecturer_logs and not student_logs:
         st.info("No data available for analytics")
@@ -1962,8 +1976,8 @@ def show_alert_center():
     st.header("🚨 Alert Center")
     
     # Check for system issues
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
     
     alerts = []
     
@@ -2007,9 +2021,9 @@ def show_alert_center():
 
 def generate_system_report():
     """Generate comprehensive system report"""
-    lecturer_logs = get_lecturer_logs()
-    student_logs = get_student_logs()
-    courses = load_courses_config()
+    lecturer_logs = get_lecturer_logs_cached()
+    student_logs = get_student_logs_cached()
+    courses = load_courses_config_cached()
     
     report = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -5550,6 +5564,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
