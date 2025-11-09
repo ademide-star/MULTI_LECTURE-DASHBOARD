@@ -5857,61 +5857,60 @@ def admin_view(course_code, course_name):
 
             if submissions:
                 st.write(f"**Found {len(submissions)} seminar submissions**")
-    
-                    for i, submission in enumerate(submissions):
-                        with st.expander(f"📝 {submission['student_name']} - {submission['topic']}", expanded=False):
-                            col1, col2, col3 = st.columns([2, 1, 1])
+                for i, submission in enumerate(submissions):
+                    with st.expander(f"📝 {submission['student_name']} - {submission['topic']}", expanded=False):
+                        col1, col2, col3 = st.columns([2, 1, 1])
             
-                            with col1:
-                                st.write(f"**Matric:** {submission['student_matric']}")
-                                st.write(f"**Topic:** {submission['topic']}")
-                                st.write(f"**File:** {submission['file_name']}")
-                                st.write(f"**Submitted:** {submission['timestamp']}")
+                        with col1:
+                            st.write(f"**Matric:** {submission['student_matric']}")
+                            st.write(f"**Topic:** {submission['topic']}")
+                            st.write(f"**File:** {submission['file_name']}")
+                            st.write(f"**Submitted:** {submission['timestamp']}")
                 
                 # Download button for the submission
-                                if st.button("📥 Download Submission", key=f"download_seminar_{i}"):
-                                    download_file(submission['file_path'])
+                            if st.button("📥 Download Submission", key=f"download_seminar_{i}"):
+                                download_file(submission['file_path'])
             
-                            with col2:
+                        with col2:
                 # View current feedback
-                                st.write("**Current Feedback:**")
-                                current_feedback = get_seminar_feedback(submission['student_matric'], admin_course)
-                                if current_feedback:
-                                    st.info(current_feedback)
-                                else:
-                                    st.write("No feedback yet")
-            
-                            with col3:
-                # Send feedback form
-                                with st.form(key=f"seminar_feedback_form_{i}"):
-                                    feedback_file = st.file_uploader(
-                                        "Upload Feedback PDF", 
-                                        type=["pdf"], 
-                                        key=f"seminar_feedback_pdf_{i}"
-                    )
-                                    feedback_text = st.text_area(
-                                        "Or write feedback message:",
-                                        key=f"seminar_feedback_text_{i}"
-                    )
-                                    send_feedback = st.form_submit_button("📤 Send Feedback")
-                    
-                                    if send_feedback:
-                                        if feedback_file or feedback_text:
-                                        # Save and send feedback
-                                            success = save_seminar_feedback(
-                                                submission['student_matric'],
-                                                admin_course,
-                                                feedback_file,
-                                                feedback_text
-                            )
-                                            if success:
-                                                st.success("✅ Feedback sent successfully!")
-                                            else:
-                                                st.error("❌ Failed to send feedback")
-                                        else:
-                                            st.error("❌ Please provide feedback (file or text)")
+                            st.write("**Current Feedback:**")
+                            current_feedback = get_seminar_feedback(submission['student_matric'], admin_course)
+                            if current_feedback:
+                                st.info(current_feedback)
                             else:
-                                st.info(f"No seminar submissions found for {admin_course}")
+                                st.write("No feedback yet")
+            
+                        with col3:
+                # Send feedback form
+                            with st.form(key=f"seminar_feedback_form_{i}"):
+                                feedback_file = st.file_uploader(
+                                    "Upload Feedback PDF", 
+                                    type=["pdf"], 
+                                    key=f"seminar_feedback_pdf_{i}"
+                    )
+                                feedback_text = st.text_area(
+                                    "Or write feedback message:",
+                                    key=f"seminar_feedback_text_{i}"
+                    )
+                                send_feedback = st.form_submit_button("📤 Send Feedback")
+                    
+                                if send_feedback:
+                                    if feedback_file or feedback_text:
+                                        # Save and send feedback
+                                        success = save_seminar_feedback(
+                                            submission['student_matric'],
+                                            admin_course,
+                                            feedback_file,
+                                            feedback_text
+                            )
+                                        if success:
+                                            st.success("✅ Feedback sent successfully!")
+                                        else:
+                                            st.error("❌ Failed to send feedback")
+                                    else:
+                                        st.error("❌ Please provide feedback (file or text)")
+                                else:
+                                    st.info(f"No seminar submissions found for {admin_course}")
         
 # 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
@@ -6001,6 +6000,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
