@@ -4298,7 +4298,76 @@ def export_announcements_to_csv(course_code):
         return df.to_csv(index=False)
     else:
         return "No announcements to export"
-      
+def get_classwork_status_file(course_code):
+    """Load classwork status from CSV file"""
+    import os
+    file_path = f"data/{course_code}_classwork.csv"
+    
+    try:
+        if os.path.exists(file_path):
+            return pd.read_csv(file_path)
+        else:
+            # Create empty dataframe with expected columns
+            empty_df = pd.DataFrame(columns=[
+                'student_id', 'student_name', 'assignment', 'status', 
+                'submission_date', 'grade', 'feedback'
+            ])
+            return empty_df
+    except Exception as e:
+        st.error(f"Error loading classwork file: {e}")
+        return pd.DataFrame()
+
+def get_classwork_status_file(course_code):
+    """
+    Get classwork status file/data for a specific course
+    Modify this based on your actual data storage method
+    """
+    try:
+        # Example implementation - adjust to your needs
+        file_pattern = f"*{course_code}*classwork*"
+        
+        # Look for matching files
+        import glob
+        files = glob.glob(f"data/{file_pattern}.csv")
+        
+        if files:
+            return files[0]  # Return first matching file
+        else:
+            # Return a default path or create file
+            default_path = f"data/{course_code}_classwork_status.csv"
+            
+            # Create file if it doesn't exist
+            import os
+            if not os.path.exists(default_path):
+                # Create directory if needed
+                os.makedirs("data", exist_ok=True)
+                # Create empty dataframe with expected columns
+                empty_df = pd.DataFrame(columns=[
+                    'timestamp', 'student_id', 'student_name', 
+                    'assignment', 'status', 'score'
+                ])
+                empty_df.to_csv(default_path, index=False)
+            
+            return default_path
+            
+    except Exception as e:
+        st.error(f"Error in get_classwork_status_file: {e}")
+        return f"data/{course_code}_classwork_status.csv"
+
+def initialize_classwork_data():
+    """Initialize classwork data structure if not exists"""
+    if 'classwork_status' not in st.session_state:
+        st.session_state.classwork_status = {}
+    
+    # Initialize for each course if needed
+    courses = get_courses()  # Your existing function
+    for course in courses:
+        if course not in st.session_state.classwork_status:
+            st.session_state.classwork_status[course] = pd.DataFrame()
+
+# Call this in your main function
+initialize_classwork_data()
+    
 # ===============================================================
 # 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
@@ -6598,6 +6667,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
