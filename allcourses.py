@@ -6451,62 +6451,62 @@ def admin_view(course_code, course_name):
 
             with tab3:
     # View and manage all announcements
-            st.write("**All Announcements**")
-            announcements = load_announcements_metadata(announcement_course, active_only=False)
+                st.write("**All Announcements**")
+                announcements = load_announcements_metadata(announcement_course, active_only=False)
     
-            if announcements:
-                for i, announcement in enumerate(announcements):
-                    with st.expander(f"{announcement['title']} - {'✅ Active' if announcement.get('is_active', True) else '❌ Inactive'}", expanded=False):
-                        col1, col2 = st.columns([3, 1])
+                if announcements:
+                    for i, announcement in enumerate(announcements):
+                        with st.expander(f"{announcement['title']} - {'✅ Active' if announcement.get('is_active', True) else '❌ Inactive'}", expanded=False):
+                            col1, col2 = st.columns([3, 1])
                 
-                        with col1:
-                            st.write(f"**Type:** {announcement.get('type', 'text')}")
-                            if announcement.get('type') == 'seminar_topics':
-                                st.write(f"**Description:** {announcement.get('description', 'No description')}")
-                                if announcement.get('file_path') and os.path.exists(announcement['file_path']):
-                                    with open(announcement['file_path'], "rb") as file:
-                                        st.download_button(
-                                            "📥 Download Topics PDF",
-                                            data=file,
-                                            file_name=os.path.basename(announcement['file_path']),
-                                            mime="application/pdf",
-                                            key=f"download_{i}"
+                            with col1:
+                                st.write(f"**Type:** {announcement.get('type', 'text')}")
+                                if announcement.get('type') == 'seminar_topics':
+                                    st.write(f"**Description:** {announcement.get('description', 'No description')}")
+                                    if announcement.get('file_path') and os.path.exists(announcement['file_path']):
+                                        with open(announcement['file_path'], "rb") as file:
+                                            st.download_button(
+                                                "📥 Download Topics PDF",
+                                                data=file,
+                                                file_name=os.path.basename(announcement['file_path']),
+                                                mime="application/pdf",
+                                                key=f"download_{i}"
                                 )
-                            else:
-                                st.write(f"**Content:** {announcement.get('content', '')}")
+                                else:
+                                    st.write(f"**Content:** {announcement.get('content', '')}")
                     
-                                st.write(f"**Expires:** {announcement.get('expiry_date', 'No expiry')}")
-                                st.write(f"**Created:** {announcement.get('timestamp', 'Unknown')}")
+                                    st.write(f"**Expires:** {announcement.get('expiry_date', 'No expiry')}")
+                                    st.write(f"**Created:** {announcement.get('timestamp', 'Unknown')}")
                 
-                        with col2:
+                            with col2:
                     # Toggle active status
-                            current_status = announcement.get('is_active', True)
-                            new_status = not current_status
-                            status_text = "Deactivate" if current_status else "Activate"
+                                current_status = announcement.get('is_active', True)
+                                new_status = not current_status
+                                status_text = "Deactivate" if current_status else "Activate"
                     
-                            if st.button(f"{'❌' if current_status else '✅'} {status_text}", key=f"toggle_{i}"):
-                                update_announcement_status(announcement['filename'], new_status)
-                                st.success(f"✅ Announcement {status_text.lower()}d!")
-                                st.rerun()
+                                if st.button(f"{'❌' if current_status else '✅'} {status_text}", key=f"toggle_{i}"):
+                                    update_announcement_status(announcement['filename'], new_status)
+                                    st.success(f"✅ Announcement {status_text.lower()}d!")
+                                    st.rerun()
                     
                     # Delete button
-                            if st.button("🗑️ Delete", key=f"delete_{i}"):
-                                if delete_announcement(announcement_course, announcement['filename']):
-                                    st.success("✅ Announcement deleted!")
-                                    st.rerun()
+                                if st.button("🗑️ Delete", key=f"delete_{i}"):
+                                    if delete_announcement(announcement_course, announcement['filename']):
+                                        st.success("✅ Announcement deleted!")
+                                        st.rerun()
     
-            else:
-                st.info("No announcements found for this course")
+                else:
+                    st.info("No announcements found for this course")
     
     # Export functionality
-            st.write("---")
-            if st.button("📊 Export Announcements to CSV"):
-                csv_data = export_announcements_to_csv(announcement_course)
-                st.download_button(
-                    "📥 Download CSV",
-                    data=csv_data,
-                    file_name=f"announcements_{announcement_course}.csv",
-                    mime="text/csv"
+                st.write("---")
+                if st.button("📊 Export Announcements to CSV"):
+                    csv_data = export_announcements_to_csv(announcement_course)
+                    st.download_button(
+                        "📥 Download CSV",
+                        data=csv_data,
+                        file_name=f"announcements_{announcement_course}.csv",
+                        mime="text/csv"
         )
             
         with tab12:
@@ -6667,6 +6667,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
