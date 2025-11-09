@@ -2189,7 +2189,141 @@ def is_recent(timestamp, days=1):
         return (datetime.now() - log_time).days <= days
     except:
         return False
+def create_seminar_topics_announcement(course_code, title, topics_file, description="", expiry_date=None, is_active=True):
+    """Create a seminar topics announcement"""
+    try:
+        # Create directories
+        os.makedirs(f"./announcements/{course_code}", exist_ok=True)
+        os.makedirs(f"./announcements/{course_code}/files", exist_ok=True)
+        
+        # Save the PDF file
+        file_extension = topics_file.name.split('.')[-1]
+        filename = f"seminar_topics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_extension}"
+        file_path = f"./announcements/{course_code}/files/{filename}"
+        
+        with open(file_path, "wb") as f:
+            f.write(topics_file.getbuffer())
+        
+        # Create announcement metadata
+        announcement_data = {
+            'filename': filename,
+            'title': title,
+            'type': 'seminar_topics',
+            'description': description,
+            'file_path': file_path,
+            'course_code': course_code,
+            'expiry_date': expiry_date.strftime("%Y-%m-%d") if expiry_date else None,
+            'is_active': is_active,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Save to announcements metadata
+        save_announcement_metadata(course_code, announcement_data)
+        return True
+        
+    except Exception as e:
+        st.error(f"Error creating seminar topics announcement: {e}")
+        return False
 
+def create_text_announcement(course_code, title, content, expiry_date=None, is_active=True):
+    """Create a text announcement"""
+    try:
+        announcement_data = {
+            'filename': f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            'title': title,
+            'type': 'text',
+            'content': content,
+            'course_code': course_code,
+            'expiry_date': expiry_date.strftime("%Y-%m-%d") if expiry_date else None,
+            'is_active': is_active,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        save_announcement_metadata(course_code, announcement_data)
+        return True
+        
+    except Exception as e:
+        st.error(f"Error creating text announcement: {e}")
+        return False
+
+def save_announcement_metadata(course_code, announcement_data):
+    """Save announcement metadata to CSV"""
+    try:
+        metadata_file = f"./announcements/{course_code}/metadata.csv"
+        file_exists = os.path.isfile(metadata_file)
+        
+        with open(metadata_file, "a", newline='') as file:
+            fieldnames = ['filename', 'title', 'type', 'content', 'description', 'file_path', 'course_code', 'expiry_date', 'is_active', 'timestamp']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(announcement_data)
+            
+    except Exception as e:
+        st.error(f"Error saving announcement metadata: {e}")
+
+def load_announcements_metadata(course_code, active_only=True):
+    """Load announcements metadata for a course"""
+    try:
+        metadata_file = f"./announcements/{course_code}/metadata.csv"
+        announcements = []
+        
+        if os.path.exists(metadata_file):
+            with open(metadata_file, "r") as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    # Convert string to boolean for is_active
+                    if 'is_active' in row:
+                        row['is_active'] = row['is_active'].lower() == 'true' if row['is_active'] else True
+                    
+                    if active_only and not row.get('is_active', True):
+                        continue
+                    
+                    announcements.append(row)
+        
+        # Sort by timestamp (newest first)
+        announcements.sort(key=lambda x: x['timestamp'], reverse=True)
+        return announcements
+        
+    except FileNotFoundError:
+        return []
+
+def delete_announcement(course_code, filename):
+    """Delete an announcement and its associated files"""
+    try:
+        metadata_file = f"./announcements/{course_code}/metadata.csv"
+        
+        if os.path.exists(metadata_file):
+            # Read all announcements and filter out the one to delete
+            announcements = []
+            with open(metadata_file, "r") as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    if row['filename'] != filename:
+                        announcements.append(row)
+                    else:
+                        # Delete associated file if it's a seminar topics announcement
+                        if row.get('type') == 'seminar_topics' and row.get('file_path'):
+                            file_path = row['file_path']
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+            
+            # Rewrite the metadata file
+            with open(metadata_file, "w", newline='') as file:
+                if announcements:
+                    fieldnames = announcements[0].keys()
+                    writer = csv.DictWriter(file, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(announcements)
+            
+            return True
+            
+        return False
+        
+    except Exception as e:
+        st.error(f"Error deleting announcement: {e}")
+        return False
 # ===============================================================
 # 🔄 UPDATE EXISTING FUNCTIONS TO INCLUDE LOGGING
 # ===============================================================
@@ -4164,7 +4298,7 @@ def export_announcements_to_csv(course_code):
         return df.to_csv(index=False)
     else:
         return "No announcements to export"
-        
+      
 # ===============================================================
 # 🎓 STUDENT VIEW - FIXED VERSION
 # ===============================================================
@@ -4393,28 +4527,84 @@ def student_view(course_code, course_name):
                             st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
 
 # Seminar submission
+            # Seminar submission (once per semester)
             st.subheader("📊 Seminar Submission")
             with st.form("seminar_upload_form"):
-                st.write(f"**Selected Week:** {selected_week}")
+                st.write("**Note:** Seminar submission is once per semester")
                 seminar_file = st.file_uploader("Upload Seminar File", type=["pdf", "ppt", "pptx", "doc", "docx"], key="seminar_upload")
+                seminar_topic = st.text_input("Enter your seminar topic:")
                 submit_seminar = st.form_submit_button("📤 Submit Seminar", use_container_width=True)
-    
+
                 if submit_seminar:
                     if not seminar_file:
                         st.error("❌ Please select a file to upload.")
+                    elif not seminar_topic:
+                        st.error("❌ Please enter your seminar topic.")
                     else:
-            # FIX: Remove the 4th argument
-                        has_submission, existing_data = check_existing_submission(course_code, selected_week, student_matric)
+                        has_submission, existing_data = check_existing_seminar_submission(course_code, student_matric)
                         if has_submission:
-                            st.error("❌ Submission already exists! You cannot submit twice.")
+                            st.error("❌ Seminar already submitted! You can only submit once per semester.")
                         else:
-                            file_path = save_file(course_code, student_name, selected_week, seminar_file, "seminar")
+                            file_path = save_seminar_file(course_code, student_name, student_matric, seminar_file)
                             if file_path:
-                                log_submission(course_code, student_matric, student_name, selected_week, seminar_file.name, "seminar")
+                                log_seminar_submission(course_code, student_matric, student_name, seminar_topic, seminar_file.name)
                                 st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
+                                st.success(f"📝 Topic: {seminar_topic}")
 
         with tab6:
-            display_pdf_announcements_student(course_code)
+            # Student Dashboard - Announcements
+            st.subheader("📢 Announcements")
+
+# Deactivate expired announcements first
+            deactivated_count = deactivate_expired_announcements(course_code)
+            if deactivated_count > 0:
+                st.info(f"📢 {deactivated_count} expired announcement(s) have been deactivated.")
+
+# Load active announcements
+            announcements = load_announcements_metadata(course_code, active_only=True)
+
+            if announcements:
+                for announcement in announcements:
+        # Check if announcement is still valid
+                expiry_date = announcement.get('expiry_date')
+                if expiry_date:
+                    expiry = datetime.strptime(expiry_date, "%Y-%m-%d").date()
+                    if expiry < datetime.now().date():
+                        continue  # Skip expired announcements
+        
+                with st.expander(f"📢 {announcement['title']}", expanded=False):
+                    if announcement.get('type') == 'seminar_topics':
+                # Seminar topics announcement
+                        st.write("**Seminar Topics**")
+                        if announcement.get('description'):
+                            st.write(announcement['description'])
+                
+                        if announcement.get('file_path') and os.path.exists(announcement['file_path']):
+                            with open(announcement['file_path'], "rb") as file:
+                                st.download_button(
+                                    "📥 Download Seminar Topics PDF",
+                                    data=file,
+                                    file_name=f"Seminar_Topics_{course_code}.pdf",
+                                    mime="application/pdf",
+                                    use_container_width=True
+                        )
+                        else:
+                            st.warning("⚠️ Seminar topics file not available.")
+                
+                    else:
+                # Regular text announcement
+                        st.write(announcement.get('content', ''))
+            
+            # Show expiry info
+                    if announcement.get('expiry_date'):
+                        expiry = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
+                        days_remaining = (expiry - datetime.now().date()).days
+                        if days_remaining >= 0:
+                            st.caption(f"Expires in {days_remaining} day(s) - {announcement['expiry_date']}")
+                        else:
+                            st.caption(f"Expired on {announcement['expiry_date']}")
+            else:
+                st.info("No active announcements at the moment.")
             
         with tab7:
             # Student Dashboard - Seminar Feedback
@@ -5122,7 +5312,7 @@ def admin_view(course_code, course_name):
             "📝 Classwork Submissions",
             "📝 Grading System",
             "📂 Student Submissions",
-            "📢 PDF Announcements",
+            "📢 Announcements",
             "📊Seminar Submissions Management"
         ])
         
@@ -6135,7 +6325,120 @@ def admin_view(course_code, course_name):
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
         with tab11:
-            display_pdf_announcements_admin(course_code)
+            # Admin Dashboard - Announcements Management
+            st.subheader("📢 Announcements Management")
+
+# Select course for announcements
+            announcement_course = st.selectbox("Select Course", get_courses(), key="announcement_course")
+
+# Tab interface for different types of announcements
+            tab1, tab2, tab3 = st.tabs(["📝 Text Announcements", "📊 Seminar Topics", "📋 All Announcements"])
+
+            with tab1:
+    # Existing text announcements form
+                st.write("**Create Text Announcement**")
+                with st.form("text_announcement_form"):
+                    title = st.text_input("Title")
+                    content = st.text_area("Content")
+                    expiry_date = st.date_input("Expiry Date", min_value=datetime.now().date())
+                    is_active = st.checkbox("Active", value=True)
+                    submit_text = st.form_submit_button("📤 Create Text Announcement")
+        
+                    if submit_text:
+                        if title and content:
+                            success = create_text_announcement(announcement_course, title, content, expiry_date, is_active)
+                            if success:
+                                st.success("✅ Text announcement created successfully!")
+                        else:
+                            st.error("❌ Please fill in both title and content")
+
+            with tab2:
+    # Seminar topics announcement
+                st.write("**Upload Seminar Topics PDF**")
+                with st.form("seminar_topics_form"):
+                    topics_title = st.text_input("Announcement Title", value="Seminar Topics Available", 
+                                   placeholder="e.g., Seminar Topics for Semester 1")
+                    topics_file = st.file_uploader("Upload Seminar Topics PDF", type=["pdf"], key="seminar_topics_upload")
+                    topics_description = st.text_area("Description", 
+                                        placeholder="Additional information about the seminar topics...")
+                    topics_expiry = st.date_input("Expiry Date", min_value=datetime.now().date(), key="topics_expiry")
+                    topics_active = st.checkbox("Active", value=True, key="topics_active")
+                    upload_topics = st.form_submit_button("📤 Create Seminar Topics Announcement")
+        
+                    if upload_topics:
+                        if not topics_file:
+                            st.error("❌ Please select a PDF file to upload.")
+                        else:
+                            success = create_seminar_topics_announcement(
+                                announcement_course, 
+                                topics_title, 
+                                topics_file, 
+                                topics_description,
+                                topics_expiry,
+                                topics_active
+                )
+                            if success:
+                                st.success("✅ Seminar topics announcement created successfully!")
+
+            with tab3:
+    # View and manage all announcements
+            st.write("**All Announcements**")
+            announcements = load_announcements_metadata(announcement_course, active_only=False)
+    
+            if announcements:
+                for i, announcement in enumerate(announcements):
+                    with st.expander(f"{announcement['title']} - {'✅ Active' if announcement.get('is_active', True) else '❌ Inactive'}", expanded=False):
+                        col1, col2 = st.columns([3, 1])
+                
+                        with col1:
+                            st.write(f"**Type:** {announcement.get('type', 'text')}")
+                            if announcement.get('type') == 'seminar_topics':
+                                st.write(f"**Description:** {announcement.get('description', 'No description')}")
+                                if announcement.get('file_path') and os.path.exists(announcement['file_path']):
+                                    with open(announcement['file_path'], "rb") as file:
+                                        st.download_button(
+                                            "📥 Download Topics PDF",
+                                            data=file,
+                                            file_name=os.path.basename(announcement['file_path']),
+                                            mime="application/pdf",
+                                            key=f"download_{i}"
+                                )
+                            else:
+                                st.write(f"**Content:** {announcement.get('content', '')}")
+                    
+                                st.write(f"**Expires:** {announcement.get('expiry_date', 'No expiry')}")
+                                st.write(f"**Created:** {announcement.get('timestamp', 'Unknown')}")
+                
+                        with col2:
+                    # Toggle active status
+                            current_status = announcement.get('is_active', True)
+                            new_status = not current_status
+                            status_text = "Deactivate" if current_status else "Activate"
+                    
+                            if st.button(f"{'❌' if current_status else '✅'} {status_text}", key=f"toggle_{i}"):
+                                update_announcement_status(announcement['filename'], new_status)
+                                st.success(f"✅ Announcement {status_text.lower()}d!")
+                                st.rerun()
+                    
+                    # Delete button
+                            if st.button("🗑️ Delete", key=f"delete_{i}"):
+                                if delete_announcement(announcement_course, announcement['filename']):
+                                    st.success("✅ Announcement deleted!")
+                                    st.rerun()
+    
+            else:
+                st.info("No announcements found for this course")
+    
+    # Export functionality
+            st.write("---")
+            if st.button("📊 Export Announcements to CSV"):
+                csv_data = export_announcements_to_csv(announcement_course)
+                st.download_button(
+                    "📥 Download CSV",
+                    data=csv_data,
+                    file_name=f"announcements_{announcement_course}.csv",
+                    mime="text/csv"
+        )
             
         with tab12:
             # ===============================================================
@@ -6295,6 +6598,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
