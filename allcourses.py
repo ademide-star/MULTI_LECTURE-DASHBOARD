@@ -4365,8 +4365,6 @@ def initialize_classwork_data():
         if course not in st.session_state.classwork_status:
             st.session_state.classwork_status[course] = pd.DataFrame()
 
-# Call this in your main function
-initialize_classwork_data()
     
 # ===============================================================
 # 🎓 STUDENT VIEW - FIXED VERSION
@@ -6667,6 +6665,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
