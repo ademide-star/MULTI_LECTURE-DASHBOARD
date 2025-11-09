@@ -2669,7 +2669,112 @@ def display_import_results(results):
             st.write(f"• {duplicate}")
     
     if results['success']:
-        st.rerun()            
+        st.rerun()  
+
+def check_existing_seminar_submission(course_code, student_matric):
+    """Check if student already submitted seminar for this course"""
+    try:
+        with open("seminar_submissions.csv", "r") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                if row['course_code'] == course_code and row['student_matric'] == student_matric:
+                    return True, row
+        return False, None
+    except FileNotFoundError:
+        return False, None
+
+def save_seminar_file(course_code, student_name, student_matric, file):
+    """Save seminar file with unique naming"""
+    try:
+        # Create directory structure: ./seminar/{course_code}/
+        file_extension = file.name.split('.')[-1]
+        file_path = f"./seminar/{course_code}/{student_matric}_{student_name}.{file_extension}"
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        with open(file_path, "wb") as f:
+            f.write(file.getbuffer())
+        return file_path
+    except Exception as e:
+        st.error(f"Error saving file: {e}")
+        return None
+
+def log_seminar_submission(course_code, student_matric, student_name, topic, file_name):
+    """Log seminar submission to CSV"""
+    try:
+        with open("seminar_submissions.csv", "a", newline='') as file:
+            fieldnames = ['course_code', 'student_matric', 'student_name', 'topic', 'file_name', 'file_path', 'timestamp']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            if file.tell() == 0:
+                writer.writeheader()
+            
+            file_path = f"./seminar/{course_code}/{student_matric}_{student_name}.{file_name.split('.')[-1]}"
+            writer.writerow({
+                'course_code': course_code,
+                'student_matric': student_matric,
+                'student_name': student_name,
+                'topic': topic,
+                'file_name': file_name,
+                'file_path': file_path,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+    except Exception as e:
+        st.error(f"Error logging submission: {e}")
+
+def get_seminar_submissions(course_code):
+    """Get all seminar submissions for a specific course"""
+    try:
+        submissions = []
+        with open("seminar_submissions.csv", "r") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                if row['course_code'] == course_code:
+                    submissions.append(row)
+        return submissions
+    except FileNotFoundError:
+        return []
+
+def get_seminar_feedback(student_matric, course_code):
+    """Get existing seminar feedback for a student"""
+    try:
+        with open("seminar_feedback.csv", "r") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                if row['student_matric'] == student_matric and row['course_code'] == course_code:
+                    return row.get('feedback_text', '') or "Feedback file provided"
+        return None
+    except FileNotFoundError:
+        return None
+
+def save_seminar_feedback(student_matric, course_code, feedback_file=None, feedback_text=""):
+    """Save seminar feedback for a student"""
+    try:
+        feedback_data = {
+            'student_matric': student_matric,
+            'course_code': course_code,
+            'feedback_text': feedback_text,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Save feedback file if provided
+        if feedback_file:
+            file_path = f"./seminar_feedback/{course_code}/{student_matric}_feedback.pdf"
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, "wb") as f:
+                f.write(feedback_file.getbuffer())
+            feedback_data['feedback_file'] = file_path
+        
+        # Log feedback
+        with open("seminar_feedback.csv", "a", newline='') as file:
+            fieldnames = ['student_matric', 'course_code', 'feedback_text', 'feedback_file', 'timestamp']
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            if file.tell() == 0:
+                writer.writeheader()
+            writer.writerow(feedback_data)
+        
+        return True
+    except Exception as e:
+        st.error(f"Error saving feedback: {e}")
+        return False
 # ===============================================================
 # 📊 SCORES MANAGEMENT
 # ===============================================================
@@ -2752,10 +2857,10 @@ def calculate_final_grade(student_scores):
         
         # Calculate final total with weights
         final_total = round(
-            assignment_avg * 0.08 +      # 8%
-            test_avg * 0.08 +            # 8%
+            assignment_avg * 0.10 +      # 8%
+            test_avg * 0.10 +            # 8%
             practical_avg * 0.05 +       # 5%
-            classwork_avg * 0.09 +       # 9%
+            classwork_avg * 0.05 +       # 9%
             exam_score * 0.70,           # 70%
             1
         )
@@ -3528,10 +3633,10 @@ def update_classwork_score(course_code, student_name, student_matric, week, scor
                 practical_score = scores_df.loc[mask, "Practical"].iloc[0] if "Practical" in scores_df.columns else 0
                 
                 weekly_total = round(
-                    assignment_score * 0.08 + 
-                    test_score * 0.08 + 
+                    assignment_score * 0.10 + 
+                    test_score * 0.10 + 
                     practical_score * 0.05 + 
-                    score * 0.09, 
+                    score * 0.05, 
                     1
                 )
                 scores_df.loc[mask, "Total"] = weekly_total
@@ -3908,12 +4013,13 @@ def student_view(course_code, course_name):
         )
         
         # Create tabs for different sections
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
              "📝 About Course",  # NEW TAB ADDED
             "📖 Lecture & Classwork", 
             "🎥 Video Lectures", 
             "🕒 Attendance",
             "📤 Submissions",
+            "   Seminar Feedback", 
             "📊 My Progress"
         ])
 
@@ -4089,6 +4195,37 @@ def student_view(course_code, course_name):
                                 st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
 
         with tab6:
+            # Student Dashboard - Seminar Feedback
+            st.subheader("📥 Seminar Feedback")
+
+# Check for seminar feedback
+            feedback = get_seminar_feedback(student_matric, course_code)
+            if feedback:
+                st.success("You have feedback for your seminar!")
+    
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write("**Instructor Feedback:**")
+                    if isinstance(feedback, str) and feedback != "Feedback file provided":
+                        st.info(feedback)
+                    else:
+                        st.info("Check the downloaded feedback file for detailed comments")
+    
+                with col2:
+        # Download feedback file if available
+                    feedback_file_path = get_seminar_feedback_file_path(student_matric, course_code)
+                    if feedback_file_path and os.path.exists(feedback_file_path):
+                        with open(feedback_file_path, "rb") as file:
+                            st.download_button(
+                                "📥 Download Feedback PDF",
+                                data=file,
+                                file_name=f"Seminar_Feedback.pdf",
+                                mime="application/pdf"
+                )
+            else:
+                st.info("No feedback available for your seminar yet")
+        
+        with tab7:
             # ===============================================================
             # 📊 SCORES VIEWING SECTION - FIXED VERSION
             # ===============================================================
@@ -4165,7 +4302,7 @@ def student_view(course_code, course_name):
                     
                     with col2:
                         st.metric("📚 Exam Score", f"{exam_score:.1f}%")
-                        st.metric("📈 Continuous Assessment (30%)", f"{(assignment_avg*0.05 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.10):.1f}%")
+                        st.metric("📈 Continuous Assessment (30%)", f"{(assignment_avg*0.10 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.05):.1f}%")
                         st.metric("🎯 Exam Contribution (70%)", f"{(exam_score * 0.70):.1f}%")
                     
                     # Final result
@@ -4174,15 +4311,15 @@ def student_view(course_code, course_name):
                     # Progress bars for visualization
                     st.subheader("📊 Grade Breakdown")
                     
-                    ca_total = assignment_avg*0.05 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.10
+                    ca_total = assignment_avg*0.10 + test_avg*0.10 + practical_avg*0.05 + classwork_avg*0.05
                     exam_contribution = exam_score * 0.70
                     
                     st.write("**Continuous Assessment (30%):**")
                     st.progress(min(ca_total / 30, 1.0))  # Ensure progress doesn't exceed 1.0
-                    st.write(f"Assignment: {assignment_avg:.1f}% × 5% = {assignment_avg*0.05:.1f}%")
+                    st.write(f"Assignment: {assignment_avg:.1f}% × 10% = {assignment_avg*0.10:.1f}%")
                     st.write(f"Test: {test_avg:.1f}% × 10% = {test_avg*0.10:.1f}%") 
                     st.write(f"Practical: {practical_avg:.1f}% × 5% = {practical_avg*0.05:.1f}%")
-                    st.write(f"Classwork: {classwork_avg:.1f}% × 10% = {classwork_avg*0.10:.1f}%")
+                    st.write(f"Classwork: {classwork_avg:.1f}% × 5% = {classwork_avg*0.05:.1f}%")
                     
                     st.write("**Exam (70%):**")
                     st.progress(min(exam_contribution / 70, 1.0))  # Ensure progress doesn't exceed 1.0
@@ -4683,7 +4820,7 @@ def admin_view(course_code, course_name):
         ensure_directories()
         
         # Create tabs for better organization - INCLUDING COURSE MANAGER
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
             "📚 Course Manager",  # NEW TAB ADDED
             "📖 Lecture Management", 
             "🎥 Video Management", 
@@ -4693,7 +4830,8 @@ def admin_view(course_code, course_name):
             "📝 MCQ Management",  # NEW TAB FOR MCQ
             "📝 Classwork Submissions",
             "📝 Grading System",
-            "📂 Student Submissions"
+            "📂 Student Submissions",
+            "📊Seminar Submissions Management"
         ])
         
         with tab1:
@@ -4701,9 +4839,6 @@ def admin_view(course_code, course_name):
             # 📚 COURSE MANAGER (INTEGRATED) - FIXED: PASS PARAMETERS
             # ===============================================================
             show_course_manager(course_code, course_name)  # ADD PARAMETERS HERE
-        
-           
-
         
         with tab2:
     # ===============================================================
@@ -5413,10 +5548,10 @@ def admin_view(course_code, course_name):
             st.info("""
             **Grading Weights (After 15 Weeks + Exam):**
             - Continuous Assessment (15 weeks average): 30%
-              - Assignment: 8% 
-              - Test: 8%
+              - Assignment and Seminar: 10% 
+              - Test: 10%
               - Practical: 5%
-              - Classwork: 9%
+              - Classwork: 5%
             - Exam (After 15 weeks): 70%
             """)
             
@@ -5707,8 +5842,76 @@ def admin_view(course_code, course_name):
         st.error(f"An error occurred in the admin dashboard: {str(e)}")
         st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
-       
+        with tab11:
+            # ===============================================================
+            # 📝SEMINAR SUBMISSION MANAGEMENT
+            # ===============================================================
+            # Admin Dashboard - Seminar Submissions Management
+            st.subheader("📊 Seminar Submissions Management")
 
+# Select course to view seminar submissions
+            admin_course = st.selectbox("Select Course", get_courses(), key="seminar_course")
+
+# Get all seminar submissions for selected course
+            submissions = get_seminar_submissions(admin_course)
+
+            if submissions:
+                st.write(f"**Found {len(submissions)} seminar submissions**")
+    
+                    for i, submission in enumerate(submissions):
+                        with st.expander(f"📝 {submission['student_name']} - {submission['topic']}", expanded=False):
+                            col1, col2, col3 = st.columns([2, 1, 1])
+            
+                            with col1:
+                                st.write(f"**Matric:** {submission['student_matric']}")
+                                st.write(f"**Topic:** {submission['topic']}")
+                                st.write(f"**File:** {submission['file_name']}")
+                                st.write(f"**Submitted:** {submission['timestamp']}")
+                
+                # Download button for the submission
+                                if st.button("📥 Download Submission", key=f"download_seminar_{i}"):
+                                    download_file(submission['file_path'])
+            
+                            with col2:
+                # View current feedback
+                                st.write("**Current Feedback:**")
+                                current_feedback = get_seminar_feedback(submission['student_matric'], admin_course)
+                                if current_feedback:
+                                    st.info(current_feedback)
+                                else:
+                                    st.write("No feedback yet")
+            
+                            with col3:
+                # Send feedback form
+                                with st.form(key=f"seminar_feedback_form_{i}"):
+                                    feedback_file = st.file_uploader(
+                                        "Upload Feedback PDF", 
+                                        type=["pdf"], 
+                                        key=f"seminar_feedback_pdf_{i}"
+                    )
+                                    feedback_text = st.text_area(
+                                        "Or write feedback message:",
+                                        key=f"seminar_feedback_text_{i}"
+                    )
+                                    send_feedback = st.form_submit_button("📤 Send Feedback")
+                    
+                                    if send_feedback:
+                                        if feedback_file or feedback_text:
+                                        # Save and send feedback
+                                            success = save_seminar_feedback(
+                                                submission['student_matric'],
+                                                admin_course,
+                                                feedback_file,
+                                                feedback_text
+                            )
+                                            if success:
+                                                st.success("✅ Feedback sent successfully!")
+                                            else:
+                                                st.error("❌ Failed to send feedback")
+                                        else:
+                                            st.error("❌ Please provide feedback (file or text)")
+                            else:
+                                st.info(f"No seminar submissions found for {admin_course}")
         
 # 🚀 UPDATE MAIN APPLICATION
 # ===============================================================
@@ -5798,6 +6001,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
