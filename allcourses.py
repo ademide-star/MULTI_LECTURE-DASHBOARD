@@ -4635,45 +4635,45 @@ def student_view(course_code, course_name):
             if announcements:
                 for announcement in announcements:
         # Check if announcement is still valid
-                expiry_date = announcement.get('expiry_date')
-                if expiry_date:
-                    expiry = datetime.strptime(expiry_date, "%Y-%m-%d").date()
-                    if expiry < datetime.now().date():
-                        continue  # Skip expired announcements
+                    expiry_date = announcement.get('expiry_date')
+                    if expiry_date:
+                        expiry = datetime.strptime(expiry_date, "%Y-%m-%d").date()
+                        if expiry < datetime.now().date():
+                            continue  # Skip expired announcements
         
-                with st.expander(f"📢 {announcement['title']}", expanded=False):
-                    if announcement.get('type') == 'seminar_topics':
+                    with st.expander(f"📢 {announcement['title']}", expanded=False):
+                        if announcement.get('type') == 'seminar_topics':
                 # Seminar topics announcement
-                        st.write("**Seminar Topics**")
-                        if announcement.get('description'):
-                            st.write(announcement['description'])
+                            st.write("**Seminar Topics**")
+                            if announcement.get('description'):
+                                st.write(announcement['description'])
                 
-                        if announcement.get('file_path') and os.path.exists(announcement['file_path']):
-                            with open(announcement['file_path'], "rb") as file:
-                                st.download_button(
-                                    "📥 Download Seminar Topics PDF",
-                                    data=file,
-                                    file_name=f"Seminar_Topics_{course_code}.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True
+                            if announcement.get('file_path') and os.path.exists(announcement['file_path']):
+                                with open(announcement['file_path'], "rb") as file:
+                                    st.download_button(
+                                        "📥 Download Seminar Topics PDF",
+                                        data=file,
+                                        file_name=f"Seminar_Topics_{course_code}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True
                         )
-                        else:
-                            st.warning("⚠️ Seminar topics file not available.")
+                            else:
+                                st.warning("⚠️ Seminar topics file not available.")
                 
-                    else:
+                        else:
                 # Regular text announcement
-                        st.write(announcement.get('content', ''))
+                            st.write(announcement.get('content', ''))
             
             # Show expiry info
-                    if announcement.get('expiry_date'):
-                        expiry = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
-                        days_remaining = (expiry - datetime.now().date()).days
-                        if days_remaining >= 0:
-                            st.caption(f"Expires in {days_remaining} day(s) - {announcement['expiry_date']}")
-                        else:
-                            st.caption(f"Expired on {announcement['expiry_date']}")
-            else:
-                st.info("No active announcements at the moment.")
+                        if announcement.get('expiry_date'):
+                            expiry = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
+                            days_remaining = (expiry - datetime.now().date()).days
+                            if days_remaining >= 0:
+                                st.caption(f"Expires in {days_remaining} day(s) - {announcement['expiry_date']}")
+                            else:
+                                st.caption(f"Expired on {announcement['expiry_date']}")
+                else:
+                    st.info("No active announcements at the moment.")
             
         with tab7:
             # Student Dashboard - Seminar Feedback
@@ -6667,6 +6667,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
