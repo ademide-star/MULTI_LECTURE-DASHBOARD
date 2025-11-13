@@ -6346,10 +6346,10 @@ def admin_view(course_code, course_name):
                         def calculate_row_total(row):
                             if row['Week'] != 'Exam':
                                 return round(
-                                    row['Assignment'] * 0.08 + 
-                                    row['Test'] * 0.08 + 
+                                    row['Assignment'] * 0.05 + 
+                                    row['Test'] * 0.10 + 
                                     row['Practical'] * 0.05 + 
-                                    row['Classwork'] * 0.09, 
+                                    row['Classwork'] * 0.05, 
                                     1
                                 )
                             return 0
@@ -6611,7 +6611,9 @@ def admin_view(course_code, course_name):
                                         st.error("❌ Please provide feedback (file or text)")
                                 else:
                                     st.info(f"No seminar submissions found for {admin_course}")
-        
+    except Exception as e:
+        st.error(f"An error occurred in admin view: {str(e)}")                               
+    # ===============================================================   
     # 🚀 UPDATE MAIN APPLICATION
     # ===============================================================
 
@@ -6700,6 +6702,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
