@@ -6390,10 +6390,12 @@ def admin_view(course_code, course_name):
                 st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
         with tab11:
-            # Admin Dashboard - Announcements Management
-            st.subheader("📢 Announcements Management")
-
-# Select course for announcements
+             # ===============================================================
+                # 📢Announcements Management
+            # ===============================================================
+  # Admin Dashboard - Announcements Management
+            st.subheader("📢Announcements Management")
+            # Select course for announcements
             announcement_course = st.selectbox("Select Course", get_courses(), key="announcement_course")
 
 # Tab interface for different types of announcements
@@ -6663,6 +6665,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
