@@ -6386,9 +6386,7 @@ def admin_view(course_code, course_name):
                                 st.markdown("---")
                                 st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-            except Exception as e:
-                st.error(f"An error occurred in the admin dashboard: {str(e)}")
-                st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
+           
 
         with tab11:
              # ===============================================================
@@ -6555,6 +6553,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
