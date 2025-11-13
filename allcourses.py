@@ -6663,54 +6663,43 @@ def main():
 
     
     # Add CSS for course cards
-st.markdown("""
-    <style>
-    .course-card {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 5px;
-        border-left: 4px solid #4CAF50;
-        margin: 5px 0;
-        }
-    </style>
-""", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+        .course-card {
+            background-color: #f0f2f6;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+            margin: 5px 0;
+            }
+        </style>
+    """, unsafe_allow_html=True)
     
-# Footer
-st.markdown("""
-    <style>
-    .custom-footer {
-        position: relative;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: #f0f2f6;
-        color: #333;
-        text-align: center;
-        padding: 8px;
-        font-size: 15px;
-        font-weight: 500;
-        border-top: 1px solid #ccc;
-        margin-top: 2rem;
-    }
-    </style>
-    <div class="custom-footer">
-        Developed by <b>Adebimpe-John Omolola</b> | © 2025 | Advanced LMS with System Monitoring
-    </div>
-""", unsafe_allow_html=True)
+    # Footer
+    st.markdown("""
+        <style>
+        .custom-footer {
+            position: relative;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #f0f2f6;
+            color: #333;
+            text-align: center;
+            padding: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            border-top: 1px solid #ccc;
+            margin-top: 2rem;
+        }
+        </style>
+        <div class="custom-footer">
+            Developed by <b>Adebimpe-John Omolola</b> | © 2025 | Advanced LMS with System Monitoring
+        </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
 
 
 
