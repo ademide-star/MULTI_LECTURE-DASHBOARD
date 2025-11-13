@@ -6393,7 +6393,7 @@ def admin_view(course_code, course_name):
                 # 📢Announcements Management
             # ===============================================================
             # Admin Dashboard - Announcements Management
-             display_pdf_announcements_admin (course_code, course_name)
+             display_pdf_announcements_admin (course_code)
             
         with tab12:
             # ===============================================================
@@ -6553,6 +6553,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
