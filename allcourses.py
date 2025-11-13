@@ -6465,8 +6465,8 @@ def admin_view(course_code, course_name):
                                 else:
                                     st.info(f"No seminar submissions found for {admin_course}")
         
-# 🚀 UPDATE MAIN APPLICATION
-# ===============================================================
+    # 🚀 UPDATE MAIN APPLICATION
+    # ===============================================================
 
 def main():
     """Main application with System Admin role"""
@@ -6553,6 +6553,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
