@@ -5379,7 +5379,7 @@ def admin_view(course_code, course_name):
             "📝 Classwork Submissions",
             "📝 Grading System",
             "📂 Student Submissions",
-            "📢 Announcements",
+            "📢 Announcements Management",
             "📊Seminar Submissions Management"
         ])
         
@@ -6382,14 +6382,12 @@ def admin_view(course_code, course_name):
                                     )
                             except Exception:
                                 st.warning("⚠️ Cannot open file for download.")
-                        st.markdown("---")
-
-        st.markdown("---")
-        st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+                                st.markdown("---")
+                                st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-    except Exception as e:
-        st.error(f"An error occurred in the admin dashboard: {str(e)}")
-        st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
+            except Exception as e:
+                st.error(f"An error occurred in the admin dashboard: {str(e)}")
+                st.info("Please refresh the page and try again. If the problem persists, contact your administrator.")
 
         with tab11:
             # Admin Dashboard - Announcements Management
@@ -6473,8 +6471,8 @@ def admin_view(course_code, course_name):
                                 else:
                                     st.write(f"**Content:** {announcement.get('content', '')}")
                     
-                                    st.write(f"**Expires:** {announcement.get('expiry_date', 'No expiry')}")
-                                    st.write(f"**Created:** {announcement.get('timestamp', 'Unknown')}")
+                                st.write(f"**Expires:** {announcement.get('expiry_date', 'No expiry')}")
+                                st.write(f"**Created:** {announcement.get('timestamp', 'Unknown')}")
                 
                             with col2:
                     # Toggle active status
@@ -6665,6 +6663,7 @@ st.markdown("""
 
 if __name__ == "__main__":
     main()
+
 
 
 
