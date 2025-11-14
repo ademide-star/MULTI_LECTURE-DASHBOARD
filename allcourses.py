@@ -6550,7 +6550,7 @@ def admin_view(course_code, course_name):
             st.subheader("📊 Seminar Submissions Management")
 
 # Select course to view seminar submissions
-            admin_course = st.selectbox("Select Course", get_courses(), key="seminar_course")
+            admin_course = st.selectbox("Select Course", get_courses_file(), key="seminar_course")
 
 # Get all seminar submissions for selected course
             submissions = get_seminar_submissions(admin_course)
@@ -6702,6 +6702,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
