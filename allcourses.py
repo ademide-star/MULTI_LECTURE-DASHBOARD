@@ -4893,24 +4893,51 @@ def student_view(course_code, course_name):
             
 # Assignment submission
             st.subheader("📝 Assignment Submission")
+
             with st.form("assignment_upload_form"):
                 st.write(f"**Selected Week:** {selected_week}")
-                assignment_file = st.file_uploader("Upload Assignment File", type=["pdf", "doc", "docx", "txt", "zip"], key="assignment_upload")
+
+                assignment_file = st.file_uploader(
+                    "Upload Assignment File",
+                    type=["pdf", "doc", "docx", "txt", "zip"],
+                    key="assignment_upload"
+    )
+
                 submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
-    
+
                 if submit_assignment:
                     if not assignment_file:
                         st.error("❌ Please select a file to upload.")
                     else:
-            # FIX: Remove the 4th argument
-                        has_submission, existing_data = check_existing_submission(course_code, selected_week, student_matric)
-                        if has_submission:
-                            st.error("❌ Submission already exists! You cannot submit twice.")
-                        else:
-                            file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
-                            if file_path:
-                                log_submission(course_code, student_matric, student_name, selected_week, assignment_file.name, "assignment")
-                                st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+            # Check if submission already exists
+                        has_submission, existing_data = check_existing_submission(
+                            course_code,
+                            selected_week,
+                            student_matric
+            )
+
+                    if has_submission:
+                        st.error("❌ Submission already exists! You cannot submit twice.")
+                    else:
+                        file_path = save_file(
+                            course_code,
+                            student_name,
+                            selected_week,
+                            assignment_file,
+                            "assignment"
+                )
+
+                        if file_path:
+                            log_submission(
+                                course_code,
+                                student_matric,
+                                student_name,
+                                selected_week,
+                                assignment_file.name,
+                                "assignment"
+                    )
+                            st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
+
 
 # Drawing submission
             st.subheader("🎨 Drawing Submission")
@@ -5535,6 +5562,25 @@ def calculate_info_completeness(course_info):
     filled_fields = [field for field in required_fields if course_info.get(field)]
     return int((len(filled_fields) / len(required_fields)) * 100)
 # Remove the duplicate function definition at the end of the file
+import sqlite3
+import pandas as pd
+
+def get_all_submissions(course_code):
+    conn = sqlite3.connect("submissions.db")
+    query = """
+        SELECT 
+            student_matric AS Matric,
+            student_name AS Name,
+            week AS Week,
+            file_name AS FileName,
+            timestamp AS SubmittedAt
+        FROM submissions
+        WHERE course_code = ?
+        ORDER BY week, student_matric
+    """
+    df = pd.read_sql_query(query, conn, params=(course_code,))
+    conn.close()
+    return df
                     
 
 def admin_view(course_code, course_name):
@@ -6605,7 +6651,26 @@ def admin_view(course_code, course_name):
                                 st.markdown("---")
                                 st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-           
+            st.subheader("📥 Download Submitted Assignments List")
+            df = get_all_submissions(course_code)
+
+            if df.empty:
+                st.info("No submissions found yet for this course.")
+            else:
+                st.dataframe(df)
+
+    # Convert to CSV
+                csv = df.to_csv(index=False).encode('utf-8')
+
+    # Download button
+                st.download_button(
+                    label="⬇️ Download CSV",
+                    data=csv,
+                    file_name=f"{course_code}_submissions.csv",
+                    mime="text/csv",
+                    use_container_width=True
+    )
+
 
         with tab11:
             # ===============================================================
@@ -6773,6 +6838,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
