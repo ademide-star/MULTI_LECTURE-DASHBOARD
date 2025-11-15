@@ -1047,6 +1047,143 @@ def get_submission_status(course_code, week, student_id):
     has_submission, _ = check_existing_submission(course_code, week, student_id)
     return "Submitted" if has_submission else "Not Submitted"
 
+# =============================================================================
+# NEW FUNCTIONS FOR ASSIGNMENT DOWNLOAD AND STUDENT LISTS
+# =============================================================================
+
+def get_all_submissions_data(course_code, week=None):
+    """
+    Get all submissions for a course as a DataFrame
+    Returns submission data with student info and file details
+    """
+    try:
+        submissions_data = []
+        course_dir = os.path.join("data", "courses", course_code, "submissions")
+        
+        if not os.path.exists(course_dir):
+            return pd.DataFrame()
+        
+        # Get all weeks or specific week
+        weeks = [week] if week else os.listdir(course_dir)
+        
+        for week_folder in weeks:
+            week_path = os.path.join(course_dir, week_folder)
+            if not os.path.isdir(week_path):
+                continue
+                
+            for file in os.listdir(week_path):
+                if file.endswith('_submission.json'):
+                    file_path = os.path.join(week_path, file)
+                    try:
+                        with open(file_path, 'r') as f:
+                            data = json.load(f)
+                            
+                        # Extract student matric from filename
+                        matric = file.replace('_submission.json', '')
+                        
+                        submissions_data.append({
+                            'Matric': matric,
+                            'Student Name': data.get('student_name', 'Unknown'),
+                            'Week': data.get('week', week_folder),
+                            'Submission Time': data.get('submission_time', ''),
+                            'File Name': data.get('submission_file', ''),
+                            'Submission Text': data.get('submission_text', ''),
+                            'JSON File': file
+                        })
+                    except Exception as e:
+                        print(f"Error reading {file_path}: {e}")
+                        continue
+        
+        return pd.DataFrame(submissions_data)
+        
+    except Exception as e:
+        st.error(f"Error getting submissions data: {e}")
+        return pd.DataFrame()
+
+def download_assignment_file(course_code, week, matric):
+    """
+    Download a specific student's assignment file
+    Returns file data and filename if available
+    """
+    try:
+        submission_file = get_submission_file(course_code, week, matric)
+        
+        if os.path.exists(submission_file):
+            with open(submission_file, 'r') as f:
+                data = json.load(f)
+            
+            # Check if there's a file attachment
+            if data.get('submission_file'):
+                # You'll need to implement file retrieval logic here
+                # This depends on how you're storing the actual files
+                file_path = data.get('file_path', '')
+                if os.path.exists(file_path):
+                    with open(file_path, 'rb') as f:
+                        return f.read(), data['submission_file']
+            
+            # Return JSON data as fallback
+            return json.dumps(data, indent=2).encode(), f"{matric}_submission.json"
+            
+        return None, None
+        
+    except Exception as e:
+        st.error(f"Error downloading assignment: {e}")
+        return None, None
+
+def get_student_list_csv(course_code):
+    """
+    Generate a CSV of all students who have submitted assignments
+    Includes matric numbers and submission status
+    """
+    try:
+        # Get all submissions data
+        submissions_df = get_all_submissions_data(course_code)
+        
+        if submissions_df.empty:
+            return None, "No submissions found"
+        
+        # Create student list with submission counts
+        student_list = []
+        for matric in submissions_df['Matric'].unique():
+            student_data = submissions_df[submissions_df['Matric'] == matric].iloc[0]
+            submission_count = len(submissions_df[submissions_df['Matric'] == matric])
+            
+            student_list.append({
+                'Matric Number': matric,
+                'Student Name': student_data['Student Name'],
+                'Total Submissions': submission_count,
+                'Weeks Submitted': ', '.join(submissions_df[submissions_df['Matric'] == matric]['Week'].unique()),
+                'Last Submission': submissions_df[submissions_df['Matric'] == matric]['Submission Time'].max()
+            })
+        
+        student_df = pd.DataFrame(student_list)
+        csv_data = student_df.to_csv(index=False)
+        
+        return csv_data, f"{course_code}_student_list.csv"
+        
+    except Exception as e:
+        st.error(f"Error generating student list: {e}")
+        return None, None
+
+def get_weekly_submissions_csv(course_code, week):
+    """
+    Generate CSV of submissions for a specific week
+    """
+    try:
+        submissions_df = get_all_submissions_data(course_code, week)
+        
+        if submissions_df.empty:
+            return None, f"No submissions found for {week}"
+        
+        # Select relevant columns
+        weekly_df = submissions_df[['Matric', 'Student Name', 'Submission Time', 'File Name']]
+        csv_data = weekly_df.to_csv(index=False)
+        
+        return csv_data, f"{course_code}_{week}_submissions.csv"
+        
+    except Exception as e:
+        st.error(f"Error generating weekly submissions: {e}")
+        return None, None
 # ===============================================================
 # 📚 LECTURE MANAGEMENT
 # ===============================================================
@@ -5562,26 +5699,6 @@ def calculate_info_completeness(course_info):
     filled_fields = [field for field in required_fields if course_info.get(field)]
     return int((len(filled_fields) / len(required_fields)) * 100)
 # Remove the duplicate function definition at the end of the file
-import sqlite3
-import pandas as pd
-
-def get_all_submissions(course_code):
-    conn = sqlite3.connect("submissions.db")
-    query = """
-        SELECT 
-            student_matric AS Matric,
-            student_name AS Name,
-            week AS Week,
-            file_name AS FileName,
-            timestamp AS SubmittedAt
-        FROM submissions
-        WHERE course_code = ?
-        ORDER BY week, student_matric
-    """
-    df = pd.read_sql_query(query, conn, params=(course_code,))
-    conn.close()
-    return df
-                    
 
 def admin_view(course_code, course_name):
     """Admin dashboard view with password management"""
@@ -6651,25 +6768,66 @@ def admin_view(course_code, course_name):
                                 st.markdown("---")
                                 st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
     
-            st.subheader("📥 Download Submitted Assignments List")
-            df = get_all_submissions(course_code)
+            # In your instructor view section
+            st.subheader("📊 Submission Management")
 
-            if df.empty:
-                st.info("No submissions found yet for this course.")
-            else:
-                st.dataframe(df)
+# Student List Download
+            st.write("### Student Submission List")
+            if st.button("📥 Download Student List CSV"):
+                csv_data, filename = get_student_list_csv(course_code)
+                if csv_data:
+                    st.download_button(
+                        label="⬇️ Download Student List",
+                        data=csv_data,
+                        file_name=filename,
+                        mime="text/csv"
+        )
+                else:
+                    st.warning("No student data available")
 
-    # Convert to CSV
-                csv = df.to_csv(index=False).encode('utf-8')
+# Weekly Submissions Download
+        st.write("### Weekly Submissions")
+        weeks = ["Week 1", "Week 2", "Week 3", "Week 4"]  # You can dynamically get these
+        selected_week = st.selectbox("Select Week for Download", weeks)
 
-    # Download button
+        if st.button("📥 Download Weekly Submissions CSV"):
+            csv_data, filename = get_weekly_submissions_csv(course_code, selected_week)
+            if csv_data:
                 st.download_button(
-                    label="⬇️ Download CSV",
-                    data=csv,
-                    file_name=f"{course_code}_submissions.csv",
-                    mime="text/csv",
-                    use_container_width=True
-    )
+                    label=f"⬇️ Download {selected_week} Submissions",
+                    data=csv_data,
+                    file_name=filename,
+                    mime="text/csv"
+        )
+            else:
+                st.warning(f"No submissions found for {selected_week}")
+
+# Individual Assignment Downloads
+        st.write("### Download Individual Assignments")
+        submissions_df = get_all_submissions_data(course_code)
+
+        if not submissions_df.empty:
+            for _, submission in submissions_df.iterrows():
+                col1, col2, col3 = st.columns([3, 2, 1])
+                with col1:
+                    st.write(f"**{submission['Student Name']}** ({submission['Matric']}) - {submission['Week']}")
+                with col2:
+                    st.write(f"Submitted: {submission['Submission Time'][:16]}")
+                with col3:
+                    if st.button("📥 Download", key=f"dl_{submission['Matric']}_{submission['Week']}"):
+                        file_data, filename = download_assignment_file(
+                            course_code, submission['Week'], submission['Matric']
+                )
+                        if file_data:
+                            st.download_button(
+                                label="⬇️ Download File",
+                                data=file_data,
+                                file_name=filename,
+                                mime="application/octet-stream",
+                                key=f"btn_{submission['Matric']}_{submission['Week']}"
+                    )
+        else:
+            st.info("No submissions available for download")
 
 
         with tab11:
@@ -6838,6 +6996,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
