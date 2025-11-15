@@ -4193,7 +4193,7 @@ import pandas as pd
 # ===============================================================
 
 def display_pdf_announcements_admin(course_code):
-    """Admin panel for uploading and managing PDF announcements - FIXED"""
+    """Admin panel for uploading and managing PDF announcements - FIXED VERSION"""
     st.header(f"📢 PDF Announcements - {course_code}")
     
     # Ensure directories exist
@@ -4204,7 +4204,7 @@ def display_pdf_announcements_admin(course_code):
     with tab1:
         st.subheader("Upload Seminar Topics PDF")
         
-        with st.form(f"pdf_upload_form_{course_code}"):
+        with st.form(f"pdf_upload_form_{course_code}", clear_on_submit=True):  # Added clear_on_submit
             # PDF upload
             uploaded_pdf = st.file_uploader(
                 "Choose PDF file", 
@@ -4231,46 +4231,80 @@ def display_pdf_announcements_admin(course_code):
             
             if submitted:
                 if uploaded_pdf is not None and announcement_title.strip():
-                    # Save PDF file
-                    pdf_dir = get_pdf_announcements_dir(course_code)
-                    os.makedirs(pdf_dir, exist_ok=True)
+                    try:
+                        # Validate file size (e.g., 10MB limit)
+                        max_size_mb = 10
+                        file_size = len(uploaded_pdf.getvalue()) / (1024 * 1024)  # Size in MB
+                        
+                        if file_size > max_size_mb:
+                            st.error(f"❌ File size too large. Maximum allowed: {max_size_mb}MB")
+                            return
+                        
+                        # Save PDF file
+                        pdf_dir = get_pdf_announcements_dir(course_code)
+                        os.makedirs(pdf_dir, exist_ok=True)
+                        
+                        # Generate unique filename with better sanitization
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        safe_name = "".join(c for c in uploaded_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
+                        safe_name = safe_name.replace(' ', '_')  # Replace spaces with underscores
+                        filename = f"{timestamp}_{safe_name}"
+                        file_path = os.path.join(pdf_dir, filename)
+                        
+                        # Check if file already exists
+                        if os.path.exists(file_path):
+                            st.warning("⚠️ File with this name already exists. Renaming...")
+                            counter = 1
+                            base_name, ext = os.path.splitext(filename)
+                            while os.path.exists(file_path):
+                                filename = f"{base_name}_{counter}{ext}"
+                                file_path = os.path.join(pdf_dir, filename)
+                                counter += 1
+                        
+                        # Save the file
+                        with open(file_path, "wb") as f:
+                            f.write(uploaded_pdf.getbuffer())
+                        
+                        # Prepare expiry date
+                        expiry_date_str = expiry_date.strftime("%Y-%m-%d") if expiry_date else ''
+                        
+                        # Save announcement metadata
+                        announcement_data = {
+                            'course_code': course_code,
+                            'title': announcement_title.strip(),
+                            'description': announcement_description,
+                            'filename': filename,
+                            'original_name': uploaded_pdf.name,
+                            'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'expiry_date': expiry_date_str,
+                            'priority': priority,
+                            'is_active': is_active,
+                            'file_size': f"{file_size:.1f} MB",
+                            'type': 'seminar_topics',
+                            'file_path': file_path
+                        }
+                        
+                        # Save to announcements database
+                        if save_announcement_metadata(announcement_data):
+                            st.success(f"✅ PDF uploaded successfully for {course_code}!")
+                            st.info(f"**File:** {uploaded_pdf.name}")
+                            st.info(f"**Title:** {announcement_title}")
+                        else:
+                            st.error("❌ Failed to save announcement metadata")
+                            # Clean up uploaded file if metadata save failed
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
                     
-                    # Generate unique filename
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    safe_name = "".join(c for c in uploaded_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
-                    filename = f"{timestamp}_{safe_name}"
-                    file_path = os.path.join(pdf_dir, filename)
-                    
-                    # Save the file
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_pdf.getbuffer())
-                    
-                    # Save announcement metadata
-                    announcement_data = {
-                        'course_code': course_code,
-                        'title': announcement_title.strip(),
-                        'description': announcement_description,
-                        'filename': filename,
-                        'original_name': uploaded_pdf.name,
-                        'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'expiry_date': expiry_date.strftime("%Y-%m-%d") if expiry_date else '',
-                        'priority': priority,
-                        'is_active': is_active,
-                        'file_size': f"{len(uploaded_pdf.getbuffer()) / 1024:.1f} KB",
-                        'type': 'seminar_topics',
-                        'file_path': file_path  # Store full path for easy access
-                    }
-                    
-                    # Save to announcements database
-                    if save_announcement_metadata(announcement_data):
-                        st.success(f"✅ PDF uploaded successfully for {course_code}!")
-                        st.info(f"**File:** {uploaded_pdf.name}")
-                        st.info(f"**Title:** {announcement_title}")
-                    else:
-                        st.error("❌ Failed to save announcement metadata")
-                    
+                    except Exception as e:
+                        st.error(f"❌ Error uploading PDF: {str(e)}")
+                        # Log the error for debugging
+                        print(f"PDF upload error for {course_code}: {e}")
+                
                 else:
-                    st.error("❌ Please provide both a PDF file and a title")
+                    if uploaded_pdf is None:
+                        st.error("❌ Please select a PDF file")
+                    if not announcement_title.strip():
+                        st.error("❌ Please provide an announcement title")
     
     with tab2:
         st.subheader("Manage PDF Announcements")
@@ -4278,81 +4312,118 @@ def display_pdf_announcements_admin(course_code):
         # Load existing announcements
         announcements = load_announcements_metadata(course_code, active_only=False)
         
-        if announcements:
-            for announcement in announcements:
-                with st.expander(f"📄 {announcement['title']} - {announcement['upload_date']}", expanded=False):
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        st.write(f"**Description:** {announcement.get('description', 'No description')}")
-                        st.write(f"**File:** {announcement['original_name']}")
-                        st.write(f"**Size:** {announcement.get('file_size', 'N/A')}")
-                        st.write(f"**Uploaded:** {announcement['upload_date']}")
-                        st.write(f"**Status:** {'Active' if announcement.get('is_active', True) else 'Inactive'}")
-                        
-                        if announcement.get('expiry_date'):
-                            expiry = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
-                            days_remaining = (expiry - datetime.now().date()).days
-                            status_color = "🟢" if days_remaining > 7 else "🟡" if days_remaining >= 0 else "🔴"
-                            st.write(f"**Expires:** {announcement['expiry_date']} {status_color} ({days_remaining} days)")
-                    
-                    with col2:
-                        # Status and actions
-                        current_status = announcement.get('is_active', True)
-                        new_status = st.selectbox(
-                            "Status", 
-                            ["Active", "Inactive"],
-                            index=0 if current_status else 1,
-                            key=f"status_{announcement['filename']}"
-                        )
-                        
-                        if st.button("Update Status", key=f"update_{announcement['filename']}"):
-                            if update_announcement_status(course_code, announcement['filename'], new_status == "Active"):
-                                st.success("Status updated!")
-                                st.rerun()
-                        
-                        # Download button for admin
-                        file_path = announcement.get('file_path') or get_pdf_file_path(course_code, announcement['filename'])
-                        if file_path and os.path.exists(file_path):
-                            with open(file_path, "rb") as file:
-                                st.download_button(
-                                    "📥 Download",
-                                    data=file,
-                                    file_name=announcement['original_name'],
-                                    mime="application/pdf",
-                                    key=f"download_{announcement['filename']}",
-                                    use_container_width=True
-                                )
-                        else:
-                            st.error("File not found")
-                        
-                        # Delete button
-                        if st.button("🗑️ Delete", key=f"delete_{announcement['filename']}", use_container_width=True):
-                            if delete_announcement(course_code, announcement['filename']):
-                                st.success("Announcement deleted!")
-                                st.rerun()
+        if not announcements:
+            st.info("📭 No PDF announcements found for this course.")
+            return
+        
+        # Add search and filter functionality
+        col_search, col_filter = st.columns(2)
+        with col_search:
+            search_term = st.text_input("🔍 Search announcements", placeholder="Search by title...")
+        
+        with col_filter:
+            status_filter = st.selectbox("Filter by status", ["All", "Active", "Inactive"])
+        
+        # Filter announcements
+        filtered_announcements = announcements
+        if search_term:
+            filtered_announcements = [a for a in filtered_announcements 
+                                    if search_term.lower() in a['title'].lower()]
+        
+        if status_filter != "All":
+            status_bool = status_filter == "Active"
+            filtered_announcements = [a for a in filtered_announcements 
+                                    if a.get('is_active', True) == status_bool]
+        
+        if not filtered_announcements:
+            st.info("No announcements match your search criteria.")
+            return
+        
+        for announcement in filtered_announcements:
+            # Create a unique key for each announcement using filename and timestamp
+            announcement_key = f"{announcement['filename']}_{announcement['upload_date']}"
             
-            # Bulk actions
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔄 Deactivate All Expired", use_container_width=True):
-                    deactivated_count = deactivate_expired_announcements(course_code)
-                    st.success(f"Deactivated {deactivated_count} expired announcements")
-                    st.rerun()
-            with col2:
-                if st.button("📊 Export Announcements List", use_container_width=True):
-                    csv_data = export_announcements_to_csv(course_code)
-                    if csv_data:
-                        st.download_button(
-                            "💾 Download CSV",
-                            data=csv_data,
-                            file_name=f"{course_code}_announcements_{datetime.now().strftime('%Y%m%d')}.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
-        else:
-            st.info("No PDF announcements uploaded for this course yet.")
+            with st.expander(f"📄 {announcement['title']} - {announcement['upload_date']}", expanded=False):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.write(f"**Description:** {announcement.get('description', 'No description')}")
+                    st.write(f"**File:** {announcement['original_name']}")
+                    st.write(f"**Size:** {announcement.get('file_size', 'N/A')}")
+                    st.write(f"**Uploaded:** {announcement['upload_date']}")
+                    
+                    # Status with color coding
+                    status = announcement.get('is_active', True)
+                    status_color = "🟢 Active" if status else "🔴 Inactive"
+                    st.write(f"**Status:** {status_color}")
+                    
+                    # Expiry date with better formatting
+                    if announcement.get('expiry_date'):
+                        try:
+                            expiry = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
+                            today = datetime.now().date()
+                            days_remaining = (expiry - today).days
+                            
+                            if days_remaining > 7:
+                                status_color = "🟢"
+                            elif days_remaining >= 0:
+                                status_color = "🟡"
+                            else:
+                                status_color = "🔴"
+                            
+                            expiry_text = f"**Expires:** {announcement['expiry_date']} {status_color} ({days_remaining} days)"
+                            
+                            if days_remaining < 0:
+                                expiry_text += " - EXPIRED"
+                            
+                            st.write(expiry_text)
+                        except ValueError:
+                            st.write(f"**Expires:** {announcement['expiry_date']} (Invalid date format)")
+                
+                with col2:
+                    # Status update with better state management
+                    current_status = announcement.get('is_active', True)
+                    
+                    new_status = st.selectbox(
+                        "Status", 
+                        ["Active", "Inactive"],
+                        index=0 if current_status else 1,
+                        key=f"status_{announcement_key}"
+                    )
+                    
+                    if st.button("Update Status", key=f"update_{announcement_key}"):
+                        if update_announcement_status(course_code, announcement['filename'], new_status == "Active"):
+                            st.success("✅ Status updated successfully!")
+                            st.rerun()
+                    
+                    # Download button
+                    file_path = announcement.get('file_path') or get_pdf_file_path(course_code, announcement['filename'])
+                    if file_path and os.path.exists(file_path):
+                        with open(file_path, "rb") as file:
+                            st.download_button(
+                                "📥 Download",
+                                data=file,
+                                file_name=announcement['original_name'],
+                                mime="application/pdf",
+                                key=f"download_{announcement_key}",
+                                use_container_width=True
+                            )
+                    else:
+                        st.error("❌ File not found on server")
+                    
+                    # Delete button with confirmation
+                    if st.button("🗑️ Delete", key=f"delete_{announcement_key}", use_container_width=True):
+                        # Double confirmation
+                        st.warning(f"Are you sure you want to delete '{announcement['title']}'?")
+                        col_confirm, col_cancel = st.columns(2)
+                        with col_confirm:
+                            if st.button("Yes, Delete", key=f"confirm_delete_{announcement_key}"):
+                                if delete_announcement(course_code, announcement['filename']):
+                                    st.success("✅ Announcement deleted!")
+                                    st.rerun()
+                        with col_cancel:
+                            if st.button("Cancel", key=f"cancel_delete_{announcement_key}"):
+                                st.rerun()
 
 def display_pdf_announcements_student(course_code):
     """Student view for PDF announcements - FIXED"""
@@ -6702,6 +6773,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
