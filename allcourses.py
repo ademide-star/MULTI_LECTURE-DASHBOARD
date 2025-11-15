@@ -6714,45 +6714,45 @@ def admin_view(course_code, course_name):
             # 📂 VIEW STUDENT SUBMISSIONS
             # ===============================================================
             st.header("📂 View Student Submissions")
-            
+
             upload_types = ["assignment", "drawing", "seminar"]
             for upload_type in upload_types:
                 st.subheader(f"📄 {upload_type.capitalize()} Submissions")
                 upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, upload_type)
-                
+    
                 if not os.path.exists(upload_dir):
                     st.info(f"No {upload_type} submissions yet.")
                     continue
-                
+    
                 files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
                 if not files:
                     st.info(f"No {upload_type} submissions yet.")
                     continue
-                
+    
                 for file in files:
                     file_path = os.path.join(upload_dir, file)
                     unique_key = f"{course_code}_{upload_type}_{file}"
-                    
-                    # Using container instead of expander for file items
+        
+        # Using container instead of expander for file items
                     with st.container():
                         col1, col2 = st.columns([3, 1])
-                        
+            
                         with col1:
                             st.write(f"**📎 {file}**")
                             try:
                                 file_size = os.path.getsize(file_path) / (1024 * 1024)
                                 st.write(f"*Size:* {file_size:.2f} MB")
-                                
-                                # Extract student info from filename
+                    
+                    # Extract student info from filename
                                 parts = file.split('_')
                                 if len(parts) >= 2:
                                     st.write(f"*Student:* {parts[0]} ({parts[1]})")
                                 if len(parts) >= 3:
                                     st.write(f"*Week:* {parts[2]}")
-                                    
+                        
                             except:
                                 st.write("*Size:* Unknown")
-                        
+            
                         with col2:
                             try:
                                 with open(file_path, "rb") as fh:
@@ -6762,13 +6762,14 @@ def admin_view(course_code, course_name):
                                         file_name=file,
                                         mime="application/octet-stream",
                                         key=f"{unique_key}_download"
-                                    )
+                        )
                             except Exception:
                                 st.warning("⚠️ Cannot open file for download.")
-                                st.markdown("---")
-                                st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-    
-            # In your instructor view section
+            
+                        st.markdown("---")
+                        st.markdown(f"*Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
+# In your instructor view section
             st.subheader("📊 Submission Management")
 
 # Student List Download
@@ -6786,12 +6787,12 @@ def admin_view(course_code, course_name):
                     st.warning("No student data available")
 
 # Weekly Submissions Download
-        st.write("### Weekly Submissions")
-        weeks = ["Week 1", "Week 2", "Week 3", "Week 4"]  # You can dynamically get these
-        selected_week = st.selectbox("Select Week for Download", weeks)
+            st.write("### Weekly Submissions")
+            weeks = ["Week 1", "Week 2", "Week 3", "Week 4"]  # You can dynamically get these
+            selected_week = st.selectbox("Select Week for Download", weeks)
 
-        if st.button("📥 Download Weekly Submissions CSV"):
-            csv_data, filename = get_weekly_submissions_csv(course_code, selected_week)
+            if st.button("📥 Download Weekly Submissions CSV"):
+                csv_data, filename = get_weekly_submissions_csv(course_code, selected_week)
             if csv_data:
                 st.download_button(
                     label=f"⬇️ Download {selected_week} Submissions",
@@ -6803,31 +6804,31 @@ def admin_view(course_code, course_name):
                 st.warning(f"No submissions found for {selected_week}")
 
 # Individual Assignment Downloads
-        st.write("### Download Individual Assignments")
-        submissions_df = get_all_submissions_data(course_code)
+            st.write("### Download Individual Assignments")
+            submissions_df = get_all_submissions_data(course_code)
 
-        if not submissions_df.empty:
-            for _, submission in submissions_df.iterrows():
-                col1, col2, col3 = st.columns([3, 2, 1])
-                with col1:
-                    st.write(f"**{submission['Student Name']}** ({submission['Matric']}) - {submission['Week']}")
-                with col2:
-                    st.write(f"Submitted: {submission['Submission Time'][:16]}")
-                with col3:
-                    if st.button("📥 Download", key=f"dl_{submission['Matric']}_{submission['Week']}"):
-                        file_data, filename = download_assignment_file(
-                            course_code, submission['Week'], submission['Matric']
+            if not submissions_df.empty:
+                for _, submission in submissions_df.iterrows():
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    with col1:
+                        st.write(f"**{submission['Student Name']}** ({submission['Matric']}) - {submission['Week']}")
+                    with col2:
+                        st.write(f"Submitted: {submission['Submission Time'][:16]}")
+                    with col3:
+                        if st.button("📥 Download", key=f"dl_{submission['Matric']}_{submission['Week']}"):
+                            file_data, filename = download_assignment_file(
+                                course_code, submission['Week'], submission['Matric']
                 )
-                        if file_data:
-                            st.download_button(
-                                label="⬇️ Download File",
-                                data=file_data,
-                                file_name=filename,
-                                mime="application/octet-stream",
-                                key=f"btn_{submission['Matric']}_{submission['Week']}"
+                            if file_data:
+                                st.download_button(
+                                    label="⬇️ Download File",
+                                    data=file_data,
+                                    file_name=filename,
+                                    mime="application/octet-stream",
+                                    key=f"btn_{submission['Matric']}_{submission['Week']}"
                     )
-        else:
-            st.info("No submissions available for download")
+            else:
+                st.info("No submissions available for download")
 
 
         with tab11:
@@ -6996,6 +6997,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
