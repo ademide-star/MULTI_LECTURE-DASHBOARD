@@ -6774,40 +6774,69 @@ def admin_view(course_code, course_name):
 
 # Student List Download
             st.write("### Student Submission List")
-            if st.button("📥 Download Student List CSV"):
+
+# Initialize session state for download data
+            if 'student_list_data' not in st.session_state:
+                st.session_state.student_list_data = None
+            if 'student_list_filename' not in st.session_state:
+                st.session_state.student_list_filename = None
+
+            if st.button("📥 Generate Student List CSV"):
                 csv_data, filename = get_student_list_csv(course_code)
                 if csv_data:
-                    st.download_button(
-                        label="⬇️ Download Student List",
-                        data=csv_data,
-                        file_name=filename,
-                        mime="text/csv"
-        )
+                    st.session_state.student_list_data = csv_data
+                    st.session_state.student_list_filename = filename
+                    st.success("✅ Student list generated successfully!")
                 else:
                     st.warning("No student data available")
+
+# Show download button only if data exists
+            if st.session_state.student_list_data:
+                st.download_button(
+                    label="⬇️ Download Student List",
+                    data=st.session_state.student_list_data,
+                    file_name=st.session_state.student_list_filename,
+                    mime="text/csv"
+    )
 
 # Weekly Submissions Download
             st.write("### Weekly Submissions")
             weeks = ["Week 1", "Week 2", "Week 3", "Week 4"]  # You can dynamically get these
-            selected_week = st.selectbox("Select Week for Download", weeks)
+            selected_week = st.selectbox("Select Week for Download", weeks, key="weekly_download")
 
-            if st.button("📥 Download Weekly Submissions CSV"):
+# Initialize session state for weekly data
+            if 'weekly_data' not in st.session_state:
+                st.session_state.weekly_data = None
+            if 'weekly_filename' not in st.session_state:
+                st.session_state.weekly_filename = None
+
+            if st.button("📥 Generate Weekly Submissions CSV"):
                 csv_data, filename = get_weekly_submissions_csv(course_code, selected_week)
-            if csv_data:
+                if csv_data:
+                    st.session_state.weekly_data = csv_data
+                    st.session_state.weekly_filename = filename
+                    st.success(f"✅ {selected_week} submissions generated successfully!")
+                else:
+                    st.warning(f"No submissions found for {selected_week}")
+
+# Show download button only if data exists
+            if st.session_state.weekly_data:
                 st.download_button(
                     label=f"⬇️ Download {selected_week} Submissions",
-                    data=csv_data,
-                    file_name=filename,
+                    data=st.session_state.weekly_data,
+                    file_name=st.session_state.weekly_filename,
                     mime="text/csv"
-        )
-            else:
-                st.warning(f"No submissions found for {selected_week}")
+    )
 
 # Individual Assignment Downloads
             st.write("### Download Individual Assignments")
             submissions_df = get_all_submissions_data(course_code)
 
             if not submissions_df.empty:
+    # Initialize session state for individual downloads
+                if 'individual_download_data' not in st.session_state:
+                    st.session_state.individual_download_data = {}
+    
                 for _, submission in submissions_df.iterrows():
                     col1, col2, col3 = st.columns([3, 2, 1])
                     with col1:
@@ -6815,21 +6844,34 @@ def admin_view(course_code, course_name):
                     with col2:
                         st.write(f"Submitted: {submission['Submission Time'][:16]}")
                     with col3:
-                        if st.button("📥 Download", key=f"dl_{submission['Matric']}_{submission['Week']}"):
+                        download_key = f"dl_{submission['Matric']}_{submission['Week']}"
+            
+                        if st.button("📥 Download", key=download_key):
                             file_data, filename = download_assignment_file(
                                 course_code, submission['Week'], submission['Matric']
                 )
                             if file_data:
-                                st.download_button(
-                                    label="⬇️ Download File",
-                                    data=file_data,
-                                    file_name=filename,
-                                    mime="application/octet-stream",
-                                    key=f"btn_{submission['Matric']}_{submission['Week']}"
-                    )
+                    # Store in session state
+                                st.session_state.individual_download_data[download_key] = {
+                                    'data': file_data,
+                                    'filename': filename
+                    }
+                                st.rerun()  # Refresh to show the download button
+    
+    # Show download buttons for items that have data
+                for key, download_info in st.session_state.individual_download_data.items():
+                    if st.download_button(
+                        label="⬇️ Download File",
+                        data=download_info['data'],
+                        file_name=download_info['filename'],
+                        mime="application/octet-stream",
+                        key=f"btn_{key}"
+        ):
+            # Optional: Remove from session state after download
+                        del st.session_state.individual_download_data[key]
+                        st.rerun()
             else:
                 st.info("No submissions available for download")
-
 
         with tab11:
             # ===============================================================
