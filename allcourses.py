@@ -6961,13 +6961,13 @@ def main():
    
     # Application Header
     st.subheader("Multi-Course Learning Management System the Education Prism")
-    st.title("🎓 Integrated Learning System")
+    st.title("🎓Integrated Learning System")
     
     # Auto-refresh
     st_autorefresh(interval=86_400_000, key="daily_refresh")
     
     # Sidebar navigation
-    st.sidebar.title("🎓 Navigation")
+    st.sidebar.title("🎓Navigation")
     
     # Role Selection
     if "role" not in st.session_state:
@@ -7028,7 +7028,7 @@ def main():
             color: #333;
             text-align: center;
             padding: 8px;
-            font-size: 15px;
+            font-size: 18px;
             font-weight: 500;
             border-top: 1px solid #ccc;
             margin-top: 2rem;
@@ -7041,6 +7041,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
