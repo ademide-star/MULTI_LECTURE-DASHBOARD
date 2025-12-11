@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -6,6 +5,8 @@ import os
 import re
 import json
 import base64
+import csv
+from io import BytesIO
 from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
 
@@ -14,7 +15,7 @@ from streamlit_autorefresh import st_autorefresh
 # ===============================================================
 
 st.set_page_config(
-    page_title="Multi-Course Dashboard", 
+    page_title="Multi-Course Learning Management System Education Prism", 
     page_icon="📚", 
     layout="wide"
 )
@@ -6959,14 +6960,14 @@ def main():
     """Main application with System Admin role"""
    
     # Application Header
-    st.subheader("Multi-Course Learning Management System")
-    st.title("🎓 Sikiru Adetona College of Education Science and Technology Course Portal")
+    st.subheader("Multi-Course Learning Management System the Education Prism")
+    st.title("🎓Integrated Learning System")
     
     # Auto-refresh
     st_autorefresh(interval=86_400_000, key="daily_refresh")
     
     # Sidebar navigation
-    st.sidebar.title("🎓 Navigation")
+    st.sidebar.title("🎓Navigation")
     
     # Role Selection
     if "role" not in st.session_state:
@@ -7027,7 +7028,7 @@ def main():
             color: #333;
             text-align: center;
             padding: 8px;
-            font-size: 15px;
+            font-size: 18px;
             font-weight: 500;
             border-top: 1px solid #ccc;
             margin-top: 2rem;
@@ -7040,6 +7041,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
 
 
