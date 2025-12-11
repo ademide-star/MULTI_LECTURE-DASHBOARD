@@ -15,7 +15,7 @@ from streamlit_autorefresh import st_autorefresh
 # ===============================================================
 
 st.set_page_config(
-    page_title="Multi-Course Learning Management System Education Prism", 
+    page_title="Multi-Course Dashboard", 
     page_icon="📚", 
     layout="wide"
 )
@@ -6960,8 +6960,8 @@ def main():
     """Main application with System Admin role"""
    
     # Application Header
-    st.subheader("Multi-Course Learning Management System the Education Prism")
-    st.title("🎓 Integrated Learning System")
+    st.subheader("Multi-Course Learning Management System")
+    st.title("🎓 Sikiru Adetona College of Education Science and Technology Course Portal")
     
     # Auto-refresh
     st_autorefresh(interval=86_400_000, key="daily_refresh")
@@ -7041,8 +7041,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
