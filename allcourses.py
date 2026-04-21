@@ -13,99 +13,481 @@ from streamlit_autorefresh import st_autorefresh
 # ===============================================================
 # 🎯 PAGE CONFIGURATION - MUST BE FIRST STREAMLIT COMMAND
 # ===============================================================
-
 st.set_page_config(
-    page_title="Multi-Course Learning Management System Education Prism",
-    page_icon="📚",
-    layout="wide"
+    page_title="NeuroMatrix LMS",
+    page_icon="neuromatrix_lms_logo.png",
+    layout="centered"
 )
+st.markdown("""
+<style>
+    /* Force sidebar to always be visible (like on desktop) */
+    @media (max-width: 300px) {
+        section[data-testid="stSidebar"] {
+            display: block !important;
+            transform: none !important;
+            width: 300px !important;
+        }
+        /* Adjust main content margin */
+        .main > div {
+            margin-left: 300px !important;
+        }
+        /* Hide the hamburger menu button */
+        button[kind="header"] {
+            display: none !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ===============================================================
-# 🎨 CUSTOM STYLING - HIDE STREAMLIT ELEMENTS
+# ===============================================================
+# 📚 DEFAULT COURSES CONFIGURATION
+# ===============================================================
+default_courses = {
+    "General Microbiology": {
+        "code": "MCB221",
+        "url": "https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"
+    },
+    "General Biochemistry": {
+        "code": "BCH201",
+        "url": "https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"
+    },
+    "General Physiology": {
+        "code": "BIO203",
+        "url": "https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"
+    },
+    "Virus Bacteria Lower Plants": {
+        "code": "BIO113",
+        "url": "https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"
+    },
+    "Diversity of Invertebrate": {
+        "code": "BIO121",
+        "url": "https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"
+    },
+    "Plant Physiology": {
+        "code": "BIO221",
+        "url": "https://neuromatrixbiosystems.com/BIO221_Interactive_Lecture_Notes#"
+    },
+    "Vertebrate Anatomy and Physiology": {
+        "code": "BIO222",
+        "url": "https://neuromatrixbiosystems.com/BIO222_Interactive_Lecture_Notes#"
+    },
+    "Systematic Biology": {
+        "code": "BIO306",
+        "url": "https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"
+    }
+}
+
+# ===============================================================
+# 🎨 NEUROMATRIX - DUOLINGO × NETFLIX UI SYSTEM
 # ===============================================================
 
-st.markdown(
-    """
+st.markdown("""
+<style>
+/* =========================
+   GLOBAL DARK CINEMATIC THEME
+========================= */
+.stApp {
+    background: radial-gradient(circle at top, #0f172a, #020617);
+    color: #e2e8f0;
+    font-family: sans-serif;
+}
+/* Hide Streamlit default UI */
+#MainMenu, footer, header {
+    visibility: hidden;
+}
+/* Smooth scrolling like modern apps */
+html, body {
+    scroll-behavior: smooth;
+}
+/* =========================
+   TYPOGRAPHY
+========================= */
+h1, h2, h3 {
+    color: #f8fafc;
+    letter-spacing: 0.5px;
+}
+/* =========================
+   SIDEBAR (APP FEEL)
+========================= */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020617, #0f172a);
+    border-right: 1px solid #1e293b;
+}
+/* =========================
+   NETFLIX STYLE CARDS
+========================= */
+.netflix-card {
+    background: linear-gradient(145deg, #0b1220, #0f172a);
+    border-radius: 18px;
+    padding: 16px;
+    border: 1px solid #1e293b;
+    transition: all 0.3s ease;
+    min-width: 240px;
+}
+.netflix-card:hover {
+    transform: scale(1.05);
+    border-color: #3b82f6;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.5);
+}
+/* Horizontal scroll row */
+.scroll-row {
+    display: flex;
+    overflow-x: auto;
+    gap: 15px;
+    padding: 10px 0;
+}
+/* =========================
+   DUOLINGO ACCENTS
+========================= */
+.duo {
+    color: #58cc02;
+    font-weight: bold;
+}
+.streak-badge {
+    background: #58cc02;
+    color: black;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+}
+/* =========================
+   METRICS (ANIMATED FEEL)
+========================= */
+[data-testid="stMetric"] {
+    background: #0b1220;
+    border-radius: 16px;
+    padding: 12px;
+    border: 1px solid #1e293b;
+    transition: all 0.3s ease;
+}
+[data-testid="stMetric"]:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+[data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    color: #60a5fa !important;
+}
+/* =========================
+   PROGRESS BAR (DUOLINGO STYLE)
+========================= */
+.progress-bar {
+    background: #1e293b;
+    border-radius: 20px;
+    height: 18px;
+    overflow: hidden;
+}
+.progress-fill {
+    background: #58cc02;
+    height: 100%;
+    width: 0%;
+    animation: fillBar 1.5s ease forwards;
+}
+@keyframes fillBar {
+    from { width: 0%; }
+}
+/* =========================
+   CONTENT CARD
+========================= */
+.card {
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 15px;
+}
+/* =========================
+   SIDEBAR RADIO STYLE
+========================= */
+div[role="radiogroup"] > label {
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    transition: 0.2s;
+}
+div[role="radiogroup"] > label:hover {
+    background: #1e293b;
+}
+/* GLOBAL APP BACKGROUND */
+.stApp {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+/* SIDEBAR */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #020617, #0f172a);
+    border-right: 1px solid #1e293b;
+}
+/* SIDEBAR TEXT */
+section[data-testid="stSidebar"] * {
+    color: #e2e8f0 !important;
+}
+/* RADIO BUTTONS (NAV ITEMS) */
+div[role="radiogroup"] > label {
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+/* HOVER EFFECT */
+div[role="radiogroup"] > label:hover {
+    background-color: #1e293b;
+}
+/* SELECTED NAV ITEM */
+div[role="radiogroup"] > label[data-checked="true"] {
+    background: linear-gradient(90deg, #2563eb, #1d4ed8);
+    color: white !important;
+    font-weight: 600;
+}
+/* MAIN HEADERS */
+h1, h2, h3 {
+    color: #f8fafc;
+}
+/* CARD STYLE */
+.card {
+    background: #020617;
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid #1e293b;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    margin-bottom: 15px;
+}
+/* BUTTONS */
+.stButton>button {
+    background: linear-gradient(90deg, #2563eb, #1d4ed8);
+    color: white;
+    border-radius: 10px;
+    border: none;
+}
+/* INPUT FIELDS */
+input, textarea {
+    background-color: #020617 !important;
+    color: white !important;
+}
+/* METRICS */
+[data-testid="stMetric"] {
+    background: #020617;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+}
+/* GLOBAL SMOOTH ANIMATION */
+.block-container {
+    transition: all 0.3s ease-in-out;
+}
+/* Hide Streamlit UI */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+/* DESKTOP */
+@media (min-width: 900px) {
+    .block-container {
+        max-width: 95% !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+}
+/* MOBILE */
+@media (max-width: 300px) {
+    .block-container {
+        max-width: 100% !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    .streamlit-expanderHeader {
+        font-size: 1.1rem !important;
+    }
+}
+/* SIDEBAR FIX */
+section[data-testid="stSidebar"] {
+    min-width: 250px !important;
+    max-width: 250px !important;
+}
+/* Hide Streamlit header button */
+button[kind="header"] {
+    display: none !important;
+}
+/* MCQ UI */
+.mcq-question {
+    background-color: #0f172a;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    border-left: 4px solid #4CAF50;
+}
+.mcq-option {
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    background-color: #020617;
+    border: 1px solid #1e293b;
+}
+.mcq-option:hover {
+    background-color: #1e293b;
+}
+/* GAP FILLING */
+.gap-filling {
+    background-color: #1e1b4b;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+/* COURSE CARD */
+.course-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 10px 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================================================
+# 🎬 LANDING PAGE CONTENT - ONLY SHOWS WHEN NO ROLE SELECTED
+# ===============================================================
+
+# Check if no role is selected
+if st.session_state.get("role") is None or st.session_state.get("role") == "Select":
+    
+    # Glass Header
+    st.markdown(f"""
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    @media (min-width: 900px) {
-        .block-container {
-            max-width: 95% !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
-        }
-    }
-
-    @media (max-width: 899px) {
-        .block-container {
-            max-width: 100% !important;
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
-        }
-        .streamlit-expanderHeader {
-            font-size: 1.1rem !important;
-        }
-    }
-
-    section[data-testid="stSidebar"] {
-        min-width: 250px !important;
-        max-width: 250px !important;
-    }
-    button[kind="header"] {
-        display: none !important;
-    }
-
-    .mcq-question {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        border-left: 4px solid #4CAF50;
-    }
-    .mcq-option {
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 5px;
-        background-color: white;
-        border: 1px solid #ddd;
-    }
-    .mcq-option:hover {
-        background-color: #e9ecef;
-    }
-    .gap-filling {
-        background-color: #fff3cd;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .course-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin: 10px 0;
-    }
+    @keyframes gradientShift {{
+        0% {{ background-position: 0% 50%; }}
+        50% {{ background-position: 100% 50%; }}
+        100% {{ background-position: 0% 50%; }}
+    }}
+    @keyframes float {{
+        0%, 100% {{ transform: translateY(0px); }}
+        50% {{ transform: translateY(-5px); }}
+    }}
+    .glass-header {{
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        padding: 1.2rem 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }}
+    .brain-icon {{
+        font-size: 2.5rem;
+        animation: float 3s ease-in-out infinite;
+        display: inline-block;
+    }}
+    .title-gradient {{
+        font-size: 1.8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #4facfe);
+        background-size: 300% 300%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gradientShift 6s ease infinite;
+        margin: 0;
+    }}
+    .badge-modern {{
+        background: linear-gradient(135deg, #58cc02, #4a9e02);
+        padding: 8px 20px;
+        border-radius: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 15px rgba(88, 204, 2, 0.3);
+        transition: transform 0.3s ease;
+    }}
+    .badge-modern:hover {{
+        transform: scale(1.05);
+    }}
+    .course-count {{
+        background: rgba(255,255,255,0.1);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-left: 10px;
+    }}
     </style>
-    """,
-    unsafe_allow_html=True
-)
+    <div class="glass-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="brain-icon">🧠</div>
+                <div>
+                    <h1 class="title-gradient">AN INTERACTIVE LEARNING MANAGEMENT</h1>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <span style="color: #94a3b8; font-size: 0.85rem;">🎓 AI-Powered Learning</span>
+                        <span style="color: #94a3b8; font-size: 0.85rem;">⚡ Real-time Analytics</span>
+                        <span style="color: #94a3b8; font-size: 0.85rem;">🎮 Gamified Experience</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="badge-modern">
+                    <span>🔥</span>
+                    <span style="font-weight: bold;">7 Day Streak</span>
+                </div>
+                <div class="course-count">
+                    📚 {len(default_courses)} Courses
+                </div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+    # Show logo and branding
+    st.image("neuromatrix_lms_logo.png", width=180)
+    st.title("NeuroMatrix LMS")
+    st.caption("Where Brain Meets Learning Intelligence")
+    st.subheader("Neuromatrix Learning Management System – Education Prism")
+    st.divider()
+
+    # ===============================================================
+    # 📊 PROGRESS BAR (DUOLINGO STYLE)
+    # ===============================================================
+    progress = 0.75
+    st.markdown(f"""
+    <h4>📊 Learning Progress</h4>
+    <div class="progress-bar">
+        <div class="progress-fill" style="width:{progress*100}%"></div>
+    </div>
+    <p class="duo">{int(progress*100)}% Complete</p>
+    """, unsafe_allow_html=True)
+
+    # ===============================================================
+    # 🎬 NETFLIX STYLE CONTENT ROW
+    # ===============================================================
+    st.markdown("### 🎬 Continue Learning")
+    st.markdown('<div class="scroll-row">', unsafe_allow_html=True)
+
+    for course_name, data in default_courses.items():
+        st.markdown(f"""
+        <a href="{data['url']}" target="_blank" style="text-decoration:none;">
+            <div class="netflix-card">
+                <h4>📘 {course_name}</h4>
+                <p>Code: {data['code']}</p>
+                <p style="color:#58cc02;">▶ Open Interactive Lecture</p>
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# If a role is selected, show nothing from landing page
+else:
+    st.empty()  # This ensures nothing from landing page shows
 # ===============================================================
 # 🗂 CONSTANTS AND DIRECTORIES
 # ===============================================================
-
 PERSISTENT_DATA_DIR = "persistent_data"
 ATTENDANCE_STATUS_FILE = "attendance_status.json"
-DEFAULT_ADMIN_PASSWORD = "sacoetec2025"
-SYSTEM_ADMIN_PASSWORD = "systemadmin2025"
-
+DEFAULT_ADMIN_PASSWORD = "ademideola2026"
+SYSTEM_ADMIN_PASSWORD = "neuromatrixsystemadmin2026"
 # ===============================================================
 # 🗂 DIRECTORY MANAGEMENT
 # ===============================================================
-
 def ensure_directories():
     """Create all required directories"""
     directories = [
@@ -130,7 +512,7 @@ def ensure_directories():
     return True
 
 ensure_directories()
-
+    
 # ===============================================================
 # 🎯 COURSE MANAGEMENT SYSTEM
 # ===============================================================
@@ -148,19 +530,57 @@ def load_courses_config():
     try:
         courses_file = get_courses_file()
         if os.path.exists(courses_file):
-            with open(courses_file, 'r') as f:
+            with open(courses_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
+        
+        # Default courses configuration - DICTIONARY with codes and URLs
         default_courses = {
-            "MCB 221 – General Microbiology": "MCB221",
-            "BCH 201 – General Biochemistry": "BCH201",
-            "BIO 203 – General Physiology": "BIO203",
-            "BIO 113 – Virus Bacteria Lower Plants": "BIO113",
-            "BIO 306 – Systematic Biology": "BIO306",
+            "MCB 221 – General Microbiology": {
+                "code": "MCB221",
+                "url": "https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"
+            },
+            "BCH 201 – General Biochemistry": {
+                "code": "BCH201",
+                "url": "https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"
+            },
+            "BIO 203 – General Physiology": {
+                "code": "BIO203",
+                "url": "https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"
+            },
+            "BIO 113 – Virus Bacteria Lower Plants": {
+                "code": "BIO113",
+                "url": "https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"
+            },
+            "BIO 121 – Diversity of Invertebrate": {
+                "code": "BIO121",
+                "url": "https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"
+            },
+            "BIO 221 – Plant Physiology": {
+                "code": "BIO221",
+                "url": "https://neuromatrixbiosystems.com/BIO221_Interactive_Lecture_Notes#"
+            },
+            "BIO 222 – Vertebrate Anatomy and Physiology": {
+                "code": "BIO222",
+                "url": "https://neuromatrixbiosystems.com/BIO222_Interactive_Lecture_Notes#"
+            },
+            "BIO 306 – Systematic Biology": {
+                "code": "BIO306",
+                "url": "https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"
+            }
         }
+
+        # Save default configuration
         save_courses_config(default_courses)
         return default_courses
+        
+    except FileNotFoundError as e:
+        st.error(f"Course configuration file not found: {e}")
+        return {}
+    except json.JSONDecodeError as e:
+        st.error(f"Error parsing course configuration JSON: {e}")
+        return {}
     except Exception as e:
-        st.error(f"Error loading courses config: {e}")
+        st.error(f"Unexpected error loading courses config: {e}")
         return {}
 
 def save_courses_config(courses):
@@ -1323,7 +1743,8 @@ def view_all_students_attendance(course_code):
         st.error(f"Error loading complete attendance: {e}")
 
 def get_global_attendance_summary():
-    courses = list(load_courses_config().values())
+    raw_courses = load_courses_config()
+    courses = [v["code"] if isinstance(v, dict) else v for v in raw_courses.values()]
     summary_data = []
     for course in courses:
         total_students = 0
@@ -2171,7 +2592,7 @@ def generate_system_report():
         "total_student_activities": len(student_logs),
         "active_lecturers": len(set(log['lecturer_name'] for log in lecturer_logs)),
         "active_students": len(set(log['student_name'] for log in student_logs)),
-        "courses": list(courses.values())
+        "courses": [v["code"] if isinstance(v, dict) else v for v in courses.values()]
     }
     report_file = os.path.join(PERSISTENT_DATA_DIR, f"system_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
     with open(report_file, 'w') as f:
@@ -2320,7 +2741,7 @@ def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, sk
             if course_name in existing_courses:
                 results['duplicates'].append(f"Line {i}: Course name exists - '{course_name}'")
                 continue
-            if skip_duplicates and course_code in existing_courses.values():
+            if skip_duplicates and course_code in [v["code"] if isinstance(v, dict) else v for v in existing_courses.values()]:
                 results['duplicates'].append(f"Line {i}: Course code exists - '{course_code}'")
                 continue
             existing_courses[course_name] = course_code
@@ -2381,7 +2802,8 @@ def show_course_management():
         st.subheader("Current Courses")
         if courses:
             course_list = list(courses.items())
-            for idx, (course_name, course_code) in enumerate(course_list):
+            for idx, (course_name, course_val) in enumerate(course_list):
+                course_code = course_val["code"] if isinstance(course_val, dict) else course_val
                 with st.container():
                     col1, col2, col3 = st.columns([3, 1, 1])
                     with col1:
@@ -2461,19 +2883,22 @@ def show_course_management():
                 new_bulk_password = st.text_input("Set same password for all courses", type="password", key="bulk_password")
                 if st.button("🔑 Apply to All Courses", key="apply_bulk_password"):
                     if new_bulk_password:
-                        for course_code in courses.values():
-                            set_course_password(course_code, new_bulk_password)
+                        for cv in courses.values():
+                            cc = cv["code"] if isinstance(cv, dict) else cv
+                            set_course_password(cc, new_bulk_password)
                         st.success("✅ Password applied to all courses!")
                         st.rerun()
             with col2:
                 if st.button("🔄 Reset All to Default", key="reset_all_passwords"):
-                    for course_code in courses.values():
-                        set_course_password(course_code, DEFAULT_ADMIN_PASSWORD)
+                    for cv in courses.values():
+                        cc = cv["code"] if isinstance(cv, dict) else cv
+                        set_course_password(cc, DEFAULT_ADMIN_PASSWORD)
                     st.success("✅ All passwords reset to default!")
                     st.rerun()
             st.divider()
             course_list = list(courses.items())
-            for idx, (course_name, course_code) in enumerate(course_list):
+            for idx, (course_name, course_val) in enumerate(course_list):
+                course_code = course_val["code"] if isinstance(course_val, dict) else course_val
                 current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
                 with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
                     st.info(f"Current password: **{current_password}**")
@@ -2503,13 +2928,22 @@ def show_course_management():
         with col1:
             st.metric("Total Courses", len(courses))
         with col2:
-            custom_passwords = len([code for code in courses.values() if code in passwords])
+            custom_passwords = len([
+            v for v in courses.values()
+            if (v["code"] if isinstance(v, dict) else v) in passwords
+        ])
             st.metric("Custom Passwords", custom_passwords)
         with col3:
             st.metric("Default Passwords", len(courses) - custom_passwords)
         if courses:
-            overview_data = [{"Course Name": n, "Course Code": c, "Password": "Custom" if c in passwords else "Default"}
-                             for n, c in courses.items()]
+            overview_data = [
+                {
+                    "Course Name": n,
+                    "Course Code": (v["code"] if isinstance(v, dict) else v),
+                    "Password": "Custom" if (v["code"] if isinstance(v, dict) else v) in passwords else "Default"
+                }
+                for n, v in courses.items()
+            ]
             st.dataframe(pd.DataFrame(overview_data), use_container_width=True)
             st.download_button("📥 Export Courses to CSV", pd.DataFrame(overview_data).to_csv(index=False),
                                "courses_export.csv", "text/csv", key="export_courses_btn")
@@ -2748,24 +3182,85 @@ def student_view(course_code, course_name):
 
         st.success(f"**Logged in as:** {student_name} ({student_matric})")
 
+        # ===============================================================
+        # 🎨 VERTICAL SIDE TABS STYLING
+        # ===============================================================
+        st.markdown("""
+            <style>
+            /* Vertical tab styling for sidebar radio */
+            section[data-testid="stSidebar"] div[role="radiogroup"] {
+                flex-direction: column;
+                gap: 6px;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label {
+                background-color: #020617;
+                padding: 12px 16px;
+                border-radius: 8px;
+                border-left: 4px solid transparent;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                margin: 0 !important;
+                width: 100%;
+                font-weight: 500;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+                background-color: #e1e5ec;
+                border-left: 4px solid #4a90e2;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+                background-color: #4a90e2 !important;
+                color: white !important;
+                border-left: 4px solid #1f5aa8;
+            }
+            /* Hide the radio circle for a cleaner tab look */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+                display: none;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # Sidebar: Week navigation + Vertical Tabs
         st.sidebar.header("📅 Week Navigation")
-        selected_week = st.sidebar.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key="student_main_week_selector")
+        selected_week = st.sidebar.selectbox(
+            "Select Week",
+            [f"Week {i}" for i in range(1, 16)],
+            key="student_main_week_selector"
+        )
 
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-            "📝 About Course", "📖 Lecture & Classwork", "🎥 Video Lectures",
-            "🕒 Attendance", "📤 Submissions", "📢 Announcements",
-            "📝 Seminar Feedback", "📊 My Progress"
-        ])
+        st.sidebar.markdown("---")
+        st.sidebar.header("📂 Menu")
 
-        with tab1:
+        student_tabs = [
+            "📝 About Course",
+            "📖 Lecture & Classwork",
+            "🎥 Video Lectures",
+            "🕒 Attendance",
+            "📤 Submissions",
+            "📢 Announcements",
+            "📝 Seminar Feedback",
+            "📊 My Progress"
+        ]
+        selected_tab = st.sidebar.radio(
+            "Navigate",
+            student_tabs,
+            label_visibility="collapsed",
+            key="student_vertical_tab"
+        )
+
+        st.markdown("---")
+
+        # ============ TAB 1: About Course ============
+        if selected_tab == "📝 About Course":
             show_student_course_description(course_code, course_name)
 
-        with tab2:
+        # ============ TAB 2: Lecture & Classwork ============
+        elif selected_tab == "📖 Lecture & Classwork":
             st.header(f"📚 {course_code} - {selected_week}")
             display_weekly_lecture_materials(course_code, selected_week, student_name, student_matric)
             display_classwork_section(course_code, selected_week, student_name, student_matric)
 
-        with tab3:
+        # ============ TAB 3: Video Lectures ============
+        elif selected_tab == "🎥 Video Lectures":
             st.header("🎥 Video Lectures")
             video_files = get_video_files(course_code)
             if video_files:
@@ -2793,7 +3288,8 @@ def student_view(course_code, course_name):
             else:
                 st.info("No video lectures available yet.")
 
-        with tab4:
+        # ============ TAB 4: Attendance ============
+        elif selected_tab == "🕒 Attendance":
             st.header("🕒 Mark Attendance")
             with st.form(f"{course_code}_attendance_form"):
                 name = st.text_input("Full Name", value=student_name, key=f"{course_code}_student_name")
@@ -2819,12 +3315,8 @@ def student_view(course_code, course_name):
                         else:
                             st.error("⚠️ Failed to record attendance.")
 
-        with tab5:
-            # ===============================================================
-            # FIX #3 & #14: FIXED INDENTATION - All submission logic is now
-            # properly inside the `if submit_*:` block so files are only
-            # saved when the button is actually clicked, not on every re-render
-            # ===============================================================
+        # ============ TAB 5: Submissions ============
+        elif selected_tab == "📤 Submissions":
             st.header("📤 Submit Assignments")
 
             # --- Assignment Submission ---
@@ -2836,7 +3328,6 @@ def student_view(course_code, course_name):
                                                    key="assignment_upload")
                 submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
 
-            # All submission logic OUTSIDE the form widget but INSIDE the if-block
             if submit_assignment:
                 if not assignment_file:
                     st.error("❌ Please select a file to upload.")
@@ -2902,10 +3393,12 @@ def student_view(course_code, course_name):
                                                    seminar_topic, seminar_file.name)
                             st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
 
-        with tab6:
+        # ============ TAB 6: Announcements ============
+        elif selected_tab == "📢 Announcements":
             display_pdf_announcements_student(course_code)
 
-        with tab7:
+        # ============ TAB 7: Seminar Feedback ============
+        elif selected_tab == "📝 Seminar Feedback":
             st.subheader("📥 Seminar Feedback")
             feedback = get_seminar_feedback(student_matric, course_code)
             if feedback:
@@ -2918,7 +3411,6 @@ def student_view(course_code, course_name):
                     else:
                         st.info("Check the downloaded feedback file for detailed comments")
                 with col2:
-                    # FIX #6: Use the now-defined get_seminar_feedback_file_path()
                     feedback_file_path = get_seminar_feedback_file_path(student_matric, course_code)
                     if feedback_file_path and os.path.exists(feedback_file_path):
                         with open(feedback_file_path, "rb") as file:
@@ -2927,7 +3419,8 @@ def student_view(course_code, course_name):
             else:
                 st.info("No feedback available for your seminar yet")
 
-        with tab8:
+        # ============ TAB 8: My Progress ============
+        elif selected_tab == "📊 My Progress":
             st.header("📊 My Scores & Grades")
             student_scores = load_student_scores(course_code, student_name, student_matric)
             if not student_scores.empty:
@@ -2981,6 +3474,7 @@ def student_view(course_code, course_name):
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again.")
 
+
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW
 # ===============================================================
@@ -3023,17 +3517,71 @@ def admin_view(course_code, course_name):
                 else:
                     st.error("❌ Please enter and confirm new password!")
 
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
-            "📚 Course Manager", "📖 Lecture Management", "🎥 Video Management",
-            "🕒 Attendance Control", "📊 Attendance Records", "🧩 Classwork Control",
-            "📝 MCQ Management", "📝 Classwork Submissions", "📝 Grading System",
-            "📂 Student Submissions", "📢 Announcements", "📊 Seminar Submissions"
-        ])
+        # ===============================================================
+        # 🎨 VERTICAL SIDE TABS STYLING
+        # ===============================================================
+        st.markdown("""
+            <style>
+            section[data-testid="stSidebar"] div[role="radiogroup"] {
+                flex-direction: column;
+                gap: 6px;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label {
+                background-color: #020617;
+                padding: 12px 16px;
+                border-radius: 8px;
+                border-left: 4px solid transparent;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                margin: 0 !important;
+                width: 100%;
+                font-weight: 500;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+                background-color: #e1e5ec;
+                border-left: 4px solid #4a90e2;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+                background-color: #4a90e2 !important;
+                color: white !important;
+                border-left: 4px solid #1f5aa8;
+            }
+            section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+                display: none;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
-        with tab1:
+        st.sidebar.header("🛠️ Admin Menu")
+        admin_tabs = [
+            "📚 Course Manager",
+            "📖 Lecture Management",
+            "🎥 Video Management",
+            "🕒 Attendance Control",
+            "📊 Attendance Records",
+            "🧩 Classwork Control",
+            "📝 MCQ Management",
+            "📝 Classwork Submissions",
+            "📝 Grading System",
+            "📂 Student Submissions",
+            "📢 Announcements",
+            "📊 Seminar Submissions"
+        ]
+        selected_admin_tab = st.sidebar.radio(
+            "Navigate",
+            admin_tabs,
+            label_visibility="collapsed",
+            key=f"admin_vertical_tab_{course_code}"
+        )
+
+        st.markdown("---")
+
+        # ============ TAB 1: Course Manager ============
+        if selected_admin_tab == "📚 Course Manager":
             show_course_manager(course_code, course_name)
 
-        with tab2:
+        # ============ TAB 2: Lecture Management ============
+        elif selected_admin_tab == "📖 Lecture Management":
             st.header("📖 Lecture Management")
             lectures_df = load_lectures(course_code)
             st.session_state["lectures_df"] = lectures_df
@@ -3207,7 +3755,8 @@ def admin_view(course_code, course_name):
                 except Exception as e:
                     st.error(f"Error saving: {e}")
 
-        with tab3:
+        # ============ TAB 3: Video Management ============
+        elif selected_admin_tab == "🎥 Video Management":
             st.header("🎥 Video Lecture Management")
             uploaded_video = st.file_uploader("Upload Lecture Video (MP4 recommended, max 200MB)",
                                               type=["mp4", "mov", "avi", "mkv"],
@@ -3260,7 +3809,8 @@ def admin_view(course_code, course_name):
             else:
                 st.info("No videos in storage yet.")
 
-        with tab4:
+        # ============ TAB 4: Attendance Control ============
+        elif selected_admin_tab == "🕒 Attendance Control":
             st.header("🎛 Attendance Control")
             selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)],
                                          key=f"{course_code}_attendance_week_select")
@@ -3294,7 +3844,8 @@ def admin_view(course_code, course_name):
                 except Exception as e:
                     st.error(f"Error in auto-close: {e}")
 
-        with tab5:
+        # ============ TAB 5: Attendance Records ============
+        elif selected_admin_tab == "📊 Attendance Records":
             st.header("📊 Attendance Records")
             att_tab1, att_tab2, att_tab3 = st.tabs(["👥 Student Details", "📈 Weekly Summary", "📋 Complete History"])
             with att_tab1:
@@ -3314,7 +3865,8 @@ def admin_view(course_code, course_name):
                 else:
                     st.info("No attendance data found.")
 
-        with tab6:
+        # ============ TAB 6: Classwork Control ============
+        elif selected_admin_tab == "🧩 Classwork Control":
             st.header("🎛 Classwork Control")
             classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)],
                                           key=f"{course_code}_classwork_control_week")
@@ -3374,7 +3926,8 @@ def admin_view(course_code, course_name):
                 except Exception as e:
                     st.error(f"Error in classwork auto-close: {e}")
 
-        with tab7:
+        # ============ TAB 7: MCQ Management ============
+        elif selected_admin_tab == "📝 MCQ Management":
             st.header("🧩 Automated MCQ & Gap-Filling Management")
             mcq_week = st.selectbox("Select Week for MCQ", [f"Week {i}" for i in range(1, 16)], key="mcq_management_week")
             existing_questions_main = load_mcq_questions(course_code, mcq_week) or []
@@ -3436,7 +3989,8 @@ def admin_view(course_code, course_name):
             else:
                 st.info("No questions added yet.")
 
-        with tab8:
+        # ============ TAB 8: Classwork Submissions ============
+        elif selected_admin_tab == "📝 Classwork Submissions":
             st.header("📝 Classwork Submissions")
             cw_tab1, cw_tab2 = st.tabs(["📅 Weekly Submissions", "📚 All Submissions"])
             with cw_tab1:
@@ -3456,7 +4010,8 @@ def admin_view(course_code, course_name):
                 else:
                     st.info("No classwork submissions yet.")
 
-        with tab9:
+        # ============ TAB 9: Grading System ============
+        elif selected_admin_tab == "📝 Grading System":
             st.header("📝 Grading System")
             st.info("""
             **Grading Weights (After 15 Weeks + Exam):**
@@ -3591,7 +4146,8 @@ def admin_view(course_code, course_name):
                 except Exception as e:
                     st.error(f"Error loading grades: {e}")
 
-        with tab10:
+        # ============ TAB 10: Student Submissions ============
+        elif selected_admin_tab == "📂 Student Submissions":
             st.header("📂 View Student Submissions")
             upload_types = ["assignment", "drawing", "seminar"]
             for upload_type in upload_types:
@@ -3665,13 +4221,14 @@ def admin_view(course_code, course_name):
                                    data=st.session_state.weekly_data,
                                    file_name=st.session_state.weekly_filename, mime="text/csv")
 
-        with tab11:
+        # ============ TAB 11: Announcements ============
+        elif selected_admin_tab == "📢 Announcements":
             display_pdf_announcements_admin(course_code)
 
-        with tab12:
+        # ============ TAB 12: Seminar Submissions ============
+        elif selected_admin_tab == "📊 Seminar Submissions":
             st.subheader("📊 Seminar Submissions Management")
-            # FIX #9: Use load_courses_config().values() instead of get_courses_file()
-            all_courses = list(load_courses_config().values())
+            all_courses = [v["code"] if isinstance(v, dict) else v for v in load_courses_config().values()]
             admin_course = st.selectbox("Select Course", all_courses, key="seminar_course_admin")
             submissions = get_seminar_submissions(admin_course)
             if submissions:
@@ -3684,7 +4241,6 @@ def admin_view(course_code, course_name):
                             st.write(f"**Topic:** {submission['topic']}")
                             st.write(f"**File:** {submission['file_name']}")
                             st.write(f"**Submitted:** {submission['timestamp']}")
-                            # FIX #7: Replaced undefined download_file() with proper st.download_button
                             file_path = submission.get('file_path', '')
                             if file_path and os.path.exists(file_path):
                                 with open(file_path, "rb") as fh:
@@ -3724,19 +4280,32 @@ def admin_view(course_code, course_name):
     except Exception as e:
         st.error(f"An error occurred in admin view: {str(e)}")
 
+                
 # ===============================================================
 # 🚀 MAIN APPLICATION
 # ===============================================================
 
 def main():
     """Main application"""
-    st.subheader("Multi-Course Learning Management System – Education Prism")
-    st.title("🎓 Integrated Learning System")
-    st_autorefresh(interval=86_400_000, key="daily_refresh")
-    st.sidebar.title("🎓 Navigation")
+    
+    # ===============================================================
+    # 🔐 SESSION STATE INITIALIZATION
+    # ===============================================================
     if "role" not in st.session_state:
         st.session_state["role"] = None
-    role = st.sidebar.radio("Select Role", ["Select", "Student", "Admin", "System Admin"], key="role_selector")
+    
+    
+    
+    st.sidebar.title("🎓 Navigation")
+    
+    role = st.sidebar.radio(
+        "Select Role", 
+        ["Select", "Student", "Admin", "System Admin"], 
+        key="role_selector",
+        on_change=handle_role_change
+    )
+    
+    # Update session state based on selection
     if role != "Select":
         st.session_state["role"] = role
     else:
@@ -3744,22 +4313,24 @@ def main():
 
     COURSES = load_courses_config()
 
+    # Route to appropriate view based on role
     if st.session_state["role"] == "System Admin":
         show_system_admin_dashboard()
     elif st.session_state["role"] == "Admin" and COURSES:
         course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
-        course_code = COURSES[course]
+        course_code = COURSES[course]["code"] if isinstance(COURSES[course], dict) else COURSES[course]
         admin_view(course_code, course)
     elif st.session_state["role"] == "Student" and COURSES:
         course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
-        course_code = COURSES[course]
+        course_code = COURSES[course]["code"] if isinstance(COURSES[course], dict) else COURSES[course]
         student_view(course_code, course)
     else:
         if not COURSES:
             st.warning("⚠️ No courses available. Please contact system administrator.")
-        else:
+        elif st.session_state["role"] is None:
             st.info("👆 Please select your role from the sidebar to continue.")
 
+    # Footer (always shown)
     st.markdown("""
         <style>
         .custom-footer {
@@ -3770,9 +4341,13 @@ def main():
         }
         </style>
         <div class="custom-footer">
-            Developed by <b>Adebimpe-John Omolola</b> | © 2025 | Advanced LMS with System Monitoring
+            Developed by <b>Adebimpe-John Omolola</b> | © 2026 | Advanced LMS with System Monitoring
         </div>
     """, unsafe_allow_html=True)
+
+def handle_role_change():
+    """Callback when role changes"""
+    pass
 
 if __name__ == "__main__":
     main()
