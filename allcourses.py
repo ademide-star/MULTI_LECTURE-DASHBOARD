@@ -66,11 +66,11 @@ default_courses = {
     },
     "Plant Physiology": {
         "code": "BIO221",
-        "url": "https://neuromatrixbiosystems.com/BIO221_Interactive_Lecture_Notes#"
+        "url": "https://neuromatrixbiosystems.com/BIO221_Plant_Physiology_Interactive_Lecture_Notes#"
     },
     "Vertebrate Anatomy and Physiology": {
         "code": "BIO222",
-        "url": "https://neuromatrixbiosystems.com/BIO222_Interactive_Lecture_Notes#"
+        "url": "https://neuromatrixbiosystems.com/BIO222_Vertebrate_Anatomy_Physiology_Interactive_Notes.html#"
     },
     "Systematic Biology": {
         "code": "BIO306",
