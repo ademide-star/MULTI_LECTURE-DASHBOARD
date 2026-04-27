@@ -3607,7 +3607,13 @@ def render_question_manager(course_code, week, row_idx,
                              topic, brief, assignment,
                              lectures_df, get_file,
                              load_mcq_questions, save_mcq_questions):
-
+    # Validate required string arguments
+    if not isinstance(course_code, str) or not course_code:
+        st.error("Course code is invalid or missing.")
+        return
+    if week is None or not isinstance(week, (str, int)):
+        st.error("Week is not selected. Please choose a week first.")
+        return
     st.markdown("---")
     st.subheader("🧩 Automated Questions")
     existing_questions = load_mcq_questions(course_code, week) or []
