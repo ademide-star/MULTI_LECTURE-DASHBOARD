@@ -2,6 +2,7 @@
 streamlit==1.38.0
 pandas==2.2.2
 numpy==1.26.4
+anthropic>=0.97.0
 
 # --- File handling and uploads ---
 python-multipart==0.0.9
