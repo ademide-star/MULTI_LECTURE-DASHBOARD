@@ -485,7 +485,6 @@ PERSISTENT_DATA_DIR = "persistent_data"
 ATTENDANCE_STATUS_FILE = "attendance_status.json"
 DEFAULT_ADMIN_PASSWORD = "ademideola2026"
 SYSTEM_ADMIN_PASSWORD = "neuromatrixsystemadmin2026"
-client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 # ===============================================================
 # 🗂 DIRECTORY MANAGEMENT
 # ===============================================================
@@ -558,7 +557,7 @@ def load_courses_config():
             },
             "BIO 221 – Plant Physiology": {
                 "code": "BIO221",
-                "url": "https://neuromatrixbiosystems.com/BIO221_[lant_Physiology_Interactive_Lecture_Notes#"
+                "url": "https://neuromatrixbiosystems.com/BIO221_Plant_Physiology_Interactive_Lecture_Notes#"
             },
             "BIO 222 – Vertebrate Anatomy and Physiology": {
                 "code": "BIO222",
@@ -666,7 +665,7 @@ def emergency_database_fix():
     except Exception as e:
         print(f"Database fix failed: {e}")
         return False
-
+client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 def check_database_schema():
     """Check if database has the correct schema"""
     try:
