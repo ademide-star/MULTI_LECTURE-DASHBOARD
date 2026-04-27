@@ -3928,7 +3928,11 @@ def admin_view(course_code, course_name):
         )
 
         st.markdown("---")
-
+        week = None
+        row_idx = None
+        topic = ""
+        brief = ""
+        assignment = ""
         # ============ TAB 1: Course Manager ============
         if selected_admin_tab == "📚 Course Manager":
             show_course_manager(course_code, course_name)
@@ -4292,7 +4296,7 @@ def admin_view(course_code, course_name):
                 get_file=get_file,
                 load_mcq_questions=load_mcq_questions,
                 save_mcq_questions=save_mcq_questions,
-       )
+    )
 
         # ============ TAB 8: Classwork Submissions ============
         elif selected_admin_tab == "📝 Classwork Submissions":
