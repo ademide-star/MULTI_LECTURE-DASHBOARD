@@ -4283,15 +4283,15 @@ def admin_view(course_code, course_name):
         elif selected_admin_tab == "📝 MCQ Management":
             render_question_manager(
                 course_code=course_code,
-                week=class_week,
+                week=week,
                 row_idx=row_idx,
                 topic=topic,
                 brief=brief,
                 assignment=assignment,
                 lectures_df=lectures_df,
                 get_file=get_file,
-               load_mcq_questions=load_mcq_questions,
-               save_mcq_questions=save_mcq_questions,
+                load_mcq_questions=load_mcq_questions,
+                save_mcq_questions=save_mcq_questions,
        )
 
         # ============ TAB 8: Classwork Submissions ============
