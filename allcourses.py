@@ -3926,14 +3926,6 @@ def admin_view(course_code, course_name):
             label_visibility="collapsed",
             key=f"admin_vertical_tab_{course_code}"
         )
-
-        st.markdown("---")
-        week = None
-        row_idx = None
-        topic = ""
-        brief = ""
-        assignment = ""
-        lectures_df = load_lectures(...)
         
         # ============ TAB 1: Course Manager ============
         if selected_admin_tab == "📚 Course Manager":
@@ -4287,6 +4279,9 @@ def admin_view(course_code, course_name):
 
         # ============ TAB 7: MCQ Management ============
         elif selected_admin_tab == "📝 MCQ Management":
+            # Then in the MCQ tab:
+            week = st.session_state.get("week")
+            row_idx = st.session_state.get("row_idx")
             render_question_manager(
                 course_code=course_code,
                 week=week,
