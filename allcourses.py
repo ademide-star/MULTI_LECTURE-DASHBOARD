@@ -3475,6 +3475,364 @@ def student_view(course_code, course_name):
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again.")
 
+import streamlit as st
+import anthropic
+import json
+import re
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPER: AI-powered short answer grader
+# ─────────────────────────────────────────────────────────────────────────────
+
+def grade_short_answer_with_ai(question: str, model_answer: str, student_answer: str, max_marks: int = 5) -> dict:
+    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+
+    prompt = f"""You are an academic examiner grading a short-answer question. Grade the student's response fairly and provide constructive feedback.
+
+QUESTION: {question}
+
+MODEL ANSWER / KEY POINTS: {model_answer}
+
+STUDENT'S ANSWER: {student_answer}
+
+Maximum marks available: {max_marks}
+
+Instructions:
+- Award marks (0 to {max_marks}) based on how well the student's answer captures the key points.
+- Partial credit is allowed.
+- Be fair but rigorous.
+- Respond ONLY in valid JSON format with no extra text:
+{{
+  "score": <integer>,
+  "feedback": "<2-3 sentence constructive feedback>",
+  "key_points_covered": ["<point 1>", "<point 2>"],
+  "key_points_missed": ["<point 1>", "<point 2>"]
+}}"""
+
+    try:
+        response = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        result = json.loads(response.content[0].text.strip())
+        result["max_score"] = max_marks
+        result["percentage"] = round((result["score"] / max_marks) * 100, 1)
+        return result
+    except Exception as e:
+        return {
+            "score": 0,
+            "max_score": max_marks,
+            "feedback": f"Grading failed: {str(e)}",
+            "key_points_covered": [],
+            "key_points_missed": [],
+            "percentage": 0
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPER: parse bulk question import
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_bulk_questions(text: str) -> list:
+    questions = []
+    blocks = re.split(r'\n(?=MCQ:|GAP:|SHORT:)', text.strip())
+
+    for block in blocks:
+        lines = [l.strip() for l in block.strip().split('\n') if l.strip()]
+        if not lines:
+            continue
+
+        if lines[0].upper().startswith("MCQ:"):
+            q_text = lines[0][4:].strip()
+            options = {}
+            correct = ""
+            for line in lines[1:]:
+                m = re.match(r'^([A-E])[.)]\s*(.+)', line, re.IGNORECASE)
+                if m:
+                    options[m.group(1).upper()] = m.group(2).strip()
+                elif line.lower().startswith("correct:"):
+                    correct = line.split(":", 1)[1].strip().upper()
+            if q_text and options and correct:
+                questions.append({
+                    "type": "mcq",
+                    "question": q_text,
+                    "options": options,
+                    "correct_answer": correct,
+                    "model_answer": "",
+                    "marks": 1
+                })
+
+        elif lines[0].upper().startswith("GAP:"):
+            q_text = lines[0][4:].strip()
+            correct = ""
+            for line in lines[1:]:
+                if line.lower().startswith("correct:"):
+                    correct = line.split(":", 1)[1].strip()
+            if q_text and correct:
+                questions.append({
+                    "type": "gap_fill",
+                    "question": q_text,
+                    "options": {},
+                    "correct_answer": correct,
+                    "model_answer": "",
+                    "marks": 1
+                })
+
+        elif lines[0].upper().startswith("SHORT:"):
+            q_text = lines[0][6:].strip()
+            model_answer = ""
+            marks = 5
+            for line in lines[1:]:
+                if line.lower().startswith("model:"):
+                    model_answer = line.split(":", 1)[1].strip()
+                elif line.lower().startswith("marks:"):
+                    try:
+                        marks = int(line.split(":", 1)[1].strip())
+                    except ValueError:
+                        marks = 5
+            if q_text and model_answer:
+                questions.append({
+                    "type": "short_answer",
+                    "question": q_text,
+                    "options": {},
+                    "correct_answer": model_answer,
+                    "model_answer": model_answer,
+                    "marks": marks
+                })
+
+    return questions
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN RENDER FUNCTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_question_manager(course_code, week, row_idx,
+                             topic, brief, assignment,
+                             lectures_df, get_file,
+                             load_mcq_questions, save_mcq_questions):
+
+    st.markdown("---")
+    st.subheader("🧩 Automated Questions")
+    existing_questions = load_mcq_questions(course_code, week) or []
+
+    # ── Bulk Import ──────────────────────────────────────────────────────────
+    st.markdown("#### 📥 Bulk Import Questions")
+    with st.expander("Click to expand bulk import"):
+        st.markdown("""
+**MCQ format:**
+```
+MCQ: Question text?
+A. Option 1
+B. Option 2
+C. Option 3
+D. Option 4
+Correct: A
+```
+**GAP format:**
+```
+GAP: The answer is ________.
+Correct: answer|alternative
+```
+**SHORT ANSWER format:**
+```
+SHORT: Explain the role of acetylcholine in memory.
+Model: Acetylcholine is a neurotransmitter involved in encoding and retrieval of memories...
+Marks: 5
+```
+        """)
+        bulk_text = st.text_area(
+            "Paste your questions here:", height=300,
+            placeholder="Paste multiple questions in the format shown above...",
+            key=f"bulk_import_{week}"
+        )
+        if st.button("📥 Import Questions", key=f"import_{week}"):
+            if bulk_text.strip():
+                new_questions = parse_bulk_questions(bulk_text)
+                if new_questions:
+                    existing_questions.extend(new_questions)
+                    if save_mcq_questions(course_code, week, existing_questions):
+                        st.success(f"✅ Imported {len(new_questions)} questions!")
+                        st.rerun()
+                else:
+                    st.error("❌ No valid questions found. Check the format.")
+            else:
+                st.warning("⚠️ Please paste some questions first.")
+
+    # ── Creation Form ────────────────────────────────────────────────────────
+    st.markdown("#### ➕ Create New Question")
+    with st.form(f"mcq_creation_form_{week}"):
+        question_type = st.selectbox(
+            "Question Type",
+            ["Multiple Choice (MCQ)", "Gap Filling", "Short Answer"],
+            key=f"question_type_{week}"
+        )
+        question_text = st.text_area(
+            "Question Text",
+            placeholder="Enter your question here...",
+            key=f"question_text_{week}"
+        )
+
+        if question_type == "Multiple Choice (MCQ)":
+            col1, col2 = st.columns(2)
+            with col1:
+                option_a = st.text_input("Option A", key=f"option_a_{week}")
+                option_b = st.text_input("Option B", key=f"option_b_{week}")
+                option_e = st.text_input("Option E (optional)", key=f"option_e_{week}")
+            with col2:
+                option_c = st.text_input("Option C", key=f"option_c_{week}")
+                option_d = st.text_input("Option D", key=f"option_d_{week}")
+            correct_answer = st.selectbox(
+                "Correct Answer", ["A", "B", "C", "D", "E"],
+                key=f"correct_answer_{week}"
+            )
+            options = {"A": option_a, "B": option_b, "C": option_c,
+                       "D": option_d, "E": option_e}
+            model_answer_val = ""
+            marks_val = 1
+
+        elif question_type == "Gap Filling":
+            correct_answer = st.text_input(
+                "Correct Answer(s)",
+                placeholder="Use | for multiple acceptable answers",
+                key=f"gap_answer_{week}"
+            )
+            options = {}
+            model_answer_val = ""
+            marks_val = 1
+
+        else:  # Short Answer
+            model_answer_val = st.text_area(
+                "Model Answer / Key Points",
+                placeholder="Write the ideal answer or list the key points Claude should check for...",
+                key=f"model_answer_{week}",
+                height=120
+            )
+            marks_val = st.number_input(
+                "Maximum Marks", min_value=1, max_value=20, value=5,
+                key=f"marks_{week}"
+            )
+            correct_answer = model_answer_val
+            options = {}
+
+        add_question = st.form_submit_button("➕ Add Question")
+        if add_question and question_text:
+            new_question = {
+                "type": (
+                    "mcq" if question_type == "Multiple Choice (MCQ)"
+                    else "gap_fill" if question_type == "Gap Filling"
+                    else "short_answer"
+                ),
+                "question": question_text,
+                "options": options,
+                "correct_answer": correct_answer,
+                "model_answer": model_answer_val,
+                "marks": int(marks_val)
+            }
+            existing_questions.append(new_question)
+            if save_mcq_questions(course_code, week, existing_questions):
+                st.success("✅ Question added!")
+                st.rerun()
+
+    # ── Display Existing Questions ───────────────────────────────────────────
+    if existing_questions:
+        st.write(f"**Existing Questions for {week}:**")
+        for i, question in enumerate(existing_questions):
+            with st.container():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    q_type = question.get("type", "mcq")
+                    type_label = {
+                        "mcq": "Multiple Choice",
+                        "gap_fill": "Gap Fill",
+                        "short_answer": "Short Answer"
+                    }.get(q_type, q_type.replace("_", " ").title())
+
+                    st.write(f"**Q{i+1}:** {question['question']}")
+                    st.write(f"*Type:* {type_label}")
+
+                    if q_type == "mcq":
+                        for opt, text in question.get("options", {}).items():
+                            if text:
+                                st.write(f"  {opt}: {text}")
+                        st.write(f"*Correct:* **{question['correct_answer']}**")
+
+                    elif q_type == "gap_fill":
+                        st.write(f"*Correct:* `{question['correct_answer']}`")
+
+                    elif q_type == "short_answer":
+                        st.write(f"*Max Marks:* {question.get('marks', 5)}")
+                        with st.expander("View model answer"):
+                            st.write(question.get("model_answer", question.get("correct_answer", "")))
+
+                        st.markdown("**🎓 Grade a student response:**")
+                        student_ans = st.text_area(
+                            "Paste student's answer here",
+                            key=f"student_ans_{week}_{i}",
+                            height=80,
+                            placeholder="Paste the student's written response..."
+                        )
+                        if st.button("🤖 Grade with AI", key=f"grade_{week}_{i}"):
+                            if student_ans.strip():
+                                with st.spinner("Claude is grading..."):
+                                    result = grade_short_answer_with_ai(
+                                        question=question["question"],
+                                        model_answer=question.get("model_answer", question.get("correct_answer", "")),
+                                        student_answer=student_ans,
+                                        max_marks=question.get("marks", 5)
+                                    )
+                                score_color = (
+                                    "🟢" if result["percentage"] >= 70
+                                    else "🟡" if result["percentage"] >= 40
+                                    else "🔴"
+                                )
+                                st.success(
+                                    f"{score_color} **Score: {result['score']} / {result['max_score']}** "
+                                    f"({result['percentage']}%)"
+                                )
+                                st.info(f"**Feedback:** {result['feedback']}")
+                                if result.get("key_points_covered"):
+                                    st.markdown("✅ **Points covered:** " +
+                                                ", ".join(result["key_points_covered"]))
+                                if result.get("key_points_missed"):
+                                    st.markdown("❌ **Points missed:** " +
+                                                ", ".join(result["key_points_missed"]))
+                            else:
+                                st.warning("⚠️ Paste a student answer first.")
+
+                    st.markdown("---")
+
+                with col2:
+                    if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
+                        existing_questions.pop(i)
+                        save_mcq_questions(course_code, week, existing_questions)
+                        st.success("✅ Question deleted!")
+                        st.rerun()
+
+        if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
+            if save_mcq_questions(course_code, week, []):
+                st.success("✅ All questions cleared!")
+                st.rerun()
+    else:
+        st.info("No questions added for this week yet.")
+
+    # ── Save All ─────────────────────────────────────────────────────────────
+    st.markdown("---")
+    if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}",
+                 type="primary", use_container_width=True):
+        try:
+            lectures_df.at[row_idx, "Topic"] = topic
+            lectures_df.at[row_idx, "Brief"] = brief
+            lectures_df.at[row_idx, "Assignment"] = assignment
+            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
+            st.session_state["lectures_df"] = lectures_df
+            st.success("🎉 All lecture materials saved!")
+            st.balloons()
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error saving: {e}")
 
 # ===============================================================
 # 👩‍🏫 ADMIN VIEW
@@ -3929,392 +4287,19 @@ def admin_view(course_code, course_name):
 
         # ============ TAB 7: MCQ Management ============
         elif selected_admin_tab == "📝 MCQ Management":
-import streamlit as st
-import anthropic
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER: AI-powered short answer grader
-# ─────────────────────────────────────────────────────────────────────────────
+            render_question_manager(
+                course_code=course_code,
+                week=week,
+                row_idx=row_idx,
+                topic=topic,
+                brief=brief,
+                assignment=assignment,
+                lectures_df=lectures_df,
+                get_file=get_file,
+               load_mcq_questions=load_mcq_questions,
+               save_mcq_questions=save_mcq_questions,
+       )
 
-def grade_short_answer_with_ai(question: str, model_answer: str, student_answer: str, max_marks: int = 5) -> dict:
-    """
-    Uses Claude to grade a short-answer response.
-    Returns: { score, max_score, feedback, percentage }
-    """
-    client = anthropic.Anthropic()
-
-    prompt = f"""You are an academic examiner grading a short-answer question. Grade the student's response fairly and provide constructive feedback.
-
-QUESTION: {question}
-
-MODEL ANSWER / KEY POINTS: {model_answer}
-
-STUDENT'S ANSWER: {student_answer}
-
-Maximum marks available: {max_marks}
-
-Instructions:
-- Award marks (0 to {max_marks}) based on how well the student's answer captures the key points.
-- Partial credit is allowed.
-- Be fair but rigorous.
-- Respond ONLY in valid JSON format with no extra text:
-{{
-  "score": <integer>,
-  "feedback": "<2-3 sentence constructive feedback>",
-  "key_points_covered": ["<point 1>", "<point 2>"],
-  "key_points_missed": ["<point 1>", "<point 2>"]
-}}"""
-
-    try:
-        response = client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        import json
-        result = json.loads(response.content[0].text.strip())
-        result["max_score"] = max_marks
-        result["percentage"] = round((result["score"] / max_marks) * 100, 1)
-        return result
-    except Exception as e:
-        return {
-            "score": 0,
-            "max_score": max_marks,
-            "feedback": f"Grading failed: {str(e)}",
-            "key_points_covered": [],
-            "key_points_missed": [],
-            "percentage": 0
-        }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER: parse bulk question import (MCQ + GAP + SHORT ANSWER)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def parse_bulk_questions(text: str) -> list:
-    """
-    Supported formats:
-
-    MCQ:
-      MCQ: Question text?
-      A. Option A
-      B. Option B
-      C. Option C
-      D. Option D
-      Correct: B
-
-    GAP FILL:
-      GAP: The capital of Nigeria is ________.
-      Correct: Abuja|Lagos
-
-    SHORT ANSWER:
-      SHORT: Explain the role of acetylcholine in memory.
-      Model: Acetylcholine is a neurotransmitter critical for memory formation and retrieval...
-      Marks: 5
-    """
-    import re
-    questions = []
-    blocks = re.split(r'\n(?=MCQ:|GAP:|SHORT:)', text.strip())
-
-    for block in blocks:
-        lines = [l.strip() for l in block.strip().split('\n') if l.strip()]
-        if not lines:
-            continue
-
-        if lines[0].upper().startswith("MCQ:"):
-            q_text = lines[0][4:].strip()
-            options = {}
-            correct = ""
-            for line in lines[1:]:
-                m = re.match(r'^([A-E])[.)]\s*(.+)', line, re.IGNORECASE)
-                if m:
-                    options[m.group(1).upper()] = m.group(2).strip()
-                elif line.lower().startswith("correct:"):
-                    correct = line.split(":", 1)[1].strip().upper()
-            if q_text and options and correct:
-                questions.append({
-                    "type": "mcq",
-                    "question": q_text,
-                    "options": options,
-                    "correct_answer": correct,
-                    "model_answer": "",
-                    "marks": 1
-                })
-
-        elif lines[0].upper().startswith("GAP:"):
-            q_text = lines[0][4:].strip()
-            correct = ""
-            for line in lines[1:]:
-                if line.lower().startswith("correct:"):
-                    correct = line.split(":", 1)[1].strip()
-            if q_text and correct:
-                questions.append({
-                    "type": "gap_fill",
-                    "question": q_text,
-                    "options": {},
-                    "correct_answer": correct,
-                    "model_answer": "",
-                    "marks": 1
-                })
-
-        elif lines[0].upper().startswith("SHORT:"):
-            q_text = lines[0][6:].strip()
-            model_answer = ""
-            marks = 5
-            for line in lines[1:]:
-                if line.lower().startswith("model:"):
-                    model_answer = line.split(":", 1)[1].strip()
-                elif line.lower().startswith("marks:"):
-                    try:
-                        marks = int(line.split(":", 1)[1].strip())
-                    except ValueError:
-                        marks = 5
-            if q_text and model_answer:
-                questions.append({
-                    "type": "short_answer",
-                    "question": q_text,
-                    "options": {},
-                    "correct_answer": model_answer,   # model answer stored here
-                    "model_answer": model_answer,
-                    "marks": marks
-                })
-
-    return questions
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN RENDER FUNCTION — drop this into your LMS page
-# ─────────────────────────────────────────────────────────────────────────────
-
-def render_question_manager(course_code: str, week: str, row_idx: int,
-                             topic: str, brief: str, assignment: str,
-                             lectures_df, get_file, load_mcq_questions,
-                             save_mcq_questions):
-    """
-    Renders the full Question Manager block for one lecture week.
-    Supports: MCQ, Gap Fill, Short Answer (with AI grading).
-    """
-
-    st.markdown("---")
-    st.subheader("🧩 Automated Questions")
-    existing_questions = load_mcq_questions(course_code, week) or []
-
-    # ── Bulk Import ──────────────────────────────────────────────────────────
-    st.markdown("#### 📥 Bulk Import Questions")
-    with st.expander("Click to expand bulk import"):
-        st.markdown("""
-**MCQ format:**
-```
-MCQ: Question text?
-A. Option 1
-B. Option 2
-C. Option 3
-D. Option 4
-Correct: A
-```
-**GAP format:**
-```
-GAP: The answer is ________.
-Correct: answer|alternative
-```
-**SHORT ANSWER format:**
-```
-SHORT: Explain the role of acetylcholine in memory.
-Model: Acetylcholine is a neurotransmitter involved in encoding and retrieval of memories...
-Marks: 5
-```
-        """)
-        bulk_text = st.text_area(
-            "Paste your questions here:", height=300,
-            placeholder="Paste multiple questions in the format shown above...",
-            key=f"bulk_import_{week}"
-        )
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📥 Import Questions", key=f"import_{week}"):
-                if bulk_text.strip():
-                    new_questions = parse_bulk_questions(bulk_text)
-                    if new_questions:
-                        existing_questions.extend(new_questions)
-                        if save_mcq_questions(course_code, week, existing_questions):
-                            st.success(f"✅ Imported {len(new_questions)} questions!")
-                            st.rerun()
-                    else:
-                        st.error("❌ No valid questions found. Check the format.")
-                else:
-                    st.warning("⚠️ Please paste some questions first.")
-
-    # ── Creation Form ────────────────────────────────────────────────────────
-    st.markdown("#### ➕ Create New Question")
-    with st.form(f"mcq_creation_form_{week}"):
-        question_type = st.selectbox(
-            "Question Type",
-            ["Multiple Choice (MCQ)", "Gap Filling", "Short Answer"],
-            key=f"question_type_{week}"
-        )
-        question_text = st.text_area(
-            "Question Text",
-            placeholder="Enter your question here...",
-            key=f"question_text_{week}"
-        )
-
-        if question_type == "Multiple Choice (MCQ)":
-            col1, col2 = st.columns(2)
-            with col1:
-                option_a = st.text_input("Option A", key=f"option_a_{week}")
-                option_b = st.text_input("Option B", key=f"option_b_{week}")
-                option_e = st.text_input("Option E (optional)", key=f"option_e_{week}")
-            with col2:
-                option_c = st.text_input("Option C", key=f"option_c_{week}")
-                option_d = st.text_input("Option D", key=f"option_d_{week}")
-            correct_answer = st.selectbox(
-                "Correct Answer", ["A", "B", "C", "D", "E"],
-                key=f"correct_answer_{week}"
-            )
-            options = {"A": option_a, "B": option_b, "C": option_c,
-                       "D": option_d, "E": option_e}
-            model_answer_val = ""
-            marks_val = 1
-
-        elif question_type == "Gap Filling":
-            correct_answer = st.text_input(
-                "Correct Answer(s)",
-                placeholder="Use | for multiple acceptable answers",
-                key=f"gap_answer_{week}"
-            )
-            options = {}
-            model_answer_val = ""
-            marks_val = 1
-
-        else:  # Short Answer
-            model_answer_val = st.text_area(
-                "Model Answer / Key Points",
-                placeholder="Write the ideal answer or list the key points Claude should check for...",
-                key=f"model_answer_{week}",
-                height=120
-            )
-            marks_val = st.number_input(
-                "Maximum Marks", min_value=1, max_value=20, value=5,
-                key=f"marks_{week}"
-            )
-            correct_answer = model_answer_val
-            options = {}
-
-        add_question = st.form_submit_button("➕ Add Question")
-        if add_question and question_text:
-            new_question = {
-                "type": (
-                    "mcq" if question_type == "Multiple Choice (MCQ)"
-                    else "gap_fill" if question_type == "Gap Filling"
-                    else "short_answer"
-                ),
-                "question": question_text,
-                "options": options,
-                "correct_answer": correct_answer,
-                "model_answer": model_answer_val,
-                "marks": int(marks_val)
-            }
-            existing_questions.append(new_question)
-            if save_mcq_questions(course_code, week, existing_questions):
-                st.success("✅ Question added!")
-                st.rerun()
-
-    # ── Display + Manage Existing Questions ──────────────────────────────────
-    if existing_questions:
-        st.write(f"**Existing Questions for {week}:**")
-        for i, question in enumerate(existing_questions):
-            with st.container():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    q_type = question.get("type", "mcq")
-                    type_label = {
-                        "mcq": "Multiple Choice",
-                        "gap_fill": "Gap Fill",
-                        "short_answer": "Short Answer"
-                    }.get(q_type, q_type.replace("_", " ").title())
-
-                    st.write(f"**Q{i+1}:** {question['question']}")
-                    st.write(f"*Type:* {type_label}")
-
-                    if q_type == "mcq":
-                        for opt, text in question.get("options", {}).items():
-                            if text:
-                                st.write(f"  {opt}: {text}")
-                        st.write(f"*Correct:* **{question['correct_answer']}**")
-
-                    elif q_type == "gap_fill":
-                        st.write(f"*Correct:* `{question['correct_answer']}`")
-
-                    elif q_type == "short_answer":
-                        st.write(f"*Max Marks:* {question.get('marks', 5)}")
-                        with st.expander("View model answer"):
-                            st.write(question.get("model_answer", question.get("correct_answer", "")))
-
-                        # ── STUDENT GRADING PANEL ─────────────────────────
-                        st.markdown("**🎓 Grade a student response:**")
-                        student_ans = st.text_area(
-                            "Paste student's answer here",
-                            key=f"student_ans_{week}_{i}",
-                            height=80,
-                            placeholder="Paste the student's written response..."
-                        )
-                        if st.button("🤖 Grade with AI", key=f"grade_{week}_{i}"):
-                            if student_ans.strip():
-                                with st.spinner("Claude is grading..."):
-                                    result = grade_short_answer_with_ai(
-                                        question=question["question"],
-                                        model_answer=question.get("model_answer", question.get("correct_answer", "")),
-                                        student_answer=student_ans,
-                                        max_marks=question.get("marks", 5)
-                                    )
-                                score_color = (
-                                    "🟢" if result["percentage"] >= 70
-                                    else "🟡" if result["percentage"] >= 40
-                                    else "🔴"
-                                )
-                                st.success(
-                                    f"{score_color} **Score: {result['score']} / {result['max_score']}**  "
-                                    f"({result['percentage']}%)"
-                                )
-                                st.info(f"**Feedback:** {result['feedback']}")
-                                if result.get("key_points_covered"):
-                                    st.markdown("✅ **Points covered:** " +
-                                                ", ".join(result["key_points_covered"]))
-                                if result.get("key_points_missed"):
-                                    st.markdown("❌ **Points missed:** " +
-                                                ", ".join(result["key_points_missed"]))
-                            else:
-                                st.warning("⚠️ Paste a student answer first.")
-
-                    st.markdown("---")
-                with col2:
-                    if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                        existing_questions.pop(i)
-                        save_mcq_questions(course_code, week, existing_questions)
-                        st.success("✅ Question deleted!")
-                        st.rerun()
-
-        if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-            if save_mcq_questions(course_code, week, []):
-                st.success("✅ All questions cleared!")
-                st.rerun()
-    else:
-        st.info("No questions added for this week yet.")
-
-    # ── Save All ─────────────────────────────────────────────────────────────
-    st.markdown("---")
-    if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}",
-                 type="primary", use_container_width=True):
-        try:
-            lectures_df.at[row_idx, "Topic"] = topic
-            lectures_df.at[row_idx, "Brief"] = brief
-            lectures_df.at[row_idx, "Assignment"] = assignment
-            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-            st.session_state["lectures_df"] = lectures_df
-            st.success("🎉 All lecture materials saved!")
-            st.balloons()
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error saving: {e}")
         # ============ TAB 8: Classwork Submissions ============
         elif selected_admin_tab == "📝 Classwork Submissions":
             st.header("📝 Classwork Submissions")
