@@ -4283,7 +4283,7 @@ def admin_view(course_code, course_name):
         elif selected_admin_tab == "📝 MCQ Management":
             render_question_manager(
                 course_code=course_code,
-                week=week,
+                week=class_week,
                 row_idx=row_idx,
                 topic=topic,
                 brief=brief,
