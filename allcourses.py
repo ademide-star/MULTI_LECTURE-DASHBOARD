@@ -3603,9 +3603,7 @@ def parse_bulk_questions(text: str) -> list:
 # MAIN RENDER FUNCTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def render_question_manager(course_code, week, row_idx,
-                             topic, brief, assignment,
-                             lectures_df, get_file,
+def render_question_manager(course_code, week, row_idx, get_file,
                              load_mcq_questions, save_mcq_questions):
   
     st.markdown("---")
