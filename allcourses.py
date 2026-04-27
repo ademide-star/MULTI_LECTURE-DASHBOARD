@@ -3933,6 +3933,8 @@ def admin_view(course_code, course_name):
         topic = ""
         brief = ""
         assignment = ""
+        lectures_df = load_lectures(...)
+        
         # ============ TAB 1: Course Manager ============
         if selected_admin_tab == "📚 Course Manager":
             show_course_manager(course_code, course_name)
