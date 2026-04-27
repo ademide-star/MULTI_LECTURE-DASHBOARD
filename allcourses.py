@@ -6,6 +6,7 @@ import re
 import json
 import base64
 import csv
+import anthropic
 from io import BytesIO
 from datetime import datetime, date, timedelta, time
 from streamlit_autorefresh import st_autorefresh
@@ -3473,12 +3474,6 @@ def student_view(course_code, course_name):
     except Exception as e:
         st.error(f"An error occurred in the student dashboard: {str(e)}")
         st.info("Please refresh the page and try again.")
-
-import streamlit as st
-import anthropic
-import json
-import re
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPER: AI-powered short answer grader
