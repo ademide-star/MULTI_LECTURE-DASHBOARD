@@ -1,4653 +1,1982 @@
-import streamlit as st
-import pandas as pd
-import sqlite3
-import os
-import re
-import json
-import base64
-import csv
-import anthropic
-from io import BytesIO
-from datetime import datetime, date, timedelta, time
-from streamlit_autorefresh import st_autorefresh
-
-# ===============================================================
-# 🎯 PAGE CONFIGURATION - MUST BE FIRST STREAMLIT COMMAND
-# ===============================================================
-st.set_page_config(
-    page_title="NeuroMatrix LMS",
-    page_icon="neuromatrix_lms_logo.png",
-    layout="centered"
-)
-st.markdown("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroMatrix LMS — Sikiru Adetona College of Education Science and Technology</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-    /* Force sidebar to always be visible (like on desktop) */
-    @media (max-width: 300px) {
-        section[data-testid="stSidebar"] {
-            display: block !important;
-            transform: none !important;
-            width: 300px !important;
-        }
-        /* Adjust main content margin */
-        .main > div {
-            margin-left: 300px !important;
-        }
-        /* Hide the hamburger menu button */
-        button[kind="header"] {
-            display: none !important;
-        }
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ===============================================================
-# ===============================================================
-# 📚 DEFAULT COURSES CONFIGURATION
-# ===============================================================
-default_courses = {
-    "General Microbiology": {
-        "code": "MCB221",
-        "url": "https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"
-    },
-    "General Biochemistry": {
-        "code": "BCH201",
-        "url": "https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"
-    },
-    "General Physiology": {
-        "code": "BIO203",
-        "url": "https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"
-    },
-    "Virus Bacteria Lower Plants": {
-        "code": "BIO113",
-        "url": "https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"
-    },
-    "Diversity of Invertebrate": {
-        "code": "BIO121",
-        "url": "https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"
-    },
-    "Plant Physiology": {
-        "code": "BIO221",
-        "url": "https://neuromatrixbiosystems.com/BIO221_Plant_Physiology_Interactive_Notes#"
-    },
-    "Vertebrate Anatomy and Physiology": {
-        "code": "BIO222",
-        "url": "https://neuromatrixbiosystems.com/BIO222_Vertebrate_Anatomy_Physiology_Interactive_Notes.html#"
-    },
-    "Systematic Biology": {
-        "code": "BIO306",
-        "url": "https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"
-    }
+:root {
+  --ink:#080d18;--surface:#0f1724;--panel:#141e30;--border:#1c2d44;
+  --muted:#2a4060;--dim:#6a8aaa;--text:#ddeeff;--bright:#ffffff;
+  --cyan:#00d4ff;--violet:#7c3aed;--green:#10b981;--amber:#f59e0b;
+  --red:#ef4444;--pink:#ec4899;
+  --head:'Syne', sans-serif;--mono:'DM Mono', monospace;--serif:'Fraunces', serif;
 }
-
-# ===============================================================
-# 🎨 NEUROMATRIX - DUOLINGO × NETFLIX UI SYSTEM
-# ===============================================================
-
-st.markdown("""
-<style>
-/* =========================
-   GLOBAL DARK CINEMATIC THEME
-========================= */
-.stApp {
-    background: radial-gradient(circle at top, #0f172a, #020617);
-    color: #e2e8f0;
-    font-family: sans-serif;
-}
-/* Hide Streamlit default UI */
-#MainMenu, footer, header {
-    visibility: hidden;
-}
-/* Smooth scrolling like modern apps */
-html, body {
-    scroll-behavior: smooth;
-}
-/* =========================
-   TYPOGRAPHY
-========================= */
-h1, h2, h3 {
-    color: #f8fafc;
-    letter-spacing: 0.5px;
-}
-/* =========================
-   SIDEBAR (APP FEEL)
-========================= */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #020617, #0f172a);
-    border-right: 1px solid #1e293b;
-}
-/* =========================
-   NETFLIX STYLE CARDS
-========================= */
-.netflix-card {
-    background: linear-gradient(145deg, #0b1220, #0f172a);
-    border-radius: 18px;
-    padding: 16px;
-    border: 1px solid #1e293b;
-    transition: all 0.3s ease;
-    min-width: 240px;
-}
-.netflix-card:hover {
-    transform: scale(1.05);
-    border-color: #3b82f6;
-    box-shadow: 0 12px 35px rgba(0,0,0,0.5);
-}
-/* Horizontal scroll row */
-.scroll-row {
-    display: flex;
-    overflow-x: auto;
-    gap: 15px;
-    padding: 10px 0;
-}
-/* =========================
-   DUOLINGO ACCENTS
-========================= */
-.duo {
-    color: #58cc02;
-    font-weight: bold;
-}
-.streak-badge {
-    background: #58cc02;
-    color: black;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-weight: bold;
-    display: inline-block;
-}
-/* =========================
-   METRICS (ANIMATED FEEL)
-========================= */
-[data-testid="stMetric"] {
-    background: #0b1220;
-    border-radius: 16px;
-    padding: 12px;
-    border: 1px solid #1e293b;
-    transition: all 0.3s ease;
-}
-[data-testid="stMetric"]:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-}
-[data-testid="stMetricValue"] {
-    font-size: 2rem !important;
-    font-weight: 700 !important;
-    color: #60a5fa !important;
-}
-/* =========================
-   PROGRESS BAR (DUOLINGO STYLE)
-========================= */
-.progress-bar {
-    background: #1e293b;
-    border-radius: 20px;
-    height: 18px;
-    overflow: hidden;
-}
-.progress-fill {
-    background: #58cc02;
-    height: 100%;
-    width: 0%;
-    animation: fillBar 1.5s ease forwards;
-}
-@keyframes fillBar {
-    from { width: 0%; }
-}
-/* =========================
-   CONTENT CARD
-========================= */
-.card {
-    background: #0b1220;
-    border: 1px solid #1e293b;
-    padding: 18px;
-    border-radius: 16px;
-    margin-bottom: 15px;
-}
-/* =========================
-   SIDEBAR RADIO STYLE
-========================= */
-div[role="radiogroup"] > label {
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 6px;
-    transition: 0.2s;
-}
-div[role="radiogroup"] > label:hover {
-    background: #1e293b;
-}
-/* GLOBAL APP BACKGROUND */
-.stApp {
-    background-color: #0f172a;
-    color: #e2e8f0;
-}
-/* SIDEBAR */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #020617, #0f172a);
-    border-right: 1px solid #1e293b;
-}
-/* SIDEBAR TEXT */
-section[data-testid="stSidebar"] * {
-    color: #e2e8f0 !important;
-}
-/* RADIO BUTTONS (NAV ITEMS) */
-div[role="radiogroup"] > label {
-    padding: 10px 12px;
-    border-radius: 10px;
-    margin-bottom: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-}
-/* HOVER EFFECT */
-div[role="radiogroup"] > label:hover {
-    background-color: #1e293b;
-}
-/* SELECTED NAV ITEM */
-div[role="radiogroup"] > label[data-checked="true"] {
-    background: linear-gradient(90deg, #2563eb, #1d4ed8);
-    color: white !important;
-    font-weight: 600;
-}
-/* MAIN HEADERS */
-h1, h2, h3 {
-    color: #f8fafc;
-}
-/* CARD STYLE */
-.card {
-    background: #020617;
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid #1e293b;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    margin-bottom: 15px;
-}
-/* BUTTONS */
-.stButton>button {
-    background: linear-gradient(90deg, #2563eb, #1d4ed8);
-    color: white;
-    border-radius: 10px;
-    border: none;
-}
-/* INPUT FIELDS */
-input, textarea {
-    background-color: #020617 !important;
-    color: white !important;
-}
-/* METRICS */
-[data-testid="stMetric"] {
-    background: #020617;
-    padding: 10px;
-    border-radius: 12px;
-    border: 1px solid #1e293b;
-}
-/* GLOBAL SMOOTH ANIMATION */
-.block-container {
-    transition: all 0.3s ease-in-out;
-}
-/* Hide Streamlit UI */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-/* DESKTOP */
-@media (min-width: 900px) {
-    .block-container {
-        max-width: 95% !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
-    }
-}
-/* MOBILE */
-@media (max-width: 300px) {
-    .block-container {
-        max-width: 100% !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    .streamlit-expanderHeader {
-        font-size: 1.1rem !important;
-    }
-}
-/* SIDEBAR FIX */
-section[data-testid="stSidebar"] {
-    min-width: 250px !important;
-    max-width: 250px !important;
-}
-/* Hide Streamlit header button */
-button[kind="header"] {
-    display: none !important;
-}
-/* MCQ UI */
-.mcq-question {
-    background-color: #0f172a;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    border-left: 4px solid #4CAF50;
-}
-.mcq-option {
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 5px;
-    background-color: #020617;
-    border: 1px solid #1e293b;
-}
-.mcq-option:hover {
-    background-color: #1e293b;
-}
-/* GAP FILLING */
-.gap-filling {
-    background-color: #1e1b4b;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 10px 0;
-}
-/* COURSE CARD */
-.course-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 10px 0;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--mono);background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);
+  background-size:64px 64px}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+.shell{display:none;flex-direction:row;min-height:100vh}
+.sb{width:252px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:1.4rem .9rem;gap:0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
+.sb-logo{font-family:var(--head);font-size:1.05rem;font-weight:800;color:var(--cyan);
+  display:flex;align-items:center;gap:.55rem;padding:.4rem .4rem 1.4rem;letter-spacing:-.02em}
+.sb-logo span{font-size:1.35rem}
+.sb-sect{font-size:.62rem;color:var(--muted);letter-spacing:.13em;text-transform:uppercase;padding:.8rem .4rem .35rem}
+.sb-nav{display:flex;flex-direction:column;gap:.18rem;flex:1}
+.ni{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:9px;
+  cursor:pointer;font-size:.8rem;color:var(--dim);transition:all .18s;border:1px solid transparent}
+.ni:hover{background:var(--panel);color:var(--text)}
+.ni.active{background:rgba(0,212,255,.1);color:var(--cyan);border-color:rgba(0,212,255,.22)}
+.ni .ico{font-size:.95rem;flex-shrink:0;width:1.1rem;text-align:center}
+.sb-sel{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);font-family:var(--mono);font-size:.8rem;padding:.5rem .85rem;width:100%;cursor:pointer;outline:none;margin-bottom:.45rem}
+.sb-sel:focus{border-color:var(--cyan)}
+.sb-foot{margin-top:auto;padding-top:1rem;border-top:1px solid var(--border)}
+.back-btn{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.75rem;
+  color:var(--dim);padding:.45rem .5rem;border-radius:8px;transition:all .18s}
+.back-btn:hover{color:var(--red);background:rgba(239,68,68,.06)}
+.content{flex:1;padding:2rem 2.4rem;overflow-y:auto}
+.tab-panel{animation:fadeUp .22s ease}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.8rem;gap:1rem;flex-wrap:wrap}
+.pt{font-family:var(--head);font-size:1.6rem;font-weight:800;color:var(--bright);line-height:1.1;letter-spacing:-.025em}
+.ps{font-size:.76rem;color:var(--dim);margin-top:.25rem}
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .85rem;border-radius:40px;font-size:.7rem;font-weight:600}
+.bc{background:rgba(0,212,255,.09);color:var(--cyan);border:1px solid rgba(0,212,255,.22)}
+.bg{background:rgba(16,185,129,.09);color:var(--green);border:1px solid rgba(16,185,129,.22)}
+.ba{background:rgba(245,158,11,.09);color:var(--amber);border:1px solid rgba(245,158,11,.22)}
+.br{background:rgba(239,68,68,.09);color:var(--red);border:1px solid rgba(239,68,68,.22)}
+.bv{background:rgba(124,58,237,.09);color:#a78bfa;border:1px solid rgba(124,58,237,.22)}
+.bp{background:rgba(236,72,153,.09);color:var(--pink);border:1px solid rgba(236,72,153,.22)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.1rem}
+.ct{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright);margin-bottom:.9rem}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.4rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:1rem}
+.mv{font-family:var(--head);font-size:1.65rem;font-weight:800;color:var(--cyan)}
+.ml{font-size:.7rem;color:var(--dim);margin-top:.2rem}
+.field{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.9rem}
+label{font-size:.74rem;color:var(--dim);letter-spacing:.04em}
+input,textarea,select{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+  padding:.65rem .95rem;color:var(--text);font-family:var(--mono);font-size:.82rem;width:100%;outline:none;transition:border-color .18s}
+input:focus,textarea:focus,select:focus{border-color:var(--cyan)}
+textarea{resize:vertical;min-height:80px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  padding:.6rem 1.3rem;border-radius:9px;border:none;cursor:pointer;
+  font-family:var(--mono);font-size:.8rem;font-weight:500;transition:all .18s}
+.btn-p{background:var(--cyan);color:var(--ink)}
+.btn-p:hover{background:#00bbd8;transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,212,255,.22)}
+.btn-s{background:var(--panel);color:var(--text);border:1px solid var(--border)}
+.btn-s:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-d{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.28)}
+.btn-d:hover{background:rgba(239,68,68,.22)}
+.btn-g{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.28)}
+.btn-g:hover{background:rgba(16,185,129,.22)}
+.btn-v{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.28)}
+.sm{padding:.38rem .8rem;font-size:.73rem;border-radius:7px}
+.full{width:100%}
+.al{padding:.8rem 1rem;border-radius:11px;font-size:.8rem;margin-bottom:.9rem;display:flex;align-items:flex-start;gap:.55rem;line-height:1.5}
+.ai{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.18);color:var(--cyan)}
+.as{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);color:var(--green)}
+.aw{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.18);color:var(--amber)}
+.ae{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.18);color:var(--red)}
+.tw{overflow-x:auto;border-radius:11px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.77rem}
+th{background:var(--panel);color:var(--dim);font-size:.67rem;letter-spacing:.08em;text-transform:uppercase;padding:.75rem .95rem;text-align:left}
+td{padding:.7rem .95rem;border-top:1px solid var(--border);color:var(--text)}
+tr:hover td{background:var(--panel)}
+.itabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1.4rem;flex-wrap:wrap}
+.itab{padding:.55rem .95rem;font-size:.77rem;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;transition:all .18s}
+.itab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.itab:hover{color:var(--text)}
+.wstrip{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:1.4rem}
+.wc{padding:.32rem .78rem;border-radius:7px;font-size:.72rem;cursor:pointer;
+  background:var(--panel);border:1px solid var(--border);color:var(--dim);transition:all .13s}
+.wc.on{background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.wc:hover{border-color:var(--cyan);color:var(--cyan)}
+.mq{margin-bottom:1.4rem}
+.mqt{font-size:.87rem;color:var(--text);margin-bottom:.7rem;font-weight:500}
+.mopts{display:flex;flex-direction:column;gap:.45rem}
+.mopt{display:flex;align-items:center;gap:.75rem;padding:.65rem .95rem;
+  border-radius:9px;border:1px solid var(--border);cursor:pointer;transition:all .13s;font-size:.8rem}
+.mopt:hover{border-color:var(--cyan);background:rgba(0,212,255,.04)}
+.mopt.sel{border-color:var(--cyan);background:rgba(0,212,255,.09);color:var(--cyan)}
+.mopt.ok{border-color:var(--green);background:rgba(16,185,129,.09);color:var(--green)}
+.mopt.wrong{border-color:var(--red);background:rgba(239,68,68,.09);color:var(--red)}
+.pbw{background:var(--panel);border-radius:99px;height:7px;overflow:hidden}
+.pbf{height:100%;border-radius:99px;transition:width .5s ease;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+.istrip{display:flex;align-items:center;gap:.9rem;background:var(--panel);
+  border-radius:13px;padding:.9rem 1.1rem;border:1px solid var(--border);margin-bottom:1.4rem}
+.iav{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--violet));
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.in{font-family:var(--head);font-size:.9rem;font-weight:700}
+.im{font-size:.72rem;color:var(--dim)}
+.crow{display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1.05rem;border-radius:11px;background:var(--panel);
+  border:1px solid var(--border);margin-bottom:.55rem;gap:.9rem}
+.crn{font-size:.85rem;font-weight:600;color:var(--text)}
+.crc{font-size:.7rem;color:var(--cyan)}
+.cra{display:flex;gap:.45rem}
+.timer{font-family:var(--head);font-size:2.5rem;font-weight:800;color:var(--amber);text-align:center;margin:1rem 0}
+.timer.urgent{color:var(--red);animation:pulse 1s infinite}
+#landing{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:2rem;text-align:center;gap:1.8rem}
+.hero-badge{display:inline-flex;align-items:center;gap:.45rem;
+  background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.28);border-radius:40px;
+  padding:.38rem 1.1rem;font-size:.72rem;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;
+  animation:fadeUp .5s ease both}
+.hero-title{font-family:var(--head);font-size:clamp(2.6rem,7vw,5.5rem);font-weight:800;line-height:.93;
+  letter-spacing:-.035em;background:linear-gradient(135deg,#fff 0%,var(--cyan) 38%,var(--violet) 75%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:fadeUp .6s .08s ease both}
+.hero-sub{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim);
+  max-width:440px;line-height:1.75;animation:fadeUp .6s .18s ease both}
+.portal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:.9rem;width:100%;max-width:720px;animation:fadeUp .6s .28s ease both}
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:15px;
+  padding:1.7rem 1.3rem;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;gap:.75rem}
+.pcard::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 0%,var(--cc,var(--cyan)) 0%,transparent 70%);
+  opacity:0;transition:opacity .3s}
+.pcard:hover{border-color:var(--cc,var(--cyan));transform:translateY(-4px);box-shadow:0 18px 36px rgba(0,0,0,.4)}
+.pcard:hover::before{opacity:.07}
+.pcard .pico{font-size:2rem}
+.pcard .plabel{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright)}
+.pcard .pdesc{font-size:.7rem;color:var(--dim);text-align:center;line-height:1.5}
+#gate{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);
+  backdrop-filter:blur(14px);align-items:center;justify-content:center}
+.gbox{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:2.2rem;width:370px;max-width:95vw;display:flex;flex-direction:column;gap:1.1rem;animation:fadeUp .3s ease}
+.gt{font-family:var(--head);font-size:1.2rem;font-weight:800;color:var(--bright)}
+#toast{position:fixed;bottom:1.8rem;right:1.8rem;z-index:999;background:var(--surface);
+  border:1px solid var(--border);border-radius:13px;padding:.85rem 1.2rem;font-size:.8rem;
+  box-shadow:0 18px 44px rgba(0,0,0,.5);opacity:0;transform:translateY(10px);
+  transition:all .28s;max-width:310px;display:flex;align-items:center;gap:.65rem}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ts{border-color:rgba(16,185,129,.4);color:var(--green)}
+#toast.te{border-color:rgba(239,68,68,.4);color:var(--red)}
+#toast.ti{border-color:rgba(0,212,255,.4);color:var(--cyan)}
+footer{border-top:1px solid var(--border);padding:.9rem 2rem;font-size:.7rem;
+  color:var(--dim);text-align:center;background:var(--surface)}
+.sys-pill{display:flex;gap:.5rem;background:var(--panel);border-radius:12px;padding:.4rem;margin-bottom:1.2rem}
+.sp{padding:.45rem 1.1rem;border-radius:8px;font-size:.78rem;cursor:pointer;color:var(--dim);transition:all .18s}
+.sp.on{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
+.sp:hover{color:var(--text)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
+.hidden{display:none!important}
+@media(max-width:680px){
+  .sb{width:200px}
+  .content{padding:1rem}
+  .fr,.fr3{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr}
 }
 </style>
-""", unsafe_allow_html=True)
+</head>
+<body>
+<div id="app">
 
-# ===============================================================
-# 🎬 LANDING PAGE CONTENT - ONLY SHOWS WHEN NO ROLE SELECTED
-# ===============================================================
+<!-- LANDING -->
+<div id="landing">
+  <div class="hero-badge">🧠 NeuroMatrix Biosystems · Unified LMS</div>
+  <h1 class="hero-title">One Portal.<br>Two Systems.<br>Zero Hassle.</h1>
+  <p class="hero-sub">Sikiru Adetona College of Education, Science & Technology — powered by NeuroMatrix.</p>
 
-# Check if no role is selected
-if st.session_state.get("role") is None or st.session_state.get("role") == "Select":
-    
-    # Glass Header
-    st.markdown(f"""
-    <style>
-    @keyframes gradientShift {{
-        0% {{ background-position: 0% 50%; }}
-        50% {{ background-position: 100% 50%; }}
-        100% {{ background-position: 0% 50%; }}
-    }}
-    @keyframes float {{
-        0%, 100% {{ transform: translateY(0px); }}
-        50% {{ transform: translateY(-5px); }}
-    }}
-    .glass-header {{
-        background: rgba(15, 23, 42, 0.8);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 1.2rem 2rem;
-        margin-bottom: 2rem;
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }}
-    .brain-icon {{
-        font-size: 2.5rem;
-        animation: float 3s ease-in-out infinite;
-        display: inline-block;
-    }}
-    .title-gradient {{
-        font-size: 1.8rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #4facfe);
-        background-size: 300% 300%;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: gradientShift 6s ease infinite;
-        margin: 0;
-    }}
-    .badge-modern {{
-        background: linear-gradient(135deg, #58cc02, #4a9e02);
-        padding: 8px 20px;
-        border-radius: 40px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 15px rgba(88, 204, 2, 0.3);
-        transition: transform 0.3s ease;
-    }}
-    .badge-modern:hover {{
-        transform: scale(1.05);
-    }}
-    .course-count {{
-        background: rgba(255,255,255,0.1);
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        margin-left: 10px;
-    }}
-    </style>
-    <div class="glass-header">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <div class="brain-icon">🧠</div>
-                <div>
-                    <h1 class="title-gradient">AN INTERACTIVE LEARNING MANAGEMENT</h1>
-                    <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <span style="color: #94a3b8; font-size: 0.85rem;">🎓 AI-Powered Learning</span>
-                        <span style="color: #94a3b8; font-size: 0.85rem;">⚡ Real-time Analytics</span>
-                        <span style="color: #94a3b8; font-size: 0.85rem;">🎮 Gamified Experience</span>
-                    </div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <div class="badge-modern">
-                    <span>🔥</span>
-                    <span style="font-weight: bold;">7 Day Streak</span>
-                </div>
-                <div class="course-count">
-                    📚 {len(default_courses)} Courses
-                </div>
-            </div>
-        </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:.7rem;width:100%;max-width:720px">
+    <div class="sys-pill" id="sys-pill">
+      <div class="sp on" data-sys="neuro" onclick="setSys('neuro',event)">🧬 NeuroMatrix LMS</div>
+      <div class="sp" data-sys="vos" onclick="setSys('vos',event)">🎓 VOS 102 Practical Skills</div>
     </div>
-    """, unsafe_allow_html=True)
 
-    # Show logo and branding
-    st.image("neuromatrix_lms_logo.png", width=180)
-    st.title("NeuroMatrix LMS")
-    st.caption("Where Brain Meets Learning Intelligence")
-    st.subheader("Neuromatrix Learning Management System – Education Prism")
-    st.divider()
-
-    # ===============================================================
-    # 📊 PROGRESS BAR (DUOLINGO STYLE)
-    # ===============================================================
-    progress = 0.75
-    st.markdown(f"""
-    <h4>📊 Learning Progress</h4>
-    <div class="progress-bar">
-        <div class="progress-fill" style="width:{progress*100}%"></div>
+    <div id="portal-neuro" class="portal-grid">
+      <div class="pcard" style="--cc:var(--cyan)" onclick="selectRole('Student')">
+        <div class="pico">🎓</div><div class="plabel">Student</div>
+        <div class="pdesc">View lectures, mark attendance, submit assignments & track progress</div>
+      </div>
+      <div class="pcard" style="--cc:var(--violet)" onclick="enterGate('admin')">
+        <div class="pico">👩‍🏫</div><div class="plabel">Lecturer / Admin</div>
+        <div class="pdesc">Manage courses, classwork, grades & announcements</div>
+      </div>
+      <div class="pcard" style="--cc:var(--amber)" onclick="enterGate('sysadmin')">
+        <div class="pico">⚙️</div><div class="plabel">System Admin</div>
+        <div class="pdesc">Global oversight — courses, logs, analytics & settings</div>
+      </div>
     </div>
-    <p class="duo">{int(progress*100)}% Complete</p>
-    """, unsafe_allow_html=True)
 
-    # ===============================================================
-    # 🎬 NETFLIX STYLE CONTENT ROW
-    # ===============================================================
-    st.markdown("### 🎬 Continue Learning")
-    st.markdown('<div class="scroll-row">', unsafe_allow_html=True)
+    <div id="portal-vos" class="portal-grid hidden">
+      <div class="pcard" style="--cc:var(--green)" onclick="vosRegisterScreen()">
+        <div class="pico">📋</div><div class="plabel">Register</div>
+        <div class="pdesc">New student? Create your account with matric number</div>
+      </div>
+      <div class="pcard" style="--cc:var(--cyan)" onclick="vosLoginScreen('student')">
+        <div class="pico">🎓</div><div class="plabel">Student Login</div>
+        <div class="pdesc">Attendance, CBT tests, results & practical uploads</div>
+      </div>
+      <div class="pcard" style="--cc:var(--violet)" onclick="vosLoginScreen('admin')">
+        <div class="pico">🛠️</div><div class="plabel">Admin Login</div>
+        <div class="pdesc">Manage sessions, CBT, grades & student records</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    for course_name, data in default_courses.items():
-        st.markdown(f"""
-        <a href="{data['url']}" target="_blank" style="text-decoration:none;">
-            <div class="netflix-card">
-                <h4>📘 {course_name}</h4>
-                <p>Code: {data['code']}</p>
-                <p style="color:#58cc02;">▶ Open Interactive Lecture</p>
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
+<!-- NEURO GATE -->
+<div id="gate">
+  <div class="gbox">
+    <div class="gt" id="gate-title">🔐 Login</div>
+    <p style="font-size:.8rem;color:var(--dim)" id="gate-sub">Enter credentials to continue.</p>
+    <div class="field" id="gate-course-wrap">
+      <label>Select Course</label>
+      <select id="gate-course" class="sb-sel"></select>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="gate-pw" placeholder="Enter password…" onkeydown="if(event.key==='Enter')gateSubmit()">
+    </div>
+    <div class="ae al hidden" id="gate-err">❌ Incorrect password. Try again.</div>
+    <div style="display:flex;gap:.65rem">
+      <button class="btn btn-p full" onclick="gateSubmit()">🔓 Enter</button>
+      <button class="btn btn-s" onclick="gateClose()">✕</button>
+    </div>
+  </div>
+</div>
 
-    st.markdown('</div>', unsafe_allow_html=True)
+<!-- VOS REGISTER -->
+<div id="vos-register" class="hidden" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+  <div style="width:100%;max-width:500px">
+    <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:1.8rem;cursor:pointer" onclick="backToLanding()">
+      <span style="color:var(--dim);font-size:.8rem">← Back</span>
+    </div>
+    <div class="pt" style="margin-bottom:.4rem">📋 Student Registration</div>
+    <div class="ps" style="margin-bottom:1.5rem">VOS 102 Practical Skills · Sikiru Adetona COEST</div>
+    <div class="card">
+      <div class="fr">
+        <div class="field"><label>Full Name *</label><input id="reg-name" placeholder="e.g. Adebimpe John Omolola"></div>
+        <div class="field"><label>Matric Number *</label><input id="reg-matric" placeholder="e.g. SCI/2022/001"></div>
+      </div>
+      <div class="fr">
+        <div class="field"><label>Department *</label><select id="reg-dept"></select></div>
+        <div class="field"><label>Level *</label><select id="reg-level"></select></div>
+      </div>
+      <div class="field"><label>Phone (optional)</label><input id="reg-phone" placeholder="+234…"></div>
+      <div class="fr">
+        <div class="field"><label>Password *</label><input type="password" id="reg-pw"></div>
+        <div class="field"><label>Confirm Password *</label><input type="password" id="reg-pw2"></div>
+      </div>
+      <div class="ae al hidden" id="reg-err"></div>
+      <div class="as al hidden" id="reg-ok"></div>
+      <button class="btn btn-p full" onclick="vosRegister()" style="margin-top:.3rem">✅ Create Account</button>
+    </div>
+    <p style="text-align:center;font-size:.75rem;color:var(--dim);margin-top:.8rem">
+      Already registered? <span style="color:var(--cyan);cursor:pointer" onclick="vosLoginScreen('student')">Login here</span>
+    </p>
+  </div>
+</div>
 
-# If a role is selected, show nothing from landing page
-else:
-    st.empty()  # This ensures nothing from landing page shows
-# ===============================================================
-# 🗂 CONSTANTS AND DIRECTORIES
-# ===============================================================
-PERSISTENT_DATA_DIR = "persistent_data"
-ATTENDANCE_STATUS_FILE = "attendance_status.json"
-DEFAULT_ADMIN_PASSWORD = "ademideola2026"
-SYSTEM_ADMIN_PASSWORD = "neuromatrixsystemadmin2026"
-# ===============================================================
-# 🗂 DIRECTORY MANAGEMENT
-# ===============================================================
-def ensure_directories():
-    """Create all required directories"""
-    directories = [
-        PERSISTENT_DATA_DIR,
-        os.path.join(PERSISTENT_DATA_DIR, "pdfs"),
-        os.path.join(PERSISTENT_DATA_DIR, "videos"),
-        os.path.join(PERSISTENT_DATA_DIR, "data"),
-        os.path.join(PERSISTENT_DATA_DIR, "attendance"),
-        os.path.join(PERSISTENT_DATA_DIR, "classwork"),
-        os.path.join(PERSISTENT_DATA_DIR, "seminar"),
-        os.path.join(PERSISTENT_DATA_DIR, "lectures"),
-        os.path.join(PERSISTENT_DATA_DIR, "scores"),
-        os.path.join(PERSISTENT_DATA_DIR, "student_uploads"),
-        os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "assignment"),
-        os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "drawing"),
-        os.path.join(PERSISTENT_DATA_DIR, "student_uploads", "seminar"),
-        os.path.join(PERSISTENT_DATA_DIR, "mcq_questions"),
-        os.path.join(PERSISTENT_DATA_DIR, "course_management"),
-    ]
-    for directory in directories:
-        os.makedirs(directory, exist_ok=True)
-    return True
+<!-- VOS LOGIN -->
+<div id="vos-login" class="hidden" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+  <div style="width:100%;max-width:400px">
+    <div style="cursor:pointer;margin-bottom:1.8rem" onclick="backToLanding()"><span style="color:var(--dim);font-size:.8rem">← Back</span></div>
+    <div class="pt" style="margin-bottom:.4rem" id="vos-login-title">🎓 Student Login</div>
+    <div class="ps" style="margin-bottom:1.5rem">VOS 102 · Sikiru Adetona COEST</div>
+    <div class="card">
+      <div class="field"><label id="vos-login-label">Matric Number</label><input id="vos-un" placeholder="Your matric number or admin username"></div>
+      <div class="field"><label>Password</label><input type="password" id="vos-pw" onkeydown="if(event.key==='Enter')vosLogin()" placeholder="Your password"></div>
+      <div class="ae al hidden" id="vos-err">❌ Invalid credentials.</div>
+      <button class="btn btn-p full" onclick="vosLogin()" style="margin-top:.3rem">🔓 Login</button>
+    </div>
+    <p style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem">Demo admin: <b>adebimpe</b> / <b>ChangeMe123</b></p>
+  </div>
+</div>
 
-ensure_directories()
-    
-# ===============================================================
-# 🎯 COURSE MANAGEMENT SYSTEM
-# ===============================================================
+<!-- NEURO SHELL -->
+<div class="shell" id="shell">
+  <nav class="sb" id="sb">
+    <div class="sb-logo"><span>🧠</span>NeuroMatrix</div>
+    <div id="sb-course-wrap">
+      <div class="sb-sect">Course</div>
+      <select class="sb-sel" id="sb-course" onchange="onCourseChange()"></select>
+    </div>
+    <div id="sb-week-wrap" class="hidden">
+      <div class="sb-sect">Week</div>
+      <select class="sb-sel" id="sb-week" onchange="APP.week=this.value;renderTab(APP.tab)"></select>
+    </div>
+    <div class="sb-sect">Menu</div>
+    <div class="sb-nav" id="sb-nav"></div>
+    <div class="sb-foot">
+      <div class="back-btn" onclick="backToLanding()">← Switch Portal</div>
+    </div>
+  </nav>
+  <main class="content"><div id="tab-content"></div></main>
+</div>
 
-def get_courses_file():
-    """Get the courses configuration file path"""
-    return os.path.join(PERSISTENT_DATA_DIR, "course_management", "courses_config.json")
+<!-- VOS SHELL -->
+<div class="shell" id="vos-shell">
+  <nav class="sb" id="vos-sb">
+    <div class="sb-logo"><span>🎓</span>VOS 102</div>
+    <div id="vos-user-strip" style="background:var(--panel);border-radius:10px;padding:.65rem .8rem;margin-bottom:.8rem;font-size:.75rem;border:1px solid var(--border)">
+      <div id="vos-user-name" style="font-family:var(--head);font-weight:700;color:var(--bright)"></div>
+      <div id="vos-user-meta" style="color:var(--dim);font-size:.68rem;margin-top:.15rem"></div>
+    </div>
+    <div class="sb-sect">Menu</div>
+    <div class="sb-nav" id="vos-sb-nav"></div>
+    <div class="sb-foot">
+      <div class="back-btn" onclick="vosLogout()">← Logout</div>
+    </div>
+  </nav>
+  <main class="content"><div id="vos-tab-content"></div></main>
+</div>
 
-def get_passwords_file():
-    """Get the passwords configuration file path"""
-    return os.path.join(PERSISTENT_DATA_DIR, "course_management", "admin_passwords.json")
+<footer id="footer" class="hidden">
+  Developed by <b>Adebimpe-John Omolola</b> · © 2026 · NeuroMatrix Biosystems · Sikiru Adetona COEST
+</footer>
+<div id="toast"></div>
+</div>
 
-def load_courses_config():
-    """Load courses configuration from JSON file"""
-    try:
-        courses_file = get_courses_file()
-        if os.path.exists(courses_file):
-            with open(courses_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        
-        # Default courses configuration - DICTIONARY with codes and URLs
-        default_courses = {
-            "MCB 221 – General Microbiology": {
-                "code": "MCB221",
-                "url": "https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"
-            },
-            "BCH 201 – General Biochemistry": {
-                "code": "BCH201",
-                "url": "https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"
-            },
-            "BIO 203 – General Physiology": {
-                "code": "BIO203",
-                "url": "https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"
-            },
-            "BIO 113 – Virus Bacteria Lower Plants": {
-                "code": "BIO113",
-                "url": "https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"
-            },
-            "BIO 121 – Diversity of Invertebrate": {
-                "code": "BIO121",
-                "url": "https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"
-            },
-            "BIO 221 – Plant Physiology": {
-                "code": "BIO221",
-                "url": "https://neuromatrixbiosystems.com/BIO221_Plant_Physiology_Interactive_Lecture_Notes#"
-            },
-            "BIO 222 – Vertebrate Anatomy and Physiology": {
-                "code": "BIO222",
-                "url": "https://neuromatrixbiosystems.com/BIO222_Vertebrate_Anatomy_Physiology_Interactive_Notes.html#"
-            },
-            "BIO 306 – Systematic Biology": {
-                "code": "BIO306",
-                "url": "https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"
-            }
-        }
+<script>
+// ═══════════════════════════════════════════════════════════
+// STORAGE & UTILITIES
+// ═══════════════════════════════════════════════════════════
+const S={
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v!=null?JSON.parse(v):(d===undefined?{}:d)}catch{return d===undefined?{}:d}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+  push:(k,item)=>{const a=S.get(k,[]);a.push(item);S.set(k,a)},
+  del:(k)=>{localStorage.removeItem(k)},
+};
 
-        # Save default configuration
-        save_courses_config(default_courses)
-        return default_courses
-        
-    except FileNotFoundError as e:
-        st.error(f"Course configuration file not found: {e}")
-        return {}
-    except json.JSONDecodeError as e:
-        st.error(f"Error parsing course configuration JSON: {e}")
-        return {}
-    except Exception as e:
-        st.error(f"Unexpected error loading courses config: {e}")
-        return {}
+function showEl(id,disp){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.remove('hidden');
+  el.style.display=disp||'';
+}
+function hideEl(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.add('hidden');
+  el.style.display='none';
+}
+function toast(msg,type='info'){
+  const t=document.getElementById('toast');if(!t)return;
+  t.className='';
+  t.classList.add(type==='success'?'ts':type==='error'?'te':'ti');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
+}
 
-def save_courses_config(courses):
-    """Save courses configuration to JSON file"""
-    try:
-        courses_file = get_courses_file()
-        os.makedirs(os.path.dirname(courses_file), exist_ok=True)
-        with open(courses_file, 'w') as f:
-            json.dump(courses, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error saving courses config: {e}")
-        return False
+// ═══════════════════════════════════════════════════════════
+// NEURO CONFIG
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_COURSES={
+  "General Microbiology":           {code:"MCB221",url:"https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"},
+  "General Biochemistry":           {code:"BCH201",url:"https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"},
+  "General Physiology":             {code:"BIO203",url:"https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"},
+  "Virus Bacteria Lower Plants":    {code:"BIO113",url:"https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"},
+  "Diversity of Invertebrate":      {code:"BIO121",url:"https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"},
+  "Plant Physiology":               {code:"BIO221",url:"https://neuromatrixbiosystems.com/BIO221_Interactive_Lecture_Notes#"},
+  "Vertebrate Anatomy & Physiology":{code:"BIO222",url:"https://neuromatrixbiosystems.com/BIO222_Interactive_Lecture_Notes#"},
+  "Systematic Biology":             {code:"BIO306",url:"https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"},
+};
 
-def load_admin_passwords():
-    """Load admin passwords from JSON file"""
-    try:
-        passwords_file = get_passwords_file()
-        if os.path.exists(passwords_file):
-            with open(passwords_file, 'r') as f:
-                return json.load(f)
-        return {}
-    except Exception as e:
-        st.error(f"Error loading passwords: {e}")
-        return {}
+// ═══════════════════════════════════════════════════════════
+// VOS CONFIG
+// ═══════════════════════════════════════════════════════════
+const VOS_MODULES=[
+  {id:'fruit-juice',name:"Fruit & Juice Making",icon:'🍊'},
+  {id:'solar-panel',name:"Solar Panel Making",icon:'☀️'},
+  {id:'interior-decor',name:"Interior Decor",icon:'🏠'},
+  {id:'catering',name:"Catering",icon:'🍽️'},
+  {id:'bead-making',name:"Bead Making",icon:'📿'},
+  {id:'textile-sewing',name:"Textile / Sewing",icon:'🧵'},
+];
+const VOS_DEPTS=["Agricultural Science","Business Education","Computer Science","Biology","Chemistry","Mathematics","Physics","English","Social Studies","Early Childhood Education","Fine & Applied Arts"];
+const VOS_LEVELS=["100","200","300","400"];
 
-def save_admin_passwords(passwords):
-    """Save admin passwords to JSON file"""
-    try:
-        passwords_file = get_passwords_file()
-        os.makedirs(os.path.dirname(passwords_file), exist_ok=True)
-        with open(passwords_file, 'w') as f:
-            json.dump(passwords, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error saving passwords: {e}")
-        return False
+function initVOSDefaults(){
+  const admins=S.get('vos_admins',[]);
+  if(!Array.isArray(admins)||!admins.find(a=>a.username==='adebimpe')){
+    S.set('vos_admins',[
+      {id:1,full_name:"Adebimpe John",username:"adebimpe",role:"super_admin",modules:VOS_MODULES.map(m=>m.id),pw:"ChangeMe123"},
+      {id:2,full_name:"Odufeko Gabriel",username:"gabriel",role:"module_admin",modules:["fruit-juice"],pw:"ChangeMe123"},
+      {id:3,full_name:"Mr Tolu Adebayo",username:"tolu",role:"module_admin",modules:["solar-panel"],pw:"ChangeMe123"},
+    ]);
+  }
+}
 
-def get_course_password(course_code):
-    """Get password for a specific course, fallback to default"""
-    passwords = load_admin_passwords()
-    return passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
+// ═══════════════════════════════════════════════════════════
+// NEURO APP STATE
+// ═══════════════════════════════════════════════════════════
+const APP={
+  role:null,course:null,week:'Week 1',student:{name:'',matric:''},
+  tab:null,gateMode:null,sys:'neuro',
+};
+const VAPP={user:null,loginType:'student',tab:null};
 
-def set_course_password(course_code, new_password):
-    """Set new password for a specific course"""
-    passwords = load_admin_passwords()
-    passwords[course_code] = new_password
-    return save_admin_passwords(passwords)
+function getCourses(){const c=S.get('nm_courses',null);return c&&Object.keys(c).length?c:{...DEFAULT_COURSES}}
+function saveCourses(c){S.set('nm_courses',c)}
+function getPasswords(){return S.get('nm_passwords',{})}
+function getCoursePassword(code){return getPasswords()[code]||'admin123'}
+function verifyAdmin(code,pw){return pw===getCoursePassword(code)}
+function verifySysAdmin(pw){return pw===(S.get('nm_sysadmin_pw',null)||'admin')}
+const WEEKS=Array.from({length:15},(_,i)=>`Week ${i+1}`);
 
-def verify_admin_password(course_code, password):
-    """Verify admin password for a course"""
-    correct_password = get_course_password(course_code)
-    return password == correct_password
+// ═══════════════════════════════════════════════════════════
+// SYSTEM SELECTOR / LANDING
+// ═══════════════════════════════════════════════════════════
+function setSys(sys,evt){
+  APP.sys=sys;
+  document.querySelectorAll('.sp').forEach(el=>el.classList.remove('on'));
+  if(evt&&evt.target)evt.target.classList.add('on');
+  else document.querySelector(`.sp[data-sys="${sys}"]`)?.classList.add('on');
+  if(sys==='neuro'){showEl('portal-neuro','grid');hideEl('portal-vos');}
+  else{showEl('portal-vos','grid');hideEl('portal-neuro');}
+}
 
-# ===============================================================
-# 🗄️ DATABASE MIGRATION FUNCTIONS
-# ===============================================================
+function hideAll(){
+  ['landing','shell','vos-shell','vos-register','vos-login','footer','gate'].forEach(id=>hideEl(id));
+}
 
-def emergency_database_fix():
-    """Emergency function to fix database schema issues"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("DROP TABLE IF EXISTS weekly_courses")
-        c.execute('''
-            CREATE TABLE weekly_courses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                week_name TEXT NOT NULL,
-                course_name TEXT NOT NULL,
-                course_code TEXT NOT NULL,
-                module_type TEXT,
-                duration TEXT,
-                difficulty TEXT,
-                objectives TEXT,
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Database fix failed: {e}")
-        return False
+function backToLanding(){
+  hideAll();
+  showEl('landing','flex');
+}
 
-def check_database_schema():
-    """Check if database has the correct schema"""
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        conn.close()
-        required_columns = ['week_name', 'course_name', 'course_code', 'module_type', 'duration', 'difficulty', 'objectives', 'notes']
-        missing_columns = [col for col in required_columns if col not in columns]
-        return len(missing_columns) == 0
-    except Exception as e:
-        print(f"Error checking schema: {e}")
-        return False
+function selectRole(role){
+  APP.role=role;
+  if(role==='Student') buildNeuroStudentShell();
+}
 
-# ===============================================================
-# 🎯 AUTOMATED MCQ & GAP-FILLING SYSTEM
-# ===============================================================
+// ═══════════════════════════════════════════════════════════
+// NEURO GATE
+// ═══════════════════════════════════════════════════════════
+function enterGate(mode){
+  APP.gateMode=mode;
+  const titles={admin:'👩‍🏫 Lecturer Login',sysadmin:'⚙️ System Admin Login'};
+  document.getElementById('gate-title').textContent=titles[mode];
+  document.getElementById('gate-sub').textContent=mode==='admin'?'Select course and enter admin password.':'Enter system administrator password.';
+  const cw=document.getElementById('gate-course-wrap');
+  if(mode==='admin'){
+    cw.style.display='';
+    const sel=document.getElementById('gate-course');
+    const courses=getCourses();
+    sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}">${n}</option>`).join('');
+  } else {cw.style.display='none'}
+  hideEl('gate-err');
+  document.getElementById('gate-pw').value='';
+  showEl('gate','flex');
+}
 
-def get_mcq_file(course_code, week):
-    folder = "mcq_data"
-    os.makedirs(folder, exist_ok=True)
-    filename = f"{folder}/{course_code}_week_{week}_mcq.json"
-    return filename
+function gateClose(){hideEl('gate')}
 
-def load_mcq_questions(course_code, week):
-    """Load MCQ/Gap-fill questions for a specific week"""
-    filename = get_mcq_file(course_code, week)
-    if os.path.exists(filename):
-        try:
-            with open(filename, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data
-        except Exception as e:
-            st.error(f"Error loading questions: {e}")
-            return []
-    return []
+function gateSubmit(){
+  const pw=document.getElementById('gate-pw').value.trim();
+  if(!pw) return;
+  if(APP.gateMode==='sysadmin'){
+    if(verifySysAdmin(pw)){gateClose();buildNeuroSysAdminShell()}
+    else showEl('gate-err');
+    return;
+  }
+  const sel=document.getElementById('gate-course');
+  const code=sel.value;
+  const name=sel.options[sel.selectedIndex]?.dataset.name||sel.options[sel.selectedIndex]?.text;
+  if(verifyAdmin(code,pw)){
+    APP.course={name,...getCourses()[name]};
+    gateClose();buildNeuroAdminShell();
+  } else showEl('gate-err');
+}
 
-def save_mcq_questions(course_code, week, questions):
-    """Save MCQ/Gap-fill questions for a specific week"""
-    filename = get_mcq_file(course_code, week)
-    try:
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(questions, f, indent=4)
-        return True
-    except Exception as e:
-        st.error(f"Error saving questions: {e}")
-        return False
+// ═══════════════════════════════════════════════════════════
+// NEURO SHELLS
+// ═══════════════════════════════════════════════════════════
+const STUDENT_TABS=[
+  {id:'about',ico:'📝',label:'About Course'},
+  {id:'lecture',ico:'📖',label:'Lecture & Classwork'},
+  {id:'attendance',ico:'🕒',label:'Attendance'},
+  {id:'submissions',ico:'📤',label:'Submissions'},
+  {id:'announcements',ico:'📢',label:'Announcements'},
+  {id:'feedback',ico:'💬',label:'Seminar Feedback'},
+  {id:'progress',ico:'📊',label:'My Progress'},
+];
+const ADMIN_TABS=[
+  {id:'course-mgr',ico:'📚',label:'Course Manager'},
+  {id:'lecture-mgmt',ico:'📖',label:'Lecture Management'},
+  {id:'att-ctrl',ico:'🕒',label:'Attendance Control'},
+  {id:'att-rec',ico:'📊',label:'Attendance Records'},
+  {id:'cw-ctrl',ico:'🧩',label:'Classwork Control'},
+  {id:'cw-subs',ico:'📝',label:'Classwork Submissions'},
+  {id:'grading',ico:'🏅',label:'Grading System'},
+  {id:'stu-subs',ico:'📂',label:'Student Submissions'},
+  {id:'ann-admin',ico:'📢',label:'Announcements'},
+  {id:'seminar-subs',ico:'🎤',label:'Seminar Submissions'},
+];
+const SYSADMIN_TABS=[
+  {id:'sys-overview',ico:'🌐',label:'System Overview'},
+  {id:'sys-courses',ico:'📚',label:'Course Management'},
+  {id:'sys-logs',ico:'📋',label:'Activity Logs'},
+  {id:'sys-analytics',ico:'📈',label:'Analytics'},
+  {id:'sys-settings',ico:'⚙️',label:'Settings'},
+];
 
-def auto_grade_mcq_submission(questions, answers):
-    """Automatically grade MCQ submissions and return score"""
-    try:
-        total_questions = len(questions)
-        correct_answers = 0
-        for i, question in enumerate(questions):
-            if i < len(answers):
-                user_answer = str(answers[i]).strip().lower()
-                correct_answer = question.get('correct_answer', '').strip().lower()
-                if question['type'] == 'mcq':
-                    if user_answer == correct_answer:
-                        correct_answers += 1
-                elif question['type'] == 'gap_fill':
-                    correct_options = [opt.strip().lower() for opt in correct_answer.split('|')]
-                    if user_answer in correct_options:
-                        correct_answers += 1
-        score_percentage = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
-        return round(score_percentage, 1), correct_answers, total_questions
-    except Exception as e:
-        st.error(f"Error in auto-grading: {e}")
-        return 0, 0, 0
+function buildNeuroStudentShell(){
+  APP.role='Student';
+  const courses=getCourses();
+  const first=Object.entries(courses)[0];
+  APP.course={name:first[0],...first[1]};
+  APP.week='Week 1';
+  const sel=document.getElementById('sb-course');
+  sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}">${n}</option>`).join('');
+  showEl('sb-course-wrap');
+  const ws=document.getElementById('sb-week');
+  ws.innerHTML=WEEKS.map(w=>`<option>${w}</option>`).join('');
+  showEl('sb-week-wrap');
+  buildNav('sb-nav',STUDENT_TABS,'neuro');
+  launchShell();
+  setTab('about');
+}
 
-def save_mcq_submission(course_code, week, student_name, student_matric, answers, score):
-    """Save MCQ submission with automatic grading"""
-    try:
-        classwork_file = get_file(course_code, "classwork")
-        os.makedirs(os.path.dirname(classwork_file), exist_ok=True)
-        submission_data = {
-            'Name': student_name,
-            'Matric': student_matric,
-            'Week': week,
-            'Type': 'MCQ',
-            'Answers': json.dumps(answers),
-            'Score': score,
-            'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        if os.path.exists(classwork_file):
-            df = pd.read_csv(classwork_file)
-            existing = df[
-                (df['Name'] == student_name) &
-                (df['Matric'] == student_matric) &
-                (df['Week'] == week) &
-                (df['Type'] == 'MCQ')
-            ]
-            if not existing.empty:
-                st.warning("⚠️ You have already submitted MCQ for this week.")
-                return False
-            df = pd.concat([df, pd.DataFrame([submission_data])], ignore_index=True)
-        else:
-            df = pd.DataFrame([submission_data])
-        df.to_csv(classwork_file, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving MCQ submission: {e}")
-        return False
+function buildNeuroAdminShell(){
+  APP.role='Admin';
+  const courses=getCourses();
+  const sel=document.getElementById('sb-course');
+  sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}" ${v.code===APP.course.code?'selected':''}>${n}</option>`).join('');
+  showEl('sb-course-wrap');
+  hideEl('sb-week-wrap');
+  buildNav('sb-nav',ADMIN_TABS,'neuro');
+  launchShell();
+  setTab('course-mgr');
+}
 
-def display_mcq_questions(questions):
-    """Display MCQ questions and collect answers"""
-    answers = []
-    for i, question in enumerate(questions):
-        st.write(f"**Q{i+1}: {question['question']}**")
-        if question['type'] == 'mcq':
-            options = question['options']
-            selected_option = st.radio(
-                f"Select your answer for Q{i+1}:",
-                options=list(options.keys()),
-                format_func=lambda x, opts=options: f"{x}: {opts[x]}",
-                key=f"mcq_{i}"
-            )
-            answers.append(selected_option if selected_option else "")
-        elif question['type'] == 'gap_fill':
-            user_answer = st.text_input(
-                f"Your answer for Q{i+1}:",
-                placeholder="Type your answer here...",
-                key=f"gap_{i}"
-            )
-            answers.append(user_answer if user_answer else "")
-    return answers
+function buildNeuroSysAdminShell(){
+  APP.role='SysAdmin';
+  hideEl('sb-course-wrap');hideEl('sb-week-wrap');
+  buildNav('sb-nav',SYSADMIN_TABS,'neuro');
+  launchShell();
+  setTab('sys-overview');
+}
 
-def parse_bulk_questions(bulk_text):
-    """Parse bulk text containing multiple questions and options"""
-    questions = []
-    lines = bulk_text.strip().split('\n')
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        if not line:
-            i += 1
-            continue
-        if line.startswith('MCQ:'):
-            question_text = line[4:].strip()
-            options = {}
-            correct_answer = None
-            i += 1
-            while i < len(lines):
-                option_line = lines[i].strip()
-                if option_line.startswith('Correct:'):
-                    correct_answer = option_line[8:].strip()
-                    i += 1
-                    break
-                elif option_line.startswith(('A.', 'B.', 'C.', 'D.', 'E.')):
-                    option_key = option_line[0]
-                    option_value = option_line[2:].strip()
-                    options[option_key] = option_value
-                i += 1
-            if question_text and options and correct_answer:
-                questions.append({
-                    "type": "mcq",
-                    "question": question_text,
-                    "options": options,
-                    "correct_answer": correct_answer
-                })
-        elif line.startswith('GAP:'):
-            question_text = line[4:].strip()
-            correct_answer = None
-            i += 1
-            while i < len(lines):
-                answer_line = lines[i].strip()
-                if answer_line.startswith('Correct:'):
-                    correct_answer = answer_line[8:].strip()
-                    i += 1
-                    break
-                i += 1
-            if question_text and correct_answer:
-                questions.append({
-                    "type": "gap_fill",
-                    "question": question_text,
-                    "options": {},
-                    "correct_answer": correct_answer
-                })
-        else:
-            i += 1
-    return questions
+function buildNav(navId,tabs,sys){
+  document.getElementById(navId).innerHTML=tabs.map(t=>
+    `<div class="ni" id="${sys==='neuro'?'ni-':'vni-'}${t.id}" onclick="${sys==='neuro'?`setTab('${t.id}')`:`vosSetTab('${t.id}')`}">
+      <span class="ico">${t.ico}</span>${t.label}</div>`).join('');
+}
 
-# ===============================================================
-# 🗄️ COURSE MANAGEMENT DATABASE FUNCTIONS
-# ===============================================================
+function launchShell(){
+  hideAll();
+  showEl('shell','flex');
+  showEl('footer','');
+}
 
-def init_course_db():
-    """Initialize SQLite database for course storage with proper migration"""
-    try:
-        ensure_directories()  # FIX #10: was ensure_data_directory()
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_courses'")
-        table_exists = c.fetchone() is not None
-        if not table_exists:
-            c.execute('''
-                CREATE TABLE weekly_courses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    week_name TEXT NOT NULL,
-                    course_name TEXT NOT NULL,
-                    course_code TEXT NOT NULL,
-                    module_type TEXT,
-                    duration TEXT,
-                    difficulty TEXT,
-                    objectives TEXT,
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-        else:
-            c.execute("PRAGMA table_info(weekly_courses)")
-            existing_columns = [column[1] for column in c.fetchall()]
-            required_columns = {
-                'module_type': 'TEXT',
-                'duration': 'TEXT',
-                'difficulty': 'TEXT',
-                'objectives': 'TEXT',
-                'notes': 'TEXT'
-            }
-            for column_name, column_type in required_columns.items():
-                if column_name not in existing_columns:
-                    c.execute(f'ALTER TABLE weekly_courses ADD COLUMN {column_name} {column_type}')
-            if 'course_code' not in existing_columns:
-                c.execute('ALTER TABLE weekly_courses ADD COLUMN course_code TEXT')
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Database initialization error: {e}")
-        return emergency_database_fix()
+function onCourseChange(){
+  const sel=document.getElementById('sb-course');
+  const name=sel.options[sel.selectedIndex]?.dataset.name||sel.options[sel.selectedIndex]?.text;
+  const courses=getCourses();
+  APP.course={name,...courses[name]};
+  renderTab(APP.tab);
+  toast('Switched to '+name,'info');
+}
 
-def add_course_to_db(week_name, course_name, course_code, module_type="Lecture", duration="1-2 hours", difficulty="Beginner", objectives="", notes=""):
-    """Add course to database"""
-    try:
-        init_course_db()
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO weekly_courses
-            (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (week_name, course_name, course_code, module_type, duration, difficulty, objectives, notes,
-              datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Database error in add_course_to_db: {e}")
-        return False
+function setTab(id){
+  APP.tab=id;
+  document.querySelectorAll('#sb-nav .ni').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('ni-'+id);
+  if(el) el.classList.add('active');
+  renderTab(id);
+}
 
-def get_weeks_from_db():
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
-    weeks = [row[0] for row in c.fetchall()]
-    conn.close()
-    return weeks
+function renderTab(id){
+  const c=document.getElementById('tab-content');
+  const d=document.createElement('div');
+  d.className='tab-panel';
+  const map={
+    'about':rAbout,'lecture':rLecture,'attendance':rAttendance,
+    'submissions':rSubmissions,'announcements':rAnnouncements,'feedback':rFeedback,'progress':rProgress,
+    'course-mgr':rAdmCourseMgr,'lecture-mgmt':rAdmLecture,
+    'att-ctrl':rAdmAttCtrl,'att-rec':rAdmAttRec,'cw-ctrl':rAdmCWCtrl,
+    'cw-subs':rAdmCWSubs,'grading':rAdmGrading,'stu-subs':rAdmStuSubs,
+    'ann-admin':rAdmAnn,'seminar-subs':rAdmSeminar,
+    'sys-overview':rSysOverview,'sys-courses':rSysCourses,'sys-logs':rSysLogs,
+    'sys-analytics':rSysAnalytics,'sys-settings':rSysSettings,
+  };
+  d.innerHTML=(map[id]||(()=>`<div class="al ai">Tab "${id}" coming soon.</div>`))();
+  c.innerHTML='';c.appendChild(d);
+}
 
-def get_courses_by_week(week_name):
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    c.execute('SELECT course_name, course_code FROM weekly_courses WHERE week_name = ? ORDER BY id', (week_name,))
-    courses = [{"name": row[0], "code": row[1]} for row in c.fetchall()]
-    conn.close()
-    return courses
+// ── HELPERS
+function ph(title,sub,badge,bcls='bc'){
+  return `<div class="ph"><div><div class="pt">${title}</div>${sub?`<div class="ps">${sub}</div>`:''}</div>${badge?`<span class="badge ${bcls}">${badge}</span>`:''}</div>`;
+}
+function istrip(){
+  const s=APP.student;
+  return `<div class="istrip"><div class="iav">🎓</div>
+    <div><div class="in">${s.name}</div><div class="im">${s.matric} · ${APP.course.name}</div></div>
+    <div style="margin-left:auto"><span class="badge bc">${APP.course.code}</span></div></div>`;
+}
+function requireIdent(fn){
+  const s=S.get('nm_student',{name:'',matric:''});APP.student=s;
+  if(!s.name||!s.matric) return identForm()+`<div class="al aw">⚠️ Save your identity above to continue.</div>`;
+  return fn();
+}
+function identForm(){
+  return `<div class="card"><div class="ct">👤 Your Identity</div>
+    <div class="fr">
+      <div class="field"><label>Full Name</label><input id="si-name" value="${APP.student.name||''}" placeholder="Enter full name…"></div>
+      <div class="field"><label>Matric Number</label><input id="si-matric" value="${APP.student.matric||''}" placeholder="e.g. BIO/2022/001…"></div>
+    </div>
+    <button class="btn btn-p" onclick="saveIdent()">💾 Save Identity</button></div>`;
+}
+function saveIdent(){
+  const name=document.getElementById('si-name')?.value.trim();
+  const matric=document.getElementById('si-matric')?.value.trim();
+  if(!name||!matric){toast('Enter both name and matric number','error');return}
+  APP.student={name,matric};S.set('nm_student',APP.student);
+  toast('Identity saved ✅','success');renderTab(APP.tab);
+}
+function logLec(action){S.push('nm_lec_log',{course:APP.course?.code||'sys',action,ts:new Date().toISOString()})}
+function logStu(action,extra={}){S.push('nm_stu_log',{name:APP.student.name,matric:APP.student.matric,course:APP.course?.code||'',action,...extra,ts:new Date().toISOString()})}
 
-def delete_week_from_db(week_name):
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
-    conn.commit()
-    conn.close()
+// ═══════════════════════════════════════════════════════════
+// NEURO STUDENT TABS
+// ═══════════════════════════════════════════════════════════
+function rAbout(){
+  const info=S.get('nm_about_'+APP.course.code,{});
+  return ph('📝 About This Course',APP.course.name+' · '+APP.course.code,APP.course.code)+`
+  <div class="card"><div class="ct">📋 Course Description</div>
+    <p style="font-size:.85rem;color:var(--dim);line-height:1.75">${info.description||'No description posted yet.'}</p></div>
+  <div class="card"><div class="ct">🎯 Learning Objectives</div>
+    <p style="font-size:.85rem;color:var(--dim);line-height:1.75">${info.objectives||'Objectives not yet posted.'}</p></div>
+  <div class="card"><div class="ct">📚 Interactive Lecture Notes</div>
+    <p style="font-size:.8rem;color:var(--dim);margin-bottom:1rem">Access full interactive notes for this course.</p>
+    <a href="${APP.course.url}" target="_blank" class="btn btn-p">🌐 Open Interactive Notes</a></div>`;
+}
 
-def get_all_courses_from_db():
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        if 'course_code' in columns:
-            df = pd.read_sql_query('SELECT week_name, course_name, course_code, created_at FROM weekly_courses ORDER BY created_at', conn)
-        else:
-            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
-            df['course_code'] = 'UNKNOWN'
-        conn.close()
-        return df
-    except Exception as e:
-        st.error(f"Database error: {e}")
-        return pd.DataFrame()
-
-def get_weeks_for_course_from_db(course_code):
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        if 'course_code' in columns:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses WHERE course_code = ? ORDER BY created_at', (course_code,))
-        else:
-            c.execute('SELECT DISTINCT week_name FROM weekly_courses ORDER BY created_at')
-        weeks = [row[0] for row in c.fetchall()]
-        conn.close()
-        return weeks
-    except:
-        return []
-
-def get_courses_for_course_from_db(course_code):
-    try:
-        conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(weekly_courses)")
-        columns = [column[1] for column in c.fetchall()]
-        if 'course_code' in columns:
-            df = pd.read_sql_query(
-                'SELECT week_name, course_name, course_code, created_at FROM weekly_courses WHERE course_code = ? ORDER BY created_at',
-                conn, params=(course_code,)
-            )
-        else:
-            df = pd.read_sql_query('SELECT week_name, course_name, created_at FROM weekly_courses ORDER BY created_at', conn)
-            df['course_code'] = 'UNKNOWN'
-        conn.close()
-        return df
-    except Exception as e:
-        st.error(f"Database error: {e}")
-        return pd.DataFrame()
-
-def delete_week_for_course(week_name, course_code):
-    conn = sqlite3.connect(os.path.join(PERSISTENT_DATA_DIR, 'courses.db'))
-    c = conn.cursor()
-    c.execute("PRAGMA table_info(weekly_courses)")
-    columns = [column[1] for column in c.fetchall()]
-    if 'course_code' in columns:
-        c.execute('DELETE FROM weekly_courses WHERE week_name = ? AND course_code = ?', (week_name, course_code))
-    else:
-        c.execute('DELETE FROM weekly_courses WHERE week_name = ?', (week_name,))
-    conn.commit()
-    conn.close()
-
-# ===============================================================
-# 🔧 HELPER FUNCTIONS
-# ===============================================================
-
-def get_persistent_path(file_type, course_code="", filename=""):
-    """Get persistent file paths"""
-    base_dir = PERSISTENT_DATA_DIR
-    file_paths = {
-        "pdf": os.path.join(base_dir, "pdfs", course_code, filename) if filename else os.path.join(base_dir, "pdfs", course_code),
-        "video": os.path.join(base_dir, "videos", course_code, filename) if filename else os.path.join(base_dir, "videos", course_code),
-        "attendance": os.path.join(base_dir, "attendance", filename) if filename else os.path.join(base_dir, "attendance"),
-        "classwork": os.path.join(base_dir, "classwork", f"{course_code}_classwork.csv"),
-        "seminar": os.path.join(base_dir, "seminar", f"{course_code}_seminar.csv"),
-        "lectures": os.path.join(base_dir, "lectures", f"{course_code}_lectures.csv"),
-        "mcq": os.path.join(base_dir, "mcq_questions"),
-        "attendance_status": os.path.join(base_dir, "data", "attendance_status.json"),
-        "scores": os.path.join(base_dir, "scores", f"{course_code.lower()}_scores.csv")
+function rAttendance(){
+  return requireIdent(()=>{
+    const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
+    const marked=S.get(`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`,null);
+    let body='';
+    if(marked){
+      body=`<div class="al as">✅ Attendance marked for ${APP.week} at ${new Date(marked.ts).toLocaleString()}</div>`;
+    } else if(!status.is_open){
+      body=`<div class="al aw">🔒 Attendance is closed for ${APP.week}.</div>`;
+    } else {
+      body=`<div class="al ai">🟢 Attendance is OPEN for ${APP.week}</div>
+            <button class="btn btn-p" onclick="markAtt()">✅ Mark Me Present</button>`;
     }
-    return file_paths.get(file_type, os.path.join(base_dir, "data", filename))
+    return istrip()+ph('🕒 Attendance',APP.course.name+' · '+APP.week)+`<div class="card">${body}</div>`;
+  });
+}
 
-# FIX #11: Only ONE definition of get_file() — the correct one using course_code subdirectory
-def get_file(course_code, file_type):
-    """Get file path for different file types"""
-    base_dir = os.path.join(PERSISTENT_DATA_DIR, course_code)
-    os.makedirs(base_dir, exist_ok=True)
-    file_map = {
-        "students": os.path.join(base_dir, "students.csv"),
-        "lectures": os.path.join(base_dir, "lectures.csv"),
-        "attendance": os.path.join(base_dir, "attendance.csv"),
-        "classwork": os.path.join(base_dir, "classwork.csv"),
-        "scores": os.path.join(base_dir, "scores.csv"),
-        "mcq": os.path.join(base_dir, "mcq_questions"),
-        "attendance_status": os.path.join(base_dir, "attendance_status.json"),
-        "classwork_status": os.path.join(base_dir, "classwork_status.json")
+function markAtt(){
+  const k=`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`;
+  const rec={name:APP.student.name,matric:APP.student.matric,ts:new Date().toISOString()};
+  S.set(k,rec);
+  S.push(`nm_att_list_${APP.course.code}_${APP.week}`,rec);
+  logStu('Attendance marked',{week:APP.week});
+  toast('Attendance marked ✅','success');renderTab('attendance');
+}
+
+function rLecture(){
+  return requireIdent(()=>{
+    const lec=S.get('nm_lectures_'+APP.course.code,{})[APP.week]||{};
+    const cwStatus=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{is_open:false});
+    const myCW=S.get(`nm_cw_${APP.course.code}_${APP.week}_${APP.student.matric}`,null);
+    let cwBlock='';
+    if(myCW){
+      cwBlock=`<div class="al as">✅ Classwork submitted for ${APP.week}. Score: ${myCW.pct!=null?myCW.pct+'%':'see results'}${myCW.pending_short&&myCW.pending_short.length?` (${myCW.pending_short.length} short answer(s) pending review)`:''}</div>`;
+      if(cwStatus.release_answers) cwBlock+=cwReview(myCW);
+    } else if(cwStatus.is_open){
+      cwBlock=cwForm();
+    } else {
+      cwBlock=`<div class="al aw">🔒 Classwork is closed for ${APP.week}.</div>`;
     }
-    return file_map.get(file_type, os.path.join(base_dir, f"{file_type}.csv"))
+    return istrip()+ph('📖 Lecture & Classwork',APP.week+' · '+APP.course.name)+`
+    <div class="card"><div class="ct">📘 ${lec.topic||'Topic not posted yet'}</div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7;margin-bottom:1rem">${lec.brief||'No brief available yet.'}</p>
+      ${lec.topic?`<a href="${APP.course.url}${APP.week.replace(' ','')}" target="_blank" class="btn btn-s sm">🔗 View Full Notes</a>`:''}</div>
+    <div class="card"><div class="ct">📝 Assignment</div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7">${lec.assignment||'No assignment posted yet.'}</p></div>
+    <div class="card"><div class="ct">🧩 Classwork</div>${cwBlock}</div>`;
+  });
+}
 
-def clean_text(val):
-    return str(val or "").strip()
+let cwSel={};
+let cwTextAnswers={};
 
-def normalize_course_name(name):
-    return name.replace("–", "-").replace("—", "-").strip()
-
-def get_lecture_file(course_code):
-    if not course_code or not isinstance(course_code, str):
-        st.warning("⚠️ Invalid or missing course code.")
-        return None
-    return get_file(course_code, "lectures")
-
-def ensure_scores_file(course_code):
-    """Ensure scores file exists with proper columns"""
-    scores_file = get_file(course_code, "scores")
-    os.makedirs(os.path.dirname(scores_file), exist_ok=True)
-    required_columns = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]
-    if not os.path.exists(scores_file):
-        df = pd.DataFrame(columns=required_columns)
-        df.to_csv(scores_file, index=False)
-        return df
-    else:
-        try:
-            df = pd.read_csv(scores_file)
-            for col in required_columns:
-                if col not in df.columns:
-                    df[col] = "" if col == "Grade" else 0
-            df.to_csv(scores_file, index=False)
-            return df
-        except:
-            df = pd.DataFrame(columns=required_columns)
-            df.to_csv(scores_file, index=False)
-            return df
-
-# ===============================================================
-# 📊 ATTENDANCE MANAGEMENT
-# ===============================================================
-
-def init_attendance_status():
-    status_file = get_persistent_path("attendance_status")
-    os.makedirs(os.path.dirname(status_file), exist_ok=True)
-    if not os.path.exists(status_file):
-        with open(status_file, 'w') as f:
-            json.dump({}, f)
-
-def get_attendance_status(course_code, week):
-    init_attendance_status()
-    status_file = get_persistent_path("attendance_status")
-    try:
-        with open(status_file, 'r') as f:
-            status_data = json.load(f)
-        week_key = week.replace(" ", "")
-        key = f"{course_code}_{week_key}"
-        return status_data.get(key, {"is_open": False, "open_time": None})
-    except Exception:
-        return {"is_open": False, "open_time": None}
-
-def set_attendance_status(course_code, week, is_open, open_time=None):
-    init_attendance_status()
-    status_file = get_persistent_path("attendance_status")
-    try:
-        with open(status_file, 'r') as f:
-            status_data = json.load(f)
-        week_key = week.replace(" ", "")
-        key = f"{course_code}_{week_key}"
-        if is_open:
-            status_data[key] = {
-                "is_open": True,
-                "open_time": open_time.isoformat() if open_time else datetime.now().isoformat()
-            }
-        else:
-            status_data[key] = {"is_open": False, "open_time": None}
-        with open(status_file, 'w') as f:
-            json.dump(status_data, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error setting attendance status: {e}")
-        return False
-
-def has_marked_attendance(course_code, week, name, matric):
-    try:
-        attendance_folder = get_persistent_path("attendance")
-        week_key = week.replace(" ", "")
-        attendance_file = os.path.join(attendance_folder, f"attendance_{course_code}_{week_key}.csv")
-        if not os.path.exists(attendance_file):
-            return False
-        df = pd.read_csv(attendance_file)
-        df['Name'] = df['Name'].astype(str).str.strip().str.lower()
-        df['Matric'] = df['Matric'].astype(str).str.strip().str.lower()
-        existing = df[(df['Name'] == name.strip().lower()) & (df['Matric'] == matric.strip().lower())]
-        return len(existing) > 0
-    except Exception as e:
-        st.error(f"Error checking attendance: {e}")
-        return True
-
-def mark_attendance_entry(course_code, name, matric, week):
-    try:
-        attendance_folder = get_persistent_path("attendance")
-        week_key = week.replace(" ", "")
-        attendance_file = os.path.join(attendance_folder, f"attendance_{course_code}_{week_key}.csv")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        new_data = {'Name': [name.strip()], 'Matric': [matric.strip()], 'Week': [week], 'Timestamp': [timestamp]}
-        new_df = pd.DataFrame(new_data)
-        if os.path.exists(attendance_file):
-            existing_df = pd.read_csv(attendance_file)
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        else:
-            combined_df = new_df
-        combined_df.to_csv(attendance_file, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error recording attendance: {e}")
-        return False
-
-# ===============================================================
-# 🧩 CLASSWORK STATUS
-# ===============================================================
-
-# FIX #4: Only ONE definition of get_classwork_status_file() — takes (course_code, week)
-def get_classwork_status_file(course_code, week):
-    """Get classwork status file path for a specific course and week"""
-    status_dir = os.path.join(PERSISTENT_DATA_DIR, course_code, "classwork_status")
-    os.makedirs(status_dir, exist_ok=True)
-    week_key = week.replace(" ", "_")
-    return os.path.join(status_dir, f"{week_key}_status.json")
-
-def get_classwork_status(course_code, week):
-    """Get classwork status for specific course and week"""
-    status_file = get_classwork_status_file(course_code, week)
-    default_status = {"is_open": False, "open_time": None, "answers_released": False}
-    try:
-        with open(status_file, 'r') as f:
-            loaded_status = json.load(f)
-            default_status.update(loaded_status)
-        return default_status
-    except:
-        return default_status
-
-def set_classwork_status(course_code, week, is_open, open_time=None):
-    """Set classwork status for specific course and week"""
-    try:
-        status_file = get_classwork_status_file(course_code, week)
-        status = get_classwork_status(course_code, week)
-        status["is_open"] = is_open
-        status["open_time"] = open_time.isoformat() if (is_open and open_time) else (datetime.now().isoformat() if is_open else None)
-        with open(status_file, 'w') as f:
-            json.dump(status, f)
-        return True
-    except Exception as e:
-        st.error(f"Error setting classwork status: {e}")
-        return False
-
-def are_answers_released(course_code, week):
-    status = get_classwork_status(course_code, week)
-    return status.get("answers_released", False)
-
-def set_classwork_answers_released(course_code, week, released):
-    try:
-        status_file = get_classwork_status_file(course_code, week)
-        status = get_classwork_status(course_code, week)
-        status["answers_released"] = released
-        with open(status_file, 'w') as f:
-            json.dump(status, f)
-        return True
-    except Exception as e:
-        st.error(f"Error setting answer release status: {e}")
-        return False
-
-def is_classwork_open(course_code, week):
-    status = get_classwork_status(course_code, week)
-    return status.get("is_open", False)
-
-def close_classwork_after_20min(course_code, week):
-    status = get_classwork_status(course_code, week)
-    if status.get("is_open", False) and status.get("open_time"):
-        try:
-            open_time = datetime.fromisoformat(status["open_time"])
-            elapsed = (datetime.now() - open_time).total_seconds()
-            if elapsed > 1200:
-                set_classwork_status(course_code, week, False)
-                return True
-        except Exception as e:
-            st.error(f"Error in classwork auto-close: {e}")
-    return False
-
-# FIX #5: save_classwork now accepts course_code as parameter
-def save_classwork(course_code, name, matric, week, answers):
-    """Save classwork submissions"""
-    try:
-        classwork_file = get_file(course_code, "classwork")
-        submission_data = {
-            'Name': name,
-            'Matric': matric,
-            'Week': week,
-            'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'Answers': json.dumps(answers)
-        }
-        if os.path.exists(classwork_file):
-            df = pd.read_csv(classwork_file)
-            existing = df[(df['Name'] == name) & (df['Matric'] == matric) & (df['Week'] == week)]
-            if not existing.empty:
-                st.warning("⚠️ You have already submitted classwork for this week.")
-                return False
-            df = pd.concat([df, pd.DataFrame([submission_data])], ignore_index=True)
-        else:
-            df = pd.DataFrame([submission_data])
-        df.to_csv(classwork_file, index=False)
-        st.success("✅ Classwork submitted successfully!")
-        return True
-    except Exception as e:
-        st.error(f"Error saving classwork: {e}")
-        return False
-
-# ===============================================================
-# 📁 FILE MANAGEMENT
-# ===============================================================
-
-def save_file(course_code, student_name, week, uploaded_file, folder_name):
-    """Safely save uploaded file"""
-    if uploaded_file is None:
-        return None
-    upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, folder_name)
-    os.makedirs(upload_dir, exist_ok=True)
-    safe_name = re.sub(r'[^A-Za-z0-9_-]', '_', student_name.strip())
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_path = os.path.join(upload_dir, f"{safe_name}_{week}_{timestamp}_{uploaded_file.name}")
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    return file_path
-
-def log_submission(course_code, matric, student_name, week, file_name, upload_type):
-    """Log each upload to CSV file"""
-    log_file = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", f"{course_code}_submissions_log.csv")
-    new_entry = pd.DataFrame([{
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Matric": matric,
-        "Student Name": student_name,
-        "Week": week,
-        "File": file_name,
-        "Type": upload_type
-    }])
-    if os.path.exists(log_file):
-        existing = pd.read_csv(log_file)
-        updated = pd.concat([existing, new_entry], ignore_index=True)
-    else:
-        updated = new_entry
-    updated.to_csv(log_file, index=False)
-
-def get_submission_file(course_code, week, student_id):
-    """Get the file path for a student's submission"""
-    safe_week = week.replace(" ", "_").replace(":", "").lower()
-    safe_student_id = str(student_id).replace(" ", "_").replace(":", "").lower()
-    submissions_dir = os.path.join("data", "courses", course_code, "submissions", safe_week)
-    os.makedirs(submissions_dir, exist_ok=True)
-    return os.path.join(submissions_dir, f"{safe_student_id}_submission.json")
-
-def check_existing_submission(course_code, week, student_id):
-    """Check if a student has already submitted an assignment"""
-    try:
-        if not all([course_code, week, student_id]):
-            return False, None
-        submission_file = get_submission_file(course_code, week, student_id)
-        if os.path.exists(submission_file):
-            with open(submission_file, 'r') as f:
-                submission_data = json.load(f)
-            if submission_data.get('submission_text') or submission_data.get('submission_file'):
-                return True, submission_data
-        return False, None
-    except Exception as e:
-        st.error(f"Error checking existing submission: {e}")
-        return False, None
-
-def save_submission(course_code, week, student_id, submission_data):
-    try:
-        submission_file = get_submission_file(course_code, week, student_id)
-        submission_data['submission_time'] = datetime.now().isoformat()
-        submission_data['student_id'] = student_id
-        submission_data['week'] = week
-        submission_data['course_code'] = course_code
-        with open(submission_file, 'w') as f:
-            json.dump(submission_data, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error saving submission: {e}")
-        return False
-
-def get_all_submissions_data(course_code, week=None):
-    try:
-        submissions_data = []
-        course_dir = os.path.join("data", "courses", course_code, "submissions")
-        if not os.path.exists(course_dir):
-            return pd.DataFrame()
-        weeks = [week] if week else os.listdir(course_dir)
-        for week_folder in weeks:
-            week_path = os.path.join(course_dir, week_folder)
-            if not os.path.isdir(week_path):
-                continue
-            for file in os.listdir(week_path):
-                if file.endswith('_submission.json'):
-                    file_path = os.path.join(week_path, file)
-                    try:
-                        with open(file_path, 'r') as f:
-                            data = json.load(f)
-                        matric = file.replace('_submission.json', '')
-                        submissions_data.append({
-                            'Matric': matric,
-                            'Student Name': data.get('student_name', 'Unknown'),
-                            'Week': data.get('week', week_folder),
-                            'Submission Time': data.get('submission_time', ''),
-                            'File Name': data.get('submission_file', ''),
-                            'Submission Text': data.get('submission_text', ''),
-                            'JSON File': file
-                        })
-                    except Exception as e:
-                        print(f"Error reading {file_path}: {e}")
-                        continue
-        return pd.DataFrame(submissions_data)
-    except Exception as e:
-        st.error(f"Error getting submissions data: {e}")
-        return pd.DataFrame()
-
-def download_assignment_file(course_code, week, matric):
-    try:
-        submission_file = get_submission_file(course_code, week, matric)
-        if os.path.exists(submission_file):
-            with open(submission_file, 'r') as f:
-                data = json.load(f)
-            if data.get('submission_file'):
-                file_path = data.get('file_path', '')
-                if os.path.exists(file_path):
-                    with open(file_path, 'rb') as f:
-                        return f.read(), data['submission_file']
-            return json.dumps(data, indent=2).encode(), f"{matric}_submission.json"
-        return None, None
-    except Exception as e:
-        st.error(f"Error downloading assignment: {e}")
-        return None, None
-
-def get_student_list_csv(course_code):
-    try:
-        submissions_df = get_all_submissions_data(course_code)
-        if submissions_df.empty:
-            return None, "No submissions found"
-        student_list = []
-        for matric in submissions_df['Matric'].unique():
-            student_data = submissions_df[submissions_df['Matric'] == matric].iloc[0]
-            submission_count = len(submissions_df[submissions_df['Matric'] == matric])
-            student_list.append({
-                'Matric Number': matric,
-                'Student Name': student_data['Student Name'],
-                'Total Submissions': submission_count,
-                'Weeks Submitted': ', '.join(submissions_df[submissions_df['Matric'] == matric]['Week'].unique()),
-                'Last Submission': submissions_df[submissions_df['Matric'] == matric]['Submission Time'].max()
-            })
-        student_df = pd.DataFrame(student_list)
-        return student_df.to_csv(index=False), f"{course_code}_student_list.csv"
-    except Exception as e:
-        st.error(f"Error generating student list: {e}")
-        return None, None
-
-def get_weekly_submissions_csv(course_code, week):
-    try:
-        submissions_df = get_all_submissions_data(course_code, week)
-        if submissions_df.empty:
-            return None, f"No submissions found for {week}"
-        weekly_df = submissions_df[['Matric', 'Student Name', 'Submission Time', 'File Name']]
-        return weekly_df.to_csv(index=False), f"{course_code}_{week}_submissions.csv"
-    except Exception as e:
-        st.error(f"Error generating weekly submissions: {e}")
-        return None, None
-
-# ===============================================================
-# 🎥 VIDEO MANAGEMENT  (FIX #12: only ONE definition each)
-# ===============================================================
-
-def get_video_files(course_code):
-    """Get list of video files for a course"""
-    video_dir = get_persistent_path("video", course_code)
-    if not os.path.exists(video_dir):
-        return []
-    return sorted([f for f in os.listdir(video_dir)
-                   if f.lower().endswith(('.mp4', '.mov', '.avi', '.mkv'))])
-
-def upload_video(course_code, uploaded_video):
-    """Upload video to persistent storage"""
-    try:
-        video_dir = get_persistent_path("video", course_code)
-        os.makedirs(video_dir, exist_ok=True)
-        safe_name = "".join(c for c in uploaded_video.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
-        safe_name = safe_name.replace(' ', '_')
-        base_name, ext = os.path.splitext(safe_name)
-        save_path = os.path.join(video_dir, safe_name)
-        counter = 1
-        while os.path.exists(save_path):
-            save_path = os.path.join(video_dir, f"{base_name}_{counter}{ext}")
-            counter += 1
-        with open(save_path, "wb") as f:
-            f.write(uploaded_video.getbuffer())
-        return True, f"✅ Video uploaded successfully: {os.path.basename(save_path)}"
-    except Exception as e:
-        return False, f"❌ Error uploading video: {str(e)}"
-
-# ===============================================================
-# 📚 LECTURE MANAGEMENT
-# ===============================================================
-
-def load_lectures(course_code):
-    """Load or create lecture CSV safely"""
-    if not course_code:
-        return pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File", "Video_File"])
-    lecture_file = get_file(course_code, "lectures")
-    os.makedirs(os.path.dirname(lecture_file), exist_ok=True)
-    if not os.path.exists(lecture_file):
-        df_default = pd.DataFrame({
-            "Week": [f"Week {i}" for i in range(1, 16)],
-            "Topic": [""] * 15,
-            "Brief": [""] * 15,
-            "Classwork": [""] * 15,
-            "Assignment": [""] * 15,
-            "PDF_File": [""] * 15,
-            "Video_File": [""] * 15,
-        })
-        df_default.to_csv(lecture_file, index=False)
-        return df_default
-    try:
-        df = pd.read_csv(lecture_file)
-        for col in ["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File", "Video_File"]:
-            if col not in df.columns:
-                df[col] = ""
-        return df
-    except Exception as e:
-        st.error(f"Could not read lecture file: {e}")
-        return pd.DataFrame(columns=["Week", "Topic", "Brief", "Classwork", "Assignment", "PDF_File", "Video_File"])
-
-# ===============================================================
-# 📊 SCORES MANAGEMENT
-# ===============================================================
-
-def compute_grade(total_score):
-    try:
-        total = float(total_score)
-        if total >= 70: return "A"
-        if total >= 60: return "B"
-        if total >= 50: return "C"
-        if total >= 45: return "D"
-        if total >= 40: return "E"
-        return "F"
-    except:
-        return ""
-
-# FIX #13: Only ONE definition of calculate_final_grade()
-def calculate_final_grade(student_scores):
-    """Calculate final grade for a student based on all scores"""
-    try:
-        if student_scores.empty:
-            return None, None, 0, 0, 0, 0, 0
-        weekly_scores = student_scores[student_scores['Week'] != 'Exam']
-        exam_scores = student_scores[student_scores['Week'] == 'Exam']
-        assignment_avg = weekly_scores['Assignment'].mean() if not weekly_scores.empty and 'Assignment' in weekly_scores.columns else 0
-        test_avg = weekly_scores['Test'].mean() if not weekly_scores.empty and 'Test' in weekly_scores.columns else 0
-        practical_avg = weekly_scores['Practical'].mean() if not weekly_scores.empty and 'Practical' in weekly_scores.columns else 0
-        classwork_avg = weekly_scores['Classwork'].mean() if not weekly_scores.empty and 'Classwork' in weekly_scores.columns else 0
-        exam_score = exam_scores['Exam'].iloc[0] if not exam_scores.empty and 'Exam' in exam_scores.columns else 0
-        ca_total = (assignment_avg * 0.08) + (test_avg * 0.08) + (practical_avg * 0.05) + (classwork_avg * 0.09)
-        exam_contribution = exam_score * 0.70
-        final_total = round(ca_total + exam_contribution, 1)
-        final_grade = compute_grade(final_total)
-        return final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score
-    except Exception as e:
-        st.error(f"Error calculating final grade: {e}")
-        return None, None, 0, 0, 0, 0, 0
-
-def load_student_scores(course_code, student_name, student_matric):
-    scores_file = get_file(course_code, "scores")
-    ensure_scores_file(course_code)
-    if not os.path.exists(scores_file):
-        return pd.DataFrame()
-    try:
-        scores_df = pd.read_csv(scores_file)
-        if "StudentName" not in scores_df.columns or "MatricNo" not in scores_df.columns:
-            return pd.DataFrame()
-        return scores_df[
-            (scores_df["StudentName"].astype(str).str.strip().str.lower() == student_name.lower()) &
-            (scores_df["MatricNo"].astype(str).str.strip().str.lower() == student_matric.lower())
-        ]
-    except Exception as e:
-        st.error(f"Error loading scores: {e}")
-        return pd.DataFrame()
-
-def update_classwork_score(course_code, student_name, student_matric, week, score):
-    try:
-        scores_file = get_file(course_code, "scores")
-        os.makedirs(os.path.dirname(scores_file), exist_ok=True)
-        if os.path.exists(scores_file):
-            scores_df = pd.read_csv(scores_file)
-        else:
-            scores_df = pd.DataFrame(columns=["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"])
-        mask = (
-            (scores_df["StudentName"].astype(str).str.strip().str.lower() == student_name.lower()) &
-            (scores_df["MatricNo"].astype(str).str.strip().str.lower() == student_matric.lower()) &
-            (scores_df["Week"].astype(str).str.strip().str.lower() == week.lower())
-        )
-        if mask.any():
-            scores_df.loc[mask, "Classwork"] = score
-        else:
-            weekly_total = round(score * 0.09, 1)
-            new_row = {
-                "StudentName": student_name.title(),
-                "MatricNo": student_matric.upper(),
-                "Week": week,
-                "Assignment": 0, "Test": 0, "Practical": 0, "Exam": 0,
-                "Classwork": score,
-                "Total": weekly_total,
-                "Grade": compute_grade(weekly_total)
-            }
-            scores_df = pd.concat([scores_df, pd.DataFrame([new_row])], ignore_index=True)
-        scores_df.to_csv(scores_file, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Error updating classwork score: {e}")
-        return False
-
-def get_student_activity_summary(course_code, student_name, student_matric):
-    summary = {
-        "attendance_count": 0,
-        "classwork_count": 0,
-        "assignment_count": 0,
-        "drawing_count": 0,
-        "seminar_count": 0,
-        "recent_activity": []
+function cwForm(){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(!qs.length) return `<div class="al ai">No classwork questions posted yet.</div>`;
+  cwSel={};cwTextAnswers={};
+  return qs.map((q,i)=>{
+    if(q.type==='mcq'){
+      const entries=Object.entries(q.options||{});
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <div class="mopts">${entries.map(([key,val])=>`
+          <div class="mopt" id="cw-${i}-${key}" onclick="cwPickMCQ(${i},'${key}')">
+            <b>${key}.</b> ${val}</div>`).join('')}</div></div>`;
+    } else if(q.type==='gap_fill'){
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <div class="field" style="margin:0"><input id="cw-gap-${i}" placeholder="Type your answer…" oninput="cwTextAnswers[${i}]=this.value"></div></div>`;
+    } else {
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <textarea id="cw-short-${i}" placeholder="Write your answer…" oninput="cwTextAnswers[${i}]=this.value"></textarea></div>`;
     }
-    for week_num in range(1, 16):
-        week = f"Week {week_num}"
-        if has_marked_attendance(course_code, week, student_name, student_matric):
-            summary["attendance_count"] += 1
-            summary["recent_activity"].append(f"✅ Attended {week}")
-    classwork_file = get_file(course_code, "classwork")
-    if os.path.exists(classwork_file):
-        try:
-            classwork_df = pd.read_csv(classwork_file)
-            student_classwork = classwork_df[
-                (classwork_df['Name'].str.lower() == student_name.lower()) &
-                (classwork_df['Matric'].str.lower() == student_matric.lower())
-            ]
-            summary["classwork_count"] = len(student_classwork)
-        except:
-            pass
-    for sub_type in ["assignment", "drawing", "seminar"]:
-        upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, sub_type)
-        if os.path.exists(upload_dir):
-            files = os.listdir(upload_dir)
-            student_files = [f for f in files if student_name.lower() in f.lower() and student_matric.lower() in f.lower()]
-            count = len(student_files)
-            summary[f"{sub_type}_count"] = count
-    summary["recent_activity"] = summary["recent_activity"][-10:]
-    return summary
+  }).join('')+`<button class="btn btn-p" style="margin-top:1rem" onclick="cwSubmit()">📤 Submit Classwork</button>`;
+}
 
-# ===============================================================
-# 📊 ATTENDANCE VIEWING FUNCTIONS
-# ===============================================================
+function cwPickMCQ(q,key){
+  cwSel[q]=key;
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  const opts=Object.keys(qs[q]?.options||{});
+  opts.forEach(k=>document.getElementById(`cw-${q}-${k}`)?.classList.remove('sel'));
+  document.getElementById(`cw-${q}-${key}`)?.classList.add('sel');
+}
 
-def view_attendance_records(course_code, week):
-    try:
-        week_key = week.replace(" ", "")
-        attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
-        if not os.path.exists(attendance_file):
-            st.warning(f"No attendance records found for {course_code} - {week}")
-            return
-        df = pd.read_csv(attendance_file)
-        if df.empty:
-            st.warning(f"No attendance records found for {course_code} - {week}")
-            return
-        st.success(f"📊 Attendance Records for {course_code} - {week}")
-        st.dataframe(df, use_container_width=True)
-        st.info(f"**Total students attended:** {len(df)}")
-        csv = df.to_csv(index=False)
-        st.download_button(label="📥 Download CSV", data=csv,
-                           file_name=f"attendance_{course_code}_{week_key}.csv",
-                           mime="text/csv", use_container_width=True)
-    except Exception as e:
-        st.error(f"Error loading attendance records: {e}")
-
-def show_attendance_summary(course_code):
-    try:
-        summary_data = []
-        for week_num in range(1, 16):
-            week = f"Week {week_num}"
-            week_key = week.replace(" ", "")
-            attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
-            status_data = get_attendance_status(course_code, week)
-            is_open = status_data.get("is_open", False)
-            status = "🟢 OPEN" if is_open else "🔴 CLOSED"
-            if os.path.exists(attendance_file):
-                df = pd.read_csv(attendance_file)
-                summary_data.append({"Week": week, "Students Attended": len(df), "Status": status})
-            else:
-                summary_data.append({"Week": week, "Students Attended": 0, "Status": status})
-        if summary_data:
-            summary_df = pd.DataFrame(summary_data)
-            st.dataframe(summary_df, use_container_width=True)
-            total_students = summary_df["Students Attended"].sum()
-            weeks_with_attendance = len(summary_df[summary_df["Students Attended"] > 0])
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Total Attendance Records", total_students)
-            with col2:
-                st.metric("Weeks with Attendance", weeks_with_attendance)
-    except Exception as e:
-        st.error(f"Error generating attendance summary: {e}")
-
-def view_student_attendance_details(course_code, week):
-    try:
-        week_key = week.replace(" ", "")
-        attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
-        if not os.path.exists(attendance_file):
-            st.warning(f"No attendance records found for {course_code} - {week}")
-            return
-        df = pd.read_csv(attendance_file)
-        if df.empty:
-            st.warning(f"No attendance records found for {course_code} - {week}")
-            return
-        st.success(f"👥 Student Attendance for {course_code} - {week}")
-        st.info(f"**Total students attended:** {len(df)}")
-        col1, col2 = st.columns(2)
-        with col1:
-            search_name = st.text_input("🔍 Search by Name", placeholder="Enter student name...")
-        with col2:
-            search_matric = st.text_input("🔍 Search by Matric", placeholder="Enter matric number...")
-        filtered_df = df.copy()
-        if search_name:
-            filtered_df = filtered_df[filtered_df['Name'].str.contains(search_name, case=False, na=False)]
-        if search_matric:
-            filtered_df = filtered_df[filtered_df['Matric'].str.contains(search_matric, case=False, na=False)]
-        if not filtered_df.empty:
-            st.dataframe(filtered_df, use_container_width=True)
-        else:
-            st.warning("No students found matching your search criteria.")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button("📥 Download Filtered", filtered_df.to_csv(index=False),
-                               f"attendance_{course_code}_{week_key}_filtered.csv", "text/csv", use_container_width=True)
-        with col2:
-            st.download_button("📥 Download All", df.to_csv(index=False),
-                               f"attendance_{course_code}_{week_key}_all.csv", "text/csv", use_container_width=True)
-    except Exception as e:
-        st.error(f"Error loading student attendance details: {e}")
-
-def view_all_students_attendance(course_code):
-    try:
-        st.subheader(f"📊 Complete Student Attendance - {course_code}")
-        all_attendance = []
-        for week_num in range(1, 16):
-            week = f"Week {week_num}"
-            week_key = week.replace(" ", "")
-            attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course_code}_{week_key}.csv")
-            if os.path.exists(attendance_file):
-                df = pd.read_csv(attendance_file)
-                if not df.empty:
-                    df['Week'] = week
-                    all_attendance.append(df)
-        if not all_attendance:
-            st.info(f"No attendance records found for {course_code}")
-            return
-        combined_df = pd.concat(all_attendance, ignore_index=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            search_student = st.text_input("🔍 Search Student", placeholder="Name or Matric...", key="search_all")
-        with col2:
-            selected_week = st.selectbox("Filter by Week", ["All Weeks"] + [f"Week {i}" for i in range(1, 16)], key="filter_week")
-        filtered_combined = combined_df.copy()
-        if search_student:
-            filtered_combined = filtered_combined[
-                filtered_combined['Name'].str.contains(search_student, case=False, na=False) |
-                filtered_combined['Matric'].str.contains(search_student, case=False, na=False)
-            ]
-        if selected_week != "All Weeks":
-            filtered_combined = filtered_combined[filtered_combined['Week'] == selected_week]
-        if filtered_combined.empty:
-            st.warning("No attendance records found matching your criteria.")
-            return
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Records", len(filtered_combined))
-        with col2:
-            st.metric("Unique Students", filtered_combined['Matric'].nunique())
-        with col3:
-            st.metric("Weeks Covered", filtered_combined['Week'].nunique())
-        student_summary = filtered_combined.groupby(['Name', 'Matric']).size().reset_index(name='Attendance Count')
-        st.subheader("👥 Student Attendance Summary")
-        st.dataframe(student_summary.sort_values('Attendance Count', ascending=False), use_container_width=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button("📥 Download Detailed Records", filtered_combined.to_csv(index=False),
-                               f"attendance_{course_code}_detailed.csv", "text/csv", use_container_width=True)
-        with col2:
-            st.download_button("📥 Download Student Summary", student_summary.to_csv(index=False),
-                               f"attendance_{course_code}_student_summary.csv", "text/csv", use_container_width=True)
-    except Exception as e:
-        st.error(f"Error loading complete attendance: {e}")
-
-def get_global_attendance_summary():
-    raw_courses = load_courses_config()
-    courses = [v["code"] if isinstance(v, dict) else v for v in raw_courses.values()]
-    summary_data = []
-    for course in courses:
-        total_students = 0
-        weeks_with_data = 0
-        for week_num in range(1, 16):
-            week = f"Week {week_num}"
-            week_key = week.replace(" ", "")
-            attendance_file = os.path.join(get_persistent_path("attendance"), f"attendance_{course}_{week_key}.csv")
-            if os.path.exists(attendance_file):
-                try:
-                    df = pd.read_csv(attendance_file)
-                    total_students += len(df)
-                    weeks_with_data += 1
-                except:
-                    pass
-        summary_data.append({
-            "Course": course,
-            "Total Attendance Records": total_students,
-            "Weeks with Data": weeks_with_data,
-            "Average per Week": round(total_students / max(weeks_with_data, 1), 1)
-        })
-    return pd.DataFrame(summary_data)
-
-# ===============================================================
-# 🧩 CLASSWORK VIEWING FUNCTIONS
-# ===============================================================
-
-def view_classwork_submissions(course_code, week):
-    try:
-        classwork_file = get_file(course_code, "classwork")
-        if not os.path.exists(classwork_file):
-            st.warning(f"No classwork submissions found for {course_code} - {week}")
-            return
-        df = pd.read_csv(classwork_file)
-        if df.empty:
-            st.warning(f"No classwork submissions found for {course_code} - {week}")
-            return
-        week_submissions = df[df['Week'] == week]
-        if week_submissions.empty:
-            st.warning(f"No classwork submissions found for {course_code} - {week}")
-            return
-        st.success(f"📝 Classwork Submissions for {course_code} - {week}")
-        for idx, row in week_submissions.iterrows():
-            with st.expander(f"🧩 {row['Name']} ({row['Matric']}) - {row['Timestamp']}", expanded=False):
-                st.write(f"**Student:** {row['Name']} ({row['Matric']})")
-                st.write(f"**Submitted:** {row['Timestamp']}")
-                try:
-                    answers = json.loads(row['Answers'])
-                    st.write("**Answers:**")
-                    for i, answer in enumerate(answers):
-                        if str(answer).strip():
-                            st.write(f"**Q{i+1}:** {answer}")
-                except:
-                    st.write("Unable to parse answers")
-        st.download_button("📥 Download Classwork Submissions", week_submissions.to_csv(index=False),
-                           f"classwork_{course_code}_{week.replace(' ', '')}.csv", "text/csv", use_container_width=True)
-    except Exception as e:
-        st.error(f"Error loading classwork submissions: {e}")
-
-# ===============================================================
-# 🧩 CLASSWORK DISPLAY FOR STUDENTS
-# ===============================================================
-
-def display_classwork_section(course_code, week, student_name, student_matric):
-    """Display classwork section for the selected week"""
-    try:
-        st.markdown("---")
-        st.subheader(f"🧩 Classwork - {week}")
-        mcq_questions = load_mcq_questions(course_code, week)
-        if not mcq_questions or len(mcq_questions) == 0:
-            st.info(f"No automated classwork assigned for {week} yet.")
-            return
-
-        classwork_status = is_classwork_open(course_code, week)
-        answers_released = are_answers_released(course_code, week)
-        close_classwork_after_20min(course_code, week)
-
-        if not classwork_status and not answers_released:
-            st.info("🔒 Classwork for this week is currently hidden.")
-            return
-
-        if classwork_status:
-            st.success("✅ Classwork is OPEN - You can submit your answers")
-            current_status = get_classwork_status(course_code, week)
-            if current_status.get("open_time"):
-                try:
-                    open_time = datetime.fromisoformat(current_status["open_time"])
-                    remaining = max(0, 600 - (datetime.now() - open_time).total_seconds())
-                    if remaining > 0:
-                        st.info(f"⏳ Auto-closes in {int(remaining//60):02d}:{int(remaining%60):02d}")
-                except:
-                    pass
-        elif answers_released:
-            st.info("📚 Classwork is CLOSED - Answers are now available for review")
-        else:
-            st.warning("🚫 Classwork is CLOSED")
-
-        # Check if already submitted
-        classwork_file = get_file(course_code, "classwork")
-        already_submitted = False
-        previous_score = 0
-        submission_data = None
-        if os.path.exists(classwork_file):
-            try:
-                df = pd.read_csv(classwork_file)
-                existing = df[
-                    (df['Name'].astype(str).str.strip().str.lower() == student_name.lower()) &
-                    (df['Matric'].astype(str).str.strip().str.lower() == student_matric.lower()) &
-                    (df['Week'].astype(str).str.strip().str.lower() == week.lower()) &
-                    (df['Type'] == 'MCQ')
-                ]
-                already_submitted = not existing.empty
-                if already_submitted:
-                    submission_data = existing.iloc[0]
-                    previous_score = submission_data['Score']
-            except Exception as e:
-                st.error(f"Error checking previous submissions: {e}")
-
-        if already_submitted:
-            st.warning(f"⚠️ You have already submitted this classwork. Your score: **{previous_score}%**")
-            with st.expander("📋 View Your Submission", expanded=False):
-                st.write(f"**Score:** {previous_score}%")
-                st.write(f"**Submitted:** {submission_data['Timestamp']}")
-                try:
-                    answers = json.loads(submission_data['Answers'])
-                    for i, (question, answer) in enumerate(zip(mcq_questions, answers)):
-                        st.write(f"**Q{i+1}:** {question['question']}")
-                        st.write(f"**Your Answer:** {answer}")
-                        if answers_released:
-                            correct_answer = question['correct_answer']
-                            if question['type'] == 'mcq':
-                                st.write(f"**Correct:** {correct_answer} - {question['options'].get(correct_answer, '')}")
-                            else:
-                                st.write(f"**Correct:** {correct_answer}")
-                        else:
-                            st.info("🔒 Correct answers will be released by your lecturer.")
-                        st.markdown("---")
-                except:
-                    st.write("Unable to display answer details")
-        elif classwork_status:
-            with st.form(f"mcq_form_{week.replace(' ', '_')}"):
-                st.write("**Answer the following questions:**")
-                answers = display_mcq_questions(mcq_questions)
-                submit_mcq = st.form_submit_button("🚀 Submit Classwork Answers", use_container_width=True)
-                if submit_mcq:
-                    if not student_name or not student_matric:
-                        st.error("❌ Please set your identity first.")
-                    elif any(not str(a).strip() for a in answers):
-                        st.error("❌ Please answer all questions before submitting.")
-                    else:
-                        # Double-check no existing submission
-                        double_check = False
-                        if os.path.exists(classwork_file):
-                            df_check = pd.read_csv(classwork_file)
-                            existing_check = df_check[
-                                (df_check['Name'].astype(str).str.strip().str.lower() == student_name.lower()) &
-                                (df_check['Matric'].astype(str).str.strip().str.lower() == student_matric.lower()) &
-                                (df_check['Week'].astype(str).str.strip().str.lower() == week.lower()) &
-                                (df_check['Type'] == 'MCQ')
-                            ]
-                            double_check = not existing_check.empty
-                        if double_check:
-                            st.error("❌ Submission already exists! You cannot submit twice.")
-                        else:
-                            score, correct, total = auto_grade_mcq_submission(mcq_questions, answers)
-                            success = save_mcq_submission(course_code, week, student_name, student_matric, answers, score)
-                            if success:
-                                update_classwork_score(course_code, student_name, student_matric, week, score)
-                                st.balloons()
-                                st.success(f"🎉 Submitted! Score: **{score}%** ({correct}/{total} correct)")
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to save submission. Please try again.")
-        else:
-            st.info("⏳ Classwork is closed. Wait for your lecturer to open it.")
-    except Exception as e:
-        st.error(f"Error displaying classwork section: {e}")
-
-def display_weekly_lecture_materials(course_code, week, student_name, student_matric):
-    try:
-        lectures_df = load_lectures(course_code)
-        if lectures_df.empty:
-            st.info(f"No lecture materials available for {week} yet.")
-            return
-        week_row = lectures_df[lectures_df["Week"] == week]
-        if week_row.empty:
-            st.info(f"No lecture materials available for {week} yet.")
-            return
-        row = week_row.iloc[0]
-        st.subheader(f"📖 {row['Topic']}")
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            if row["Brief"] and str(row["Brief"]).strip():
-                st.markdown(f"**Description:** {row['Brief']}")
-            if row["Assignment"] and str(row["Assignment"]).strip():
-                st.markdown(f"**Assignment:** {row['Assignment']}")
-        with col2:
-            pdf_file = str(row.get("PDF_File", "") or "").strip()
-            if pdf_file and os.path.exists(pdf_file):
-                try:
-                    with open(pdf_file, "rb") as pdf_file_obj:
-                        file_size = os.path.getsize(pdf_file) / (1024 * 1024)
-                        st.download_button(
-                            label=f"📥 Download PDF ({file_size:.1f}MB)",
-                            data=pdf_file_obj,
-                            file_name=os.path.basename(pdf_file),
-                            mime="application/pdf",
-                            key=f"student_pdf_{week.replace(' ', '_')}"
-                        )
-                        st.success("✅ PDF available")
-                except Exception as e:
-                    st.error(f"Error loading PDF: {e}")
-            else:
-                st.info("No PDF available")
-    except Exception as e:
-        st.error(f"Error loading lecture materials: {e}")
-
-# ===============================================================
-# 📢 PDF ANNOUNCEMENTS
-# ===============================================================
-
-def ensure_announcement_directories(course_code):
-    pdf_dir = get_pdf_announcements_dir(course_code)
-    metadata_dir = os.path.dirname(get_announcements_metadata_file(course_code))
-    os.makedirs(pdf_dir, exist_ok=True)
-    os.makedirs(metadata_dir, exist_ok=True)
-
-def get_pdf_announcements_dir(course_code):
-    return f"data/{course_code}/announcements/pdfs"
-
-def get_announcements_metadata_file(course_code):
-    return f"data/{course_code}/announcements/metadata.json"
-
-def get_pdf_file_path(course_code, filename):
-    return os.path.join(get_pdf_announcements_dir(course_code), filename)
-
-def save_announcement_metadata(announcement_data):
-    try:
-        course_code = announcement_data['course_code']
-        metadata_file = get_announcements_metadata_file(course_code)
-        os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
-        if os.path.exists(metadata_file):
-            with open(metadata_file, 'r', encoding='utf-8') as f:
-                existing_data = json.load(f)
-        else:
-            existing_data = []
-        existing_data.append(announcement_data)
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(existing_data, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving announcement metadata: {e}")
-        return False
-
-def load_announcements_metadata(course_code, active_only=True):
-    try:
-        metadata_file = get_announcements_metadata_file(course_code)
-        if not os.path.exists(metadata_file):
-            return []
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            announcements = json.load(f)
-        if active_only:
-            current_date = datetime.now().date()
-            active = []
-            for ann in announcements:
-                if not ann.get('is_active', True):
-                    continue
-                expiry_date = ann.get('expiry_date')
-                if expiry_date:
-                    try:
-                        if datetime.strptime(expiry_date, "%Y-%m-%d").date() < current_date:
-                            continue
-                    except ValueError:
-                        pass
-                active.append(ann)
-            return active
-        return announcements
-    except Exception as e:
-        st.error(f"Error loading announcements: {e}")
-        return []
-
-def update_announcement_status(course_code, filename, is_active):
-    try:
-        metadata_file = get_announcements_metadata_file(course_code)
-        if not os.path.exists(metadata_file):
-            return False
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            announcements = json.load(f)
-        for ann in announcements:
-            if ann['filename'] == filename:
-                ann['is_active'] = is_active
-                break
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(announcements, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        st.error(f"Error updating announcement status: {e}")
-        return False
-
-def delete_announcement(course_code, filename):
-    try:
-        metadata_file = get_announcements_metadata_file(course_code)
-        if not os.path.exists(metadata_file):
-            return False
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            announcements = json.load(f)
-        to_delete = None
-        updated = []
-        for ann in announcements:
-            if ann['filename'] == filename:
-                to_delete = ann
-            else:
-                updated.append(ann)
-        if to_delete:
-            file_path = to_delete.get('file_path') or get_pdf_file_path(course_code, filename)
-            if file_path and os.path.exists(file_path):
-                os.remove(file_path)
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(updated, f, indent=2, ensure_ascii=False)
-            return True
-        return False
-    except Exception as e:
-        st.error(f"Error deleting announcement: {e}")
-        return False
-
-def deactivate_expired_announcements(course_code):
-    try:
-        metadata_file = get_announcements_metadata_file(course_code)
-        if not os.path.exists(metadata_file):
-            return 0
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            announcements = json.load(f)
-        current_date = datetime.now().date()
-        deactivated_count = 0
-        for ann in announcements:
-            if not ann.get('is_active', True):
-                continue
-            expiry_date = ann.get('expiry_date')
-            if expiry_date:
-                try:
-                    if datetime.strptime(expiry_date, "%Y-%m-%d").date() < current_date:
-                        ann['is_active'] = False
-                        deactivated_count += 1
-                except ValueError:
-                    continue
-        if deactivated_count > 0:
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(announcements, f, indent=2, ensure_ascii=False)
-        return deactivated_count
-    except Exception as e:
-        st.error(f"Error deactivating expired announcements: {e}")
-        return 0
-
-def export_announcements_to_csv(course_code):
-    try:
-        announcements = load_announcements_metadata(course_code, active_only=False)
-        if not announcements:
-            return None
-        df = pd.DataFrame(announcements)
-        columns_to_keep = ['title', 'description', 'original_name', 'upload_date', 'expiry_date', 'priority', 'is_active', 'file_size']
-        available_columns = [col for col in columns_to_keep if col in df.columns]
-        return df[available_columns].to_csv(index=False)
-    except Exception as e:
-        st.error(f"Error exporting announcements: {e}")
-        return None
-
-def display_pdf_announcements_admin(course_code):
-    """Admin panel for PDF announcements"""
-    st.header(f"📢 PDF Announcements - {course_code}")
-    ensure_announcement_directories(course_code)
-    tab1, tab2 = st.tabs(["Upload New PDF", "Manage Existing PDFs"])
-
-    with tab1:
-        st.subheader("Upload Seminar Topics PDF")
-        with st.form(f"pdf_upload_form_{course_code}", clear_on_submit=True):
-            uploaded_pdf = st.file_uploader("Choose PDF file", type=['pdf'], key=f"pdf_upload_{course_code}")
-            announcement_title = st.text_input("Announcement Title*", placeholder="e.g., BCH201 Seminar Topics - Week 1")
-            announcement_description = st.text_area("Description", placeholder="Brief description...")
-            expiry_date = st.date_input("Expiry Date (Optional)", value=None)
-            col1, col2 = st.columns(2)
-            with col1:
-                priority = st.selectbox("Priority", ["Normal", "High"])
-            with col2:
-                is_active = st.checkbox("Active", value=True)
-            submitted = st.form_submit_button("📤 Upload PDF Announcement")
-            if submitted:
-                if uploaded_pdf is not None and announcement_title.strip():
-                    try:
-                        file_size = len(uploaded_pdf.getvalue()) / (1024 * 1024)
-                        if file_size > 10:
-                            st.error("❌ File size too large. Maximum: 10MB")
-                        else:
-                            pdf_dir = get_pdf_announcements_dir(course_code)
-                            os.makedirs(pdf_dir, exist_ok=True)
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            safe_name = "".join(c for c in uploaded_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip().replace(' ', '_')
-                            filename = f"{timestamp}_{safe_name}"
-                            file_path = os.path.join(pdf_dir, filename)
-                            counter = 1
-                            base_name, ext = os.path.splitext(filename)
-                            while os.path.exists(file_path):
-                                filename = f"{base_name}_{counter}{ext}"
-                                file_path = os.path.join(pdf_dir, filename)
-                                counter += 1
-                            with open(file_path, "wb") as f:
-                                f.write(uploaded_pdf.getbuffer())
-                            announcement_data = {
-                                'course_code': course_code,
-                                'title': announcement_title.strip(),
-                                'description': announcement_description,
-                                'filename': filename,
-                                'original_name': uploaded_pdf.name,
-                                'upload_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                'expiry_date': expiry_date.strftime("%Y-%m-%d") if expiry_date else '',
-                                'priority': priority,
-                                'is_active': is_active,
-                                'file_size': f"{file_size:.1f} MB",
-                                'type': 'seminar_topics',
-                                'file_path': file_path
-                            }
-                            if save_announcement_metadata(announcement_data):
-                                st.success(f"✅ PDF uploaded successfully!")
-                            else:
-                                st.error("❌ Failed to save metadata")
-                                if os.path.exists(file_path):
-                                    os.remove(file_path)
-                    except Exception as e:
-                        st.error(f"❌ Error uploading PDF: {str(e)}")
-                else:
-                    if uploaded_pdf is None:
-                        st.error("❌ Please select a PDF file")
-                    if not announcement_title.strip():
-                        st.error("❌ Please provide an announcement title")
-
-    with tab2:
-        st.subheader("Manage PDF Announcements")
-        announcements = load_announcements_metadata(course_code, active_only=False)
-        if not announcements:
-            st.info("📭 No PDF announcements found for this course.")
-            return
-        col_search, col_filter = st.columns(2)
-        with col_search:
-            search_term = st.text_input("🔍 Search announcements", placeholder="Search by title...")
-        with col_filter:
-            status_filter = st.selectbox("Filter by status", ["All", "Active", "Inactive"])
-        filtered_announcements = announcements
-        if search_term:
-            filtered_announcements = [a for a in filtered_announcements if search_term.lower() in a['title'].lower()]
-        if status_filter != "All":
-            filtered_announcements = [a for a in filtered_announcements if a.get('is_active', True) == (status_filter == "Active")]
-        if not filtered_announcements:
-            st.info("No announcements match your search criteria.")
-            return
-        for announcement in filtered_announcements:
-            ann_key = f"{announcement['filename']}_{announcement['upload_date']}"
-            with st.expander(f"📄 {announcement['title']} - {announcement['upload_date']}", expanded=False):
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"**Description:** {announcement.get('description', 'No description')}")
-                    st.write(f"**File:** {announcement['original_name']}")
-                    st.write(f"**Size:** {announcement.get('file_size', 'N/A')}")
-                    st.write(f"**Status:** {'🟢 Active' if announcement.get('is_active', True) else '🔴 Inactive'}")
-                with col2:
-                    new_status = st.selectbox("Status", ["Active", "Inactive"],
-                                              index=0 if announcement.get('is_active', True) else 1,
-                                              key=f"status_{ann_key}")
-                    if st.button("Update Status", key=f"update_{ann_key}"):
-                        if update_announcement_status(course_code, announcement['filename'], new_status == "Active"):
-                            st.success("✅ Status updated!")
-                            st.rerun()
-                    file_path = announcement.get('file_path') or get_pdf_file_path(course_code, announcement['filename'])
-                    if file_path and os.path.exists(file_path):
-                        with open(file_path, "rb") as file:
-                            st.download_button("📥 Download", data=file,
-                                               file_name=announcement['original_name'],
-                                               mime="application/pdf",
-                                               key=f"download_{ann_key}",
-                                               use_container_width=True)
-                    else:
-                        st.error("❌ File not found on server")
-                    if st.button("🗑️ Delete", key=f"delete_{ann_key}", use_container_width=True):
-                        if delete_announcement(course_code, announcement['filename']):
-                            st.success("✅ Announcement deleted!")
-                            st.rerun()
-
-def display_pdf_announcements_student(course_code):
-    """Student view for PDF announcements"""
-    st.header(f"📢 Course Announcements - {course_code}")
-    deactivated_count = deactivate_expired_announcements(course_code)
-    if deactivated_count > 0:
-        st.info(f"📢 {deactivated_count} expired announcement(s) have been deactivated.")
-    announcements = load_announcements_metadata(course_code, active_only=True)
-    if announcements:
-        announcements.sort(key=lambda x: x['upload_date'], reverse=True)
-        for announcement in announcements:
-            st.markdown("---")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                if announcement.get('priority') == 'High':
-                    st.error(f"🚨 **{announcement['title']}**")
-                else:
-                    st.subheader(f"📄 {announcement['title']}")
-            with col2:
-                st.write(f"**Date:** {announcement['upload_date'].split()[0]}")
-            if announcement.get('description'):
-                st.write(announcement['description'])
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.write(f"**File:** {announcement['original_name']}")
-                st.write(f"**Size:** {announcement.get('file_size', 'N/A')}")
-                if announcement.get('expiry_date'):
-                    try:
-                        expiry_date = datetime.strptime(announcement['expiry_date'], "%Y-%m-%d").date()
-                        days_remaining = (expiry_date - datetime.now().date()).days
-                        if days_remaining <= 7 and days_remaining >= 0:
-                            st.warning(f"⚠️ Expires in {days_remaining} days")
-                    except:
-                        pass
-            with col2:
-                file_path = announcement.get('file_path') or get_pdf_file_path(course_code, announcement['filename'])
-                if file_path and os.path.exists(file_path):
-                    with open(file_path, "rb") as file:
-                        st.download_button("📥 Download PDF", data=file,
-                                           file_name=announcement['original_name'],
-                                           mime="application/pdf",
-                                           key=f"download_{announcement['filename']}",
-                                           use_container_width=True)
-                else:
-                    st.error("File not available")
-    else:
-        st.info("📝 No active announcements for this course.")
-
-# ===============================================================
-# 📝 SEMINAR FUNCTIONS
-# ===============================================================
-
-def check_existing_seminar_submission(course_code, student_matric):
-    try:
-        with open("seminar_submissions.csv", "r") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if row['course_code'] == course_code and row['student_matric'] == student_matric:
-                    return True, row
-        return False, None
-    except FileNotFoundError:
-        return False, None
-
-def save_seminar_file(course_code, student_name, student_matric, file):
-    try:
-        file_extension = file.name.split('.')[-1]
-        file_path = f"./seminar/{course_code}/{student_matric}_{student_name}.{file_extension}"
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "wb") as f:
-            f.write(file.getbuffer())
-        return file_path
-    except Exception as e:
-        st.error(f"Error saving file: {e}")
-        return None
-
-def log_seminar_submission(course_code, student_matric, student_name, topic, file_name):
-    try:
-        with open("seminar_submissions.csv", "a", newline='') as file:
-            fieldnames = ['course_code', 'student_matric', 'student_name', 'topic', 'file_name', 'file_path', 'timestamp']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            if file.tell() == 0:
-                writer.writeheader()
-            file_path = f"./seminar/{course_code}/{student_matric}_{student_name}.{file_name.split('.')[-1]}"
-            writer.writerow({
-                'course_code': course_code,
-                'student_matric': student_matric,
-                'student_name': student_name,
-                'topic': topic,
-                'file_name': file_name,
-                'file_path': file_path,
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-    except Exception as e:
-        st.error(f"Error logging submission: {e}")
-
-def get_seminar_submissions(course_code):
-    try:
-        submissions = []
-        with open("seminar_submissions.csv", "r") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if row['course_code'] == course_code:
-                    submissions.append(row)
-        return submissions
-    except FileNotFoundError:
-        return []
-
-def get_seminar_feedback(student_matric, course_code):
-    try:
-        with open("seminar_feedback.csv", "r") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if row['student_matric'] == student_matric and row['course_code'] == course_code:
-                    return row.get('feedback_text', '') or "Feedback file provided"
-        return None
-    except FileNotFoundError:
-        return None
-
-# FIX #6: Added missing get_seminar_feedback_file_path()
-def get_seminar_feedback_file_path(student_matric, course_code):
-    """Get the file path for a student's seminar feedback PDF"""
-    return f"./seminar_feedback/{course_code}/{student_matric}_feedback.pdf"
-
-def save_seminar_feedback(student_matric, course_code, feedback_file=None, feedback_text=""):
-    try:
-        feedback_data = {
-            'student_matric': student_matric,
-            'course_code': course_code,
-            'feedback_text': feedback_text,
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        if feedback_file:
-            file_path = get_seminar_feedback_file_path(student_matric, course_code)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, "wb") as f:
-                f.write(feedback_file.getbuffer())
-            feedback_data['feedback_file'] = file_path
-        with open("seminar_feedback.csv", "a", newline='') as file:
-            fieldnames = ['student_matric', 'course_code', 'feedback_text', 'feedback_file', 'timestamp']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            if file.tell() == 0:
-                writer.writeheader()
-            writer.writerow(feedback_data)
-        return True
-    except Exception as e:
-        st.error(f"Error saving feedback: {e}")
-        return False
-
-# ===============================================================
-# 📝 COURSE DESCRIPTION FUNCTIONS
-# ===============================================================
-
-def load_course_description(course_code):
-    try:
-        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
-        if os.path.exists(desc_file):
-            with open(desc_file, 'r') as f:
-                all_descriptions = json.load(f)
-                return all_descriptions.get(course_code, {})
-        return {}
-    except Exception as e:
-        print(f"Error loading course description: {e}")
-        return {}
-
-def save_course_description(course_code, course_data):
-    try:
-        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
-        if os.path.exists(desc_file):
-            with open(desc_file, 'r') as f:
-                all_descriptions = json.load(f)
-        else:
-            all_descriptions = {}
-        all_descriptions[course_code] = course_data
-        with open(desc_file, 'w') as f:
-            json.dump(all_descriptions, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error saving course description: {e}")
-        return False
-
-def reset_course_description(course_code):
-    try:
-        desc_file = os.path.join(PERSISTENT_DATA_DIR, "course_descriptions.json")
-        if os.path.exists(desc_file):
-            with open(desc_file, 'r') as f:
-                all_descriptions = json.load(f)
-            if course_code in all_descriptions:
-                del all_descriptions[course_code]
-            with open(desc_file, 'w') as f:
-                json.dump(all_descriptions, f, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Error resetting course description: {e}")
-        return False
-
-def display_course_description_preview(course_info):
-    if not course_info:
-        st.info("No course description available yet.")
-        return
-    if course_info.get('overview'):
-        st.subheader("🎯 Course Overview")
-        st.write(course_info['overview'])
-    if course_info.get('outcomes'):
-        st.subheader("📚 Learning Outcomes")
-        st.write(course_info['outcomes'])
-    if course_info.get('instructor_name'):
-        st.subheader("👨‍🏫 Instructor Information")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"**Name:** {course_info['instructor_name']}")
-            if course_info.get('instructor_email'):
-                st.write(f"**Email:** {course_info['instructor_email']}")
-        with col2:
-            if course_info.get('office_hours'):
-                st.write(f"**Office Hours:** {course_info['office_hours']}")
-            if course_info.get('office_location'):
-                st.write(f"**Office Location:** {course_info['office_location']}")
-    col1, col2 = st.columns(2)
-    with col1:
-        if course_info.get('prerequisites'):
-            st.subheader("📋 Prerequisites")
-            st.write(course_info['prerequisites'])
-        if course_info.get('materials'):
-            st.subheader("📖 Required Materials")
-            st.write(course_info['materials'])
-    with col2:
-        if course_info.get('assessment'):
-            st.subheader("📊 Assessment Methods")
-            st.write(course_info['assessment'])
-        if course_info.get('schedule'):
-            st.subheader("🗓️ Course Schedule")
-            st.write(course_info['schedule'])
-    if course_info.get('contact_policy'):
-        st.subheader("📞 Contact Policy")
-        st.write(course_info['contact_policy'])
-    if course_info.get('last_updated'):
-        st.caption(f"Last updated: {course_info['last_updated']}")
-
-def calculate_info_completeness(course_info):
-    if not course_info:
-        return 0
-    required_fields = ['overview', 'outcomes', 'instructor_name', 'assessment']
-    filled_fields = [f for f in required_fields if course_info.get(f)]
-    return int((len(filled_fields) / len(required_fields)) * 100)
-
-def show_student_course_description(course_code, course_name):
-    st.header(f"📝 {course_name} - Course Information")
-    course_info = load_course_description(course_code)
-    if not course_info:
-        st.info("📋 Course description is being prepared by your lecturer. Check back soon!")
-        return
-    display_course_description_preview(course_info)
-
-# ===============================================================
-# 📊 SYSTEM LOGGING
-# ===============================================================
-
-def get_system_logs_file():
-    return os.path.join(PERSISTENT_DATA_DIR, "system_logs.json")
-
-def init_system_logs():
-    logs_file = get_system_logs_file()
-    if not os.path.exists(logs_file):
-        with open(logs_file, 'w') as f:
-            json.dump({"lecturer_logs": [], "student_logs": []}, f)
-
-def log_lecturer_activity(lecturer_name, course_code, action, details=""):
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-        else:
-            logs = {"lecturer_logs": [], "student_logs": []}
-        logs["lecturer_logs"].append({
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "lecturer_name": lecturer_name,
-            "course_code": course_code,
-            "action": action,
-            "details": details
-        })
-        if len(logs["lecturer_logs"]) > 1000:
-            logs["lecturer_logs"] = logs["lecturer_logs"][-1000:]
-        with open(logs_file, 'w') as f:
-            json.dump(logs, f, indent=2)
-    except Exception as e:
-        print(f"Error logging lecturer activity: {e}")
-
-def log_student_activity(student_name, matric, course_code, action, details=""):
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-        else:
-            logs = {"lecturer_logs": [], "student_logs": []}
-        logs["student_logs"].append({
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "student_name": student_name,
-            "matric": matric,
-            "course_code": course_code,
-            "action": action,
-            "details": details
-        })
-        if len(logs["student_logs"]) > 1000:
-            logs["student_logs"] = logs["student_logs"][-1000:]
-        with open(logs_file, 'w') as f:
-            json.dump(logs, f, indent=2)
-    except Exception as e:
-        print(f"Error logging student activity: {e}")
-
-def get_lecturer_logs():
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-            return logs.get("lecturer_logs", [])
-        return []
-    except:
-        return []
-
-def get_student_logs():
-    try:
-        logs_file = get_system_logs_file()
-        if os.path.exists(logs_file):
-            with open(logs_file, 'r') as f:
-                logs = json.load(f)
-            return logs.get("student_logs", [])
-        return []
-    except:
-        return []
-
-def is_recent(timestamp, days=1):
-    try:
-        log_time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-        return (datetime.now() - log_time).days <= days
-    except:
-        return False
-
-@st.cache_data(ttl=60)
-def get_lecturer_logs_cached():
-    return get_lecturer_logs()
-
-@st.cache_data(ttl=60)
-def get_student_logs_cached():
-    return get_student_logs()
-
-@st.cache_data(ttl=300)
-def load_courses_config_cached():
-    return load_courses_config()
-
-def generate_system_report():
-    lecturer_logs = get_lecturer_logs_cached()
-    student_logs = get_student_logs_cached()
-    courses = load_courses_config_cached()
-    report = {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "total_courses": len(courses),
-        "total_lecturer_activities": len(lecturer_logs),
-        "total_student_activities": len(student_logs),
-        "active_lecturers": len(set(log['lecturer_name'] for log in lecturer_logs)),
-        "active_students": len(set(log['student_name'] for log in student_logs)),
-        "courses": [v["code"] if isinstance(v, dict) else v for v in courses.values()]
+function cwSubmit(){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  for(let i=0;i<qs.length;i++){
+    const q=qs[i];
+    if(q.type==='mcq'&&!cwSel[i]){toast(`Answer question ${i+1}`,'error');return}
+    if((q.type==='gap_fill'||q.type==='short_answer')&&!cwTextAnswers[i]?.trim()){toast(`Answer question ${i+1}`,'error');return}
+  }
+  let autoScore=0,autoTotal=0,pendingShort=[];
+  const answerLog=[];
+  qs.forEach((q,i)=>{
+    if(q.type==='mcq'){
+      const ans=cwSel[i];answerLog.push({type:'mcq',q:q.question,ans,correct:q.correct_answer,options:q.options});
+      if(ans===q.correct_answer)autoScore+=q.marks||1;
+      autoTotal+=q.marks||1;
+    } else if(q.type==='gap_fill'){
+      const ans=(cwTextAnswers[i]||'').trim().toLowerCase();
+      const accepted=(q.correct_answer||'').split('|').map(a=>a.trim().toLowerCase());
+      answerLog.push({type:'gap_fill',q:q.question,ans:cwTextAnswers[i],correct:q.correct_answer});
+      if(accepted.includes(ans))autoScore+=q.marks||1;
+      autoTotal+=q.marks||1;
+    } else {
+      pendingShort.push({idx:i,q:q.question,ans:cwTextAnswers[i],model:q.model_answer,marks:q.marks||5});
+      answerLog.push({type:'short_answer',q:q.question,ans:cwTextAnswers[i],model:q.model_answer,status:'pending'});
+      autoTotal+=q.marks||5;
     }
-    report_file = os.path.join(PERSISTENT_DATA_DIR, f"system_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-    with open(report_file, 'w') as f:
-        json.dump(report, f, indent=2)
-    return report
-
-# ===============================================================
-# 🏫 COURSE MANAGEMENT (ADMIN)
-# ===============================================================
-
-def show_course_manager(course_code, course_name):
-    st.header(f"📚 Course Manager - {course_name}")
-    cm_tab1, cm_tab2 = st.tabs(["📝 About Course", "⚙️ Course Data"])
-
-    with cm_tab1:
-        st.subheader("📝 Course Description & Information")
-        course_info = load_course_description(course_code)
-        with st.form(f"course_description_form_{course_code}"):
-            course_overview = st.text_area("**Course Overview & Description**",
-                                           value=course_info.get('overview', ''), height=120,
-                                           placeholder="Describe the course objectives...",
-                                           key=f"overview_{course_code}")
-            col1, col2 = st.columns(2)
-            with col1:
-                learning_outcomes = st.text_area("**Learning Outcomes**", value=course_info.get('outcomes', ''), height=100,
-                                                 key=f"outcomes_{course_code}")
-                prerequisites = st.text_area("**Prerequisites**", value=course_info.get('prerequisites', ''), height=80,
-                                             key=f"prerequisites_{course_code}")
-            with col2:
-                assessment = st.text_area("**Assessment Methods**", value=course_info.get('assessment', ''), height=100,
-                                          key=f"assessment_{course_code}")
-                materials = st.text_area("**Required Materials**", value=course_info.get('materials', ''), height=80,
-                                         key=f"materials_{course_code}")
-            schedule_overview = st.text_area("**Course Schedule Overview**", value=course_info.get('schedule', ''), height=80,
-                                             key=f"schedule_{course_code}")
-            st.subheader("👨‍🏫 Instructor Information")
-            col1, col2 = st.columns(2)
-            with col1:
-                instructor_name = st.text_input("Instructor Name", value=course_info.get('instructor_name', ''),
-                                                key=f"instructor_name_{course_code}")
-                instructor_email = st.text_input("Email", value=course_info.get('instructor_email', ''),
-                                                 key=f"instructor_email_{course_code}")
-            with col2:
-                office_hours = st.text_input("Office Hours", value=course_info.get('office_hours', ''),
-                                             key=f"office_hours_{course_code}")
-                office_location = st.text_input("Office Location", value=course_info.get('office_location', ''),
-                                                key=f"office_location_{course_code}")
-            contact_policy = st.text_area("**Contact Policy**", value=course_info.get('contact_policy', ''), height=60,
-                                          key=f"contact_policy_{course_code}")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                if st.form_submit_button("💾 Save Course Description", type="primary", use_container_width=True):
-                    course_data = {
-                        'overview': course_overview, 'outcomes': learning_outcomes, 'prerequisites': prerequisites,
-                        'assessment': assessment, 'materials': materials, 'schedule': schedule_overview,
-                        'instructor_name': instructor_name, 'instructor_email': instructor_email,
-                        'office_hours': office_hours, 'office_location': office_location,
-                        'contact_policy': contact_policy,
-                        'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    if save_course_description(course_code, course_data):
-                        st.success("✅ Course description saved successfully!")
-                    else:
-                        st.error("❌ Failed to save course description")
-            with col2:
-                if st.form_submit_button("🔄 Reset Form", use_container_width=True):
-                    st.rerun()
-        st.divider()
-        st.subheader("👁️ Course Description Preview")
-        display_course_description_preview(course_info)
-
-    with cm_tab2:
-        st.subheader("Course Data Management")
-        course_info = load_course_description(course_code)
-        if course_info:
-            info_completeness = calculate_info_completeness(course_info)
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Description Completeness", f"{info_completeness}%")
-            with col2:
-                filled_fields = len([v for v in course_info.values() if v])
-                st.metric("Fields Completed", f"{filled_fields}/{len(course_info)}")
-            with col3:
-                last_updated = course_info.get('last_updated', 'Never')
-                st.metric("Last Updated", last_updated.split()[0] if last_updated != 'Never' else 'Never')
-            st.progress(info_completeness / 100)
-        st.subheader("📤 Export Course Data")
-        col1, col2 = st.columns(2)
-        with col1:
-            if course_info:
-                st.download_button("📥 Download Course Info (JSON)", json.dumps(course_info, indent=2),
-                                   f"{course_code}_course_description.json", "application/json",
-                                   use_container_width=True, key=f"export_info_{course_code}")
-        with col2:
-            if course_info:
-                csv_lines = [f"{k},{v}" for k, v in course_info.items() if k != 'last_updated']
-                st.download_button("📥 Download Course Info (CSV)", "\n".join(csv_lines),
-                                   f"{course_code}_course_description.csv", "text/csv",
-                                   use_container_width=True, key=f"export_csv_{course_code}")
-        st.subheader("🔄 Data Management")
-        with st.expander("Reset Course Information", expanded=False):
-            st.warning("⚠️ This will delete all course description data!")
-            if st.button("🗑️ Reset Course Description", type="secondary", use_container_width=True):
-                if reset_course_description(course_code):
-                    st.success("✅ Course description reset!")
-                    st.rerun()
-
-# ===============================================================
-# 🏢 SYSTEM ADMIN DASHBOARD
-# ===============================================================
-
-def process_bulk_courses(bulk_text, existing_courses, separator, import_mode, skip_duplicates, auto_generate_codes):
-    results = {'success': [], 'errors': [], 'duplicates': [], 'total_processed': 0}
-    lines = [line.strip() for line in bulk_text.split('\n') if line.strip()]
-    results['total_processed'] = len(lines)
-    if import_mode == "Replace all courses":
-        existing_courses.clear()
-    for i, line in enumerate(lines, 1):
-        try:
-            if separator in line:
-                parts = [p.strip() for p in line.split(separator)]
-            elif ',' in line:
-                parts = [p.strip() for p in line.split(',')]
-            elif '|' in line:
-                parts = [p.strip() for p in line.split('|')]
-            else:
-                parts = [line]
-            if len(parts) >= 2:
-                course_name = parts[0]
-                course_code = parts[1].upper()
-            else:
-                course_name = parts[0]
-                if auto_generate_codes:
-                    code_match = re.findall(r'[A-Z]+\s*\d+', course_name)
-                    if code_match:
-                        course_code = code_match[0].replace(' ', '')
-                    else:
-                        words = course_name.split()
-                        course_code = (words[0][0] + words[1][0]).upper() + "101" if len(words) >= 2 else course_name[:6].upper().replace(' ', '')
-                else:
-                    results['errors'].append(f"Line {i}: Cannot extract course code - '{line}'")
-                    continue
-            if not course_name or not course_code:
-                results['errors'].append(f"Line {i}: Missing course name or code - '{line}'")
-                continue
-            if course_name in existing_courses:
-                results['duplicates'].append(f"Line {i}: Course name exists - '{course_name}'")
-                continue
-            if skip_duplicates and course_code in [v["code"] if isinstance(v, dict) else v for v in existing_courses.values()]:
-                results['duplicates'].append(f"Line {i}: Course code exists - '{course_code}'")
-                continue
-            existing_courses[course_name] = course_code
-            results['success'].append(f"'{course_name}' - {course_code}")
-        except Exception as e:
-            results['errors'].append(f"Line {i}: Error - '{line}' - {str(e)}")
-    if results['success']:
-        save_courses_config(existing_courses)
-    return results
-
-def display_import_results(results):
-    st.subheader("📊 Import Results")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Successful", len(results['success']))
-    with col2:
-        st.metric("Errors", len(results['errors']))
-    with col3:
-        st.metric("Duplicates", len(results['duplicates']))
-    if results['success']:
-        st.success(f"✅ Successfully imported {len(results['success'])} courses:")
-        for s in results['success']:
-            st.write(f"• {s}")
-    if results['errors']:
-        st.error(f"❌ {len(results['errors'])} errors:")
-        for e in results['errors']:
-            st.write(f"• {e}")
-    if results['duplicates']:
-        st.warning(f"⚠️ {len(results['duplicates'])} duplicates skipped:")
-        for d in results['duplicates']:
-            st.write(f"• {d}")
-    if results['success']:
-        st.rerun()
-
-def show_course_management():
-    st.header("🏫 Course Management System")
-    courses = load_courses_config()
-    tab1, tab2, tab3, tab4 = st.tabs(["📚 Manage Courses", "📥 Bulk Import", "🔑 Manage Passwords", "📊 System Overview"])
-
-    with tab1:
-        st.subheader("Add/Remove Courses")
-        col1, col2 = st.columns(2)
-        with col1:
-            new_course_name = st.text_input("New Course Name", placeholder="e.g., CHEM 101 - Organic Chemistry")
-        with col2:
-            new_course_code = st.text_input("Course Code", placeholder="e.g., CHEM101").upper()
-        if st.button("➕ Add Course", type="primary", key="add_course_btn"):
-            if new_course_name and new_course_code:
-                if new_course_name in courses:
-                    st.error("❌ Course name already exists!")
-                else:
-                    courses[new_course_name] = new_course_code
-                    if save_courses_config(courses):
-                        st.success(f"✅ Course '{new_course_name}' added!")
-                        st.rerun()
-            else:
-                st.error("❌ Please enter both course name and code.")
-        st.subheader("Current Courses")
-        if courses:
-            course_list = list(courses.items())
-            for idx, (course_name, course_val) in enumerate(course_list):
-                course_code = course_val["code"] if isinstance(course_val, dict) else course_val
-                with st.container():
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    with col1:
-                        st.markdown(f'<div class="course-card">{course_name}<br><small>Code: {course_code}</small></div>', unsafe_allow_html=True)
-                    with col2:
-                        edit_key = f"edit_{idx}_{course_name.replace(' ', '_')}"
-                        if st.button("✏️", key=edit_key):
-                            st.session_state[edit_key] = True
-                    with col3:
-                        delete_key = f"delete_{idx}_{course_name.replace(' ', '_')}"
-                        if st.button("🗑️", key=delete_key):
-                            del courses[course_name]
-                            save_courses_config(courses)
-                            st.success(f"✅ Course '{course_name}' deleted!")
-                            st.rerun()
-                    if st.session_state.get(edit_key, False):
-                        with st.form(f"edit_form_{idx}_{course_name.replace(' ', '_')}"):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                edited_name = st.text_input("Course Name", value=course_name, key=f"name_{idx}_{course_code}")
-                            with col2:
-                                edited_code = st.text_input("Course Code", value=course_code, key=f"code_{idx}_{course_code}").upper()
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                if st.form_submit_button("💾 Save Changes"):
-                                    if edited_name and edited_code:
-                                        del courses[course_name]
-                                        courses[edited_name] = edited_code
-                                        save_courses_config(courses)
-                                        st.session_state[edit_key] = False
-                                        st.success("✅ Course updated!")
-                                        st.rerun()
-                            with col2:
-                                if st.form_submit_button("❌ Cancel"):
-                                    st.session_state[edit_key] = False
-                                    st.rerun()
-        else:
-            st.info("No courses added yet.")
-
-    with tab2:
-        st.subheader("📥 Bulk Course Import")
-        st.info("Format: `Course Name | Course Code` or `Course Name, Course Code` (one per line)")
-        bulk_courses_text = st.text_area("Paste courses here:", height=200, key="bulk_courses_textarea")
-        col1, col2 = st.columns(2)
-        with col1:
-            separator = st.selectbox("Separator", [",", "|", "Tab", "Custom"], key="separator_select")
-            if separator == "Custom":
-                separator = st.text_input("Custom separator", value=";", key="custom_sep")
-            elif separator == "Tab":
-                separator = "\t"
-        with col2:
-            st.write("**Preview:**")
-            if bulk_courses_text:
-                lines = [line.strip() for line in bulk_courses_text.split('\n') if line.strip()]
-                st.write(f"Found {len(lines)} courses to import")
-        col1, col2 = st.columns(2)
-        with col1:
-            import_mode = st.radio("Import Mode", ["Add new only", "Replace all courses"], key="import_mode")
-        with col2:
-            remove_duplicates = st.checkbox("Remove duplicate course code", value=True, key="remove_duplicates")
-            auto_generate_codes = st.checkbox("Auto-generate missing codes", key="auto_generate_codes")
-        if st.button("🚀 Import Courses", type="primary", key="import_courses_btn"):
-            if bulk_courses_text:
-                results = process_bulk_courses(bulk_courses_text, courses, separator, import_mode, remove_duplicates, auto_generate_codes)
-                display_import_results(results)
-            else:
-                st.error("❌ Please paste some courses to import!")
-
-    with tab3:
-        st.subheader("Manage Admin Passwords")
-        passwords = load_admin_passwords()
-        courses = load_courses_config()
-        if courses:
-            st.write("**Bulk Password Operations:**")
-            col1, col2 = st.columns(2)
-            with col1:
-                new_bulk_password = st.text_input("Set same password for all courses", type="password", key="bulk_password")
-                if st.button("🔑 Apply to All Courses", key="apply_bulk_password"):
-                    if new_bulk_password:
-                        for cv in courses.values():
-                            cc = cv["code"] if isinstance(cv, dict) else cv
-                            set_course_password(cc, new_bulk_password)
-                        st.success("✅ Password applied to all courses!")
-                        st.rerun()
-            with col2:
-                if st.button("🔄 Reset All to Default", key="reset_all_passwords"):
-                    for cv in courses.values():
-                        cc = cv["code"] if isinstance(cv, dict) else cv
-                        set_course_password(cc, DEFAULT_ADMIN_PASSWORD)
-                    st.success("✅ All passwords reset to default!")
-                    st.rerun()
-            st.divider()
-            course_list = list(courses.items())
-            for idx, (course_name, course_val) in enumerate(course_list):
-                course_code = course_val["code"] if isinstance(course_val, dict) else course_val
-                current_password = passwords.get(course_code, DEFAULT_ADMIN_PASSWORD)
-                with st.expander(f"🔐 {course_name} ({course_code})", expanded=False):
-                    st.info(f"Current password: **{current_password}**")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        new_password = st.text_input("New Password", type="password", key=f"new_pass_{idx}_{course_code}")
-                    with col2:
-                        confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_{idx}_{course_code}")
-                    if st.button("🔄 Change Password", key=f"change_{idx}_{course_code}"):
-                        if new_password and confirm_password:
-                            if new_password == confirm_password:
-                                if set_course_password(course_code, new_password):
-                                    st.success("✅ Password changed!")
-                                    st.rerun()
-                            else:
-                                st.error("❌ Passwords don't match!")
-                        else:
-                            st.error("❌ Please enter and confirm new password!")
-        else:
-            st.info("No courses available. Add courses first.")
-
-    with tab4:
-        st.subheader("System Overview")
-        courses = load_courses_config()
-        passwords = load_admin_passwords()
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Courses", len(courses))
-        with col2:
-            custom_passwords = len([
-            v for v in courses.values()
-            if (v["code"] if isinstance(v, dict) else v) in passwords
-        ])
-            st.metric("Custom Passwords", custom_passwords)
-        with col3:
-            st.metric("Default Passwords", len(courses) - custom_passwords)
-        if courses:
-            overview_data = [
-                {
-                    "Course Name": n,
-                    "Course Code": (v["code"] if isinstance(v, dict) else v),
-                    "Password": "Custom" if (v["code"] if isinstance(v, dict) else v) in passwords else "Default"
-                }
-                for n, v in courses.items()
-            ]
-            st.dataframe(pd.DataFrame(overview_data), use_container_width=True)
-            st.download_button("📥 Export Courses to CSV", pd.DataFrame(overview_data).to_csv(index=False),
-                               "courses_export.csv", "text/csv", key="export_courses_btn")
-
-def show_system_overview():
-    st.header("📊 System Overview")
-    courses = load_courses_config_cached()
-    lecturer_logs = get_lecturer_logs_cached()
-    student_logs = get_student_logs_cached()
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Courses", len(courses))
-    with col2:
-        active_lecturers = len(set(log['lecturer_name'] for log in lecturer_logs if is_recent(log['timestamp'], 7)))
-        st.metric("Active Lecturers (7d)", active_lecturers)
-    with col3:
-        active_students = len(set(log['student_name'] for log in student_logs if is_recent(log['timestamp'], 7)))
-        st.metric("Active Students (7d)", active_students)
-    with col4:
-        st.metric("Total Activities", len(lecturer_logs) + len(student_logs))
-    st.subheader("🕒 Recent Activity Timeline")
-    all_logs = []
-    for log in lecturer_logs[-20:]:
-        log_copy = dict(log)
-        log_copy['type'] = 'Lecturer'
-        all_logs.append(log_copy)
-    for log in student_logs[-20:]:
-        log_copy = dict(log)
-        log_copy['type'] = 'Student'
-        all_logs.append(log_copy)
-    all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
-    if all_logs:
-        for log in all_logs[:10]:
-            if log['type'] == 'Lecturer':
-                st.write(f"👩‍🏫 **{log['lecturer_name']}** - {log['action']} - *{log['timestamp']}*")
-            else:
-                st.write(f"🎓 **{log['student_name']}** - {log['action']} - *{log['timestamp']}*")
-            if log.get('details'):
-                st.caption(f"Details: {log['details']}")
-            st.divider()
-    else:
-        st.info("No recent activity recorded")
-
-def show_lecturer_activity():
-    st.header("👩‍🏫 Lecturer Activity Monitor")
-    lecturer_logs = get_lecturer_logs_cached()
-    if not lecturer_logs:
-        st.info("No lecturer activity recorded yet")
-        return
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        date_filter = st.selectbox("Time Filter", ["All Time", "Last 24 Hours", "Last 7 Days", "Last 30 Days"])
-    with col2:
-        lecturers = sorted(set(log['lecturer_name'] for log in lecturer_logs))
-        lecturer_filter = st.selectbox("Filter by Lecturer", ["All Lecturers"] + lecturers)
-    with col3:
-        actions = sorted(set(log['action'] for log in lecturer_logs))
-        action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions)
-    filtered_logs = lecturer_logs
-    if date_filter != "All Time":
-        cutoff = datetime.now() - timedelta(hours=24 if "24" in date_filter else (7 if "7" in date_filter else 30)*24)
-        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
-    if lecturer_filter != "All Lecturers":
-        filtered_logs = [log for log in filtered_logs if log['lecturer_name'] == lecturer_filter]
-    if action_filter != "All Actions":
-        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
-    if filtered_logs:
-        log_data = [{'Timestamp': l['timestamp'], 'Lecturer': l['lecturer_name'], 'Course': l['course_code'], 'Action': l['action'], 'Details': l.get('details', '')} for l in filtered_logs]
-        df = pd.DataFrame(log_data)
-        st.dataframe(df, use_container_width=True)
-        st.download_button("📥 Download Lecturer Logs (CSV)", df.to_csv(index=False), "lecturer_activity_logs.csv", "text/csv")
-    else:
-        st.info("No lecturer activity matching the filters")
-
-def show_student_activity():
-    st.header("🎓 Student Activity Monitor")
-    student_logs = get_student_logs_cached()
-    if not student_logs:
-        st.info("No student activity recorded yet")
-        return
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        date_filter = st.selectbox("Time Filter", ["All Time", "Last 24 Hours", "Last 7 Days", "Last 30 Days"], key="student_date_filter")
-    with col2:
-        courses = sorted(set(log['course_code'] for log in student_logs))
-        course_filter = st.selectbox("Filter by Course", ["All Courses"] + courses)
-    with col3:
-        actions = sorted(set(log['action'] for log in student_logs))
-        action_filter = st.selectbox("Filter by Action", ["All Actions"] + actions, key="student_action_filter")
-    filtered_logs = student_logs
-    if date_filter != "All Time":
-        cutoff = datetime.now() - timedelta(hours=24 if "24" in date_filter else (7 if "7" in date_filter else 30)*24)
-        filtered_logs = [log for log in filtered_logs if datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S") > cutoff]
-    if course_filter != "All Courses":
-        filtered_logs = [log for log in filtered_logs if log['course_code'] == course_filter]
-    if action_filter != "All Actions":
-        filtered_logs = [log for log in filtered_logs if log['action'] == action_filter]
-    if filtered_logs:
-        log_data = [{'Timestamp': l['timestamp'], 'Student': l['student_name'], 'Matric': l['matric'], 'Course': l['course_code'], 'Action': l['action'], 'Details': l.get('details', '')} for l in filtered_logs]
-        df = pd.DataFrame(log_data)
-        st.dataframe(df, use_container_width=True)
-        st.download_button("📥 Download Student Logs (CSV)", df.to_csv(index=False), "student_activity_logs.csv", "text/csv")
-    else:
-        st.info("No student activity matching the filters")
-
-def show_analytics():
-    st.header("📈 System Analytics")
-    lecturer_logs = get_lecturer_logs_cached()
-    student_logs = get_student_logs_cached()
-    if not lecturer_logs and not student_logs:
-        st.info("No data available for analytics")
-        return
-    dates = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
-    lecturer_daily = {d: 0 for d in dates}
-    student_daily = {d: 0 for d in dates}
-    for log in lecturer_logs:
-        log_date = log['timestamp'].split()[0]
-        if log_date in lecturer_daily:
-            lecturer_daily[log_date] += 1
-    for log in student_logs:
-        log_date = log['timestamp'].split()[0]
-        if log_date in student_daily:
-            student_daily[log_date] += 1
-    trend_df = pd.DataFrame({
-        'Date': dates,
-        'Lecturer Activities': [lecturer_daily[d] for d in dates],
-        'Student Activities': [student_daily[d] for d in dates]
-    })
-    st.line_chart(trend_df.set_index('Date'))
-
-def show_system_settings():
-    st.header("🔧 System Settings")
-    st.subheader("ℹ️ System Information")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("System Admin Password", "🔒 Secured")
-    with col2:
-        st.metric("Data Directory", PERSISTENT_DATA_DIR)
-    st.subheader("🛠️ System Maintenance")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔄 Clear All Logs", type="secondary"):
-            logs_file = get_system_logs_file()
-            if os.path.exists(logs_file):
-                with open(logs_file, 'w') as f:
-                    json.dump({"lecturer_logs": [], "student_logs": []}, f)
-                st.success("✅ All system logs cleared!")
-    with col2:
-        if st.button("📊 Generate System Report", type="primary"):
-            generate_system_report()
-            st.success("✅ System report generated!")
-
-def show_alert_center():
-    st.header("🚨 Alert Center")
-    lecturer_logs = get_lecturer_logs_cached()
-    student_logs = get_student_logs_cached()
-    alerts = []
-    if not any(is_recent(log['timestamp'], 1) for log in lecturer_logs):
-        alerts.append("⚠️ No lecturer activity in the last 24 hours")
-    if not any(is_recent(log['timestamp'], 1) for log in student_logs):
-        alerts.append("⚠️ No student activity in the last 24 hours")
-    error_actions = [log for log in lecturer_logs + student_logs if 'error' in log.get('action', '').lower() or 'fail' in log.get('action', '').lower()]
-    if error_actions:
-        alerts.append(f"🚨 {len(error_actions)} error/failure actions detected")
-    if alerts:
-        for alert in alerts:
-            st.error(alert)
-    else:
-        st.success("✅ All systems operational - No critical alerts")
-
-def show_system_admin_dashboard():
-    st.title("🏢 System Administration Dashboard")
-    st.sidebar.subheader("🔐 System Admin Access")
-    sys_admin_password = st.sidebar.text_input("System Admin Password", type="password", key="sys_admin_pass")
-    if sys_admin_password != SYSTEM_ADMIN_PASSWORD:
-        st.warning("Enter the System Admin password to continue")
-        return
-    st.success("✅ Logged in as System Administrator")
-    init_system_logs()
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 System Overview", "🏫 Course Management", "👩‍🏫 Lecturer Activity",
-        "🎓 Student Activity", "📈 Analytics", "🔧 System Settings", "🚨 Alert Center"
-    ])
-    with tab1:
-        show_system_overview()
-    with tab2:
-        show_course_management()
-    with tab3:
-        show_lecturer_activity()
-    with tab4:
-        show_student_activity()
-    with tab5:
-        show_analytics()
-    with tab6:
-        show_system_settings()
-    with tab7:
-        show_alert_center()
-
-# ===============================================================
-# 🎓 STUDENT VIEW
-# ===============================================================
-
-def student_view(course_code, course_name):
-    """Student dashboard view"""
-    try:
-        ensure_directories()
-        st.title(f"🎓 Student Dashboard - {course_name}")
-
-        if "student_identity" not in st.session_state:
-            st.session_state.student_identity = {"name": "", "matric": ""}
-
-        student_name = st.session_state.student_identity["name"]
-        student_matric = st.session_state.student_identity["matric"]
-
-        st.subheader("👤 Student Identity")
-        with st.form("student_identity_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                new_name = st.text_input("Full Name", value=student_name, placeholder="Enter your full name")
-            with col2:
-                new_matric = st.text_input("Matric Number", value=student_matric, placeholder="Enter your matric number")
-            save_identity = st.form_submit_button("💾 Save Identity", use_container_width=True)
-            if save_identity:
-                if new_name.strip() and new_matric.strip():
-                    st.session_state.student_identity = {"name": new_name.strip(), "matric": new_matric.strip()}
-                    student_name = new_name.strip()
-                    student_matric = new_matric.strip()
-                    st.success("✅ Identity saved successfully!")
-                    st.rerun()
-                else:
-                    st.error("❌ Please enter both name and matric number.")
-
-        if not student_name or not student_matric:
-            st.warning("⚠️ Please set your identity above to continue.")
-            return
-
-        st.success(f"**Logged in as:** {student_name} ({student_matric})")
-
-        # ===============================================================
-        # 🎨 VERTICAL SIDE TABS STYLING
-        # ===============================================================
-        st.markdown("""
-            <style>
-            /* Vertical tab styling for sidebar radio */
-            section[data-testid="stSidebar"] div[role="radiogroup"] {
-                flex-direction: column;
-                gap: 6px;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label {
-                background-color: #020617;
-                padding: 12px 16px;
-                border-radius: 8px;
-                border-left: 4px solid transparent;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                margin: 0 !important;
-                width: 100%;
-                font-weight: 500;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-                background-color: #e1e5ec;
-                border-left: 4px solid #4a90e2;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-                background-color: #4a90e2 !important;
-                color: white !important;
-                border-left: 4px solid #1f5aa8;
-            }
-            /* Hide the radio circle for a cleaner tab look */
-            section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-                display: none;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # Sidebar: Week navigation + Vertical Tabs
-        st.sidebar.header("📅 Week Navigation")
-        selected_week = st.sidebar.selectbox(
-            "Select Week",
-            [f"Week {i}" for i in range(1, 16)],
-            key="student_main_week_selector"
-        )
-
-        st.sidebar.markdown("---")
-        st.sidebar.header("📂 Menu")
-
-        student_tabs = [
-            "📝 About Course",
-            "📖 Lecture & Classwork",
-            "🎥 Video Lectures",
-            "🕒 Attendance",
-            "📤 Submissions",
-            "📢 Announcements",
-            "📝 Seminar Feedback",
-            "📊 My Progress"
-        ]
-        selected_tab = st.sidebar.radio(
-            "Navigate",
-            student_tabs,
-            label_visibility="collapsed",
-            key="student_vertical_tab"
-        )
-
-        st.markdown("---")
-
-        # ============ TAB 1: About Course ============
-        if selected_tab == "📝 About Course":
-            show_student_course_description(course_code, course_name)
-
-        # ============ TAB 2: Lecture & Classwork ============
-        elif selected_tab == "📖 Lecture & Classwork":
-            st.header(f"📚 {course_code} - {selected_week}")
-            display_weekly_lecture_materials(course_code, selected_week, student_name, student_matric)
-            display_classwork_section(course_code, selected_week, student_name, student_matric)
-
-        # ============ TAB 3: Video Lectures ============
-        elif selected_tab == "🎥 Video Lectures":
-            st.header("🎥 Video Lectures")
-            video_files = get_video_files(course_code)
-            if video_files:
-                st.success(f"Found {len(video_files)} video lecture(s) available!")
-                for i, video in enumerate(video_files):
-                    video_path = get_persistent_path("video", course_code, video)
-                    with st.expander(f"🎬 {video}", expanded=False):
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            try:
-                                st.video(video_path, start_time=0)
-                                file_size = os.path.getsize(video_path) / (1024 * 1024)
-                                st.caption(f"File size: {file_size:.2f} MB")
-                            except Exception as e:
-                                st.error(f"Cannot play this video: {str(e)}")
-                        with col2:
-                            try:
-                                with open(video_path, "rb") as vid_file:
-                                    st.download_button("📥 Download Video", data=vid_file,
-                                                       file_name=video, mime="video/mp4",
-                                                       key=f"student_download_{i}",
-                                                       use_container_width=True)
-                            except Exception as e:
-                                st.error("Download unavailable")
-            else:
-                st.info("No video lectures available yet.")
-
-        # ============ TAB 4: Attendance ============
-        elif selected_tab == "🕒 Attendance":
-            st.header("🕒 Mark Attendance")
-            with st.form(f"{course_code}_attendance_form"):
-                name = st.text_input("Full Name", value=student_name, key=f"{course_code}_student_name")
-                matric = st.text_input("Matric Number", value=student_matric, key=f"{course_code}_student_matric")
-                st.write(f"**Selected Week:** {selected_week}")
-                submit_attendance = st.form_submit_button("✅ Mark Attendance", use_container_width=True)
-            if submit_attendance:
-                if not name.strip() or not matric.strip():
-                    st.warning("Please enter your full name and matric number.")
-                else:
-                    st.session_state.student_identity = {"name": name.strip(), "matric": matric.strip()}
-                    student_name = name.strip()
-                    student_matric = matric.strip()
-                    status_data = get_attendance_status(course_code, selected_week)
-                    if not status_data.get("is_open", False):
-                        st.error("🚫 Attendance for this course is currently closed.")
-                    elif has_marked_attendance(course_code, selected_week, student_name, student_matric):
-                        st.info("✅ Attendance already marked for this week.")
-                    else:
-                        if mark_attendance_entry(course_code, student_name, student_matric, selected_week):
-                            st.success(f"🎉 Attendance recorded for {course_code} - {selected_week}.")
-                            st.balloons()
-                        else:
-                            st.error("⚠️ Failed to record attendance.")
-
-        # ============ TAB 5: Submissions ============
-        elif selected_tab == "📤 Submissions":
-            st.header("📤 Submit Assignments")
-
-            # --- Assignment Submission ---
-            st.subheader("📝 Assignment Submission")
-            with st.form("assignment_upload_form"):
-                st.write(f"**Selected Week:** {selected_week}")
-                assignment_file = st.file_uploader("Upload Assignment File",
-                                                   type=["pdf", "doc", "docx", "txt", "zip"],
-                                                   key="assignment_upload")
-                submit_assignment = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
-
-            if submit_assignment:
-                if not assignment_file:
-                    st.error("❌ Please select a file to upload.")
-                else:
-                    has_submission, existing_data = check_existing_submission(
-                        course_code, selected_week, student_matric)
-                    if has_submission:
-                        st.error("❌ Submission already exists! You cannot submit twice.")
-                    else:
-                        file_path = save_file(course_code, student_name, selected_week, assignment_file, "assignment")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name,
-                                           selected_week, assignment_file.name, "assignment")
-                            st.success(f"✅ Assignment submitted successfully: {assignment_file.name}")
-
-            # --- Drawing Submission ---
-            st.subheader("🎨 Drawing Submission")
-            with st.form("drawing_upload_form"):
-                st.write(f"**Selected Week:** {selected_week}")
-                drawing_file = st.file_uploader("Upload Drawing File",
-                                                type=["jpg", "jpeg", "png", "gif", "pdf"],
-                                                key="drawing_upload")
-                submit_drawing = st.form_submit_button("📤 Submit Drawing", use_container_width=True)
-
-            if submit_drawing:
-                if not drawing_file:
-                    st.error("❌ Please select a file to upload.")
-                else:
-                    has_submission, existing_data = check_existing_submission(
-                        course_code, selected_week, student_matric)
-                    if has_submission:
-                        st.error("❌ Submission already exists! You cannot submit twice.")
-                    else:
-                        file_path = save_file(course_code, student_name, selected_week, drawing_file, "drawing")
-                        if file_path:
-                            log_submission(course_code, student_matric, student_name,
-                                           selected_week, drawing_file.name, "drawing")
-                            st.success(f"✅ Drawing submitted successfully: {drawing_file.name}")
-
-            # --- Seminar Submission ---
-            st.subheader("📊 Seminar Submission")
-            with st.form("seminar_upload_form"):
-                st.write("**Note:** Seminar submission is once per semester")
-                seminar_file = st.file_uploader("Upload Seminar File",
-                                                type=["pdf", "ppt", "pptx", "doc", "docx"],
-                                                key="seminar_upload")
-                seminar_topic = st.text_input("Enter your seminar topic:")
-                submit_seminar = st.form_submit_button("📤 Submit Seminar", use_container_width=True)
-
-            if submit_seminar:
-                if not seminar_file:
-                    st.error("❌ Please select a file to upload.")
-                elif not seminar_topic:
-                    st.error("❌ Please enter your seminar topic.")
-                else:
-                    has_submission, existing_data = check_existing_seminar_submission(course_code, student_matric)
-                    if has_submission:
-                        st.error("❌ Seminar already submitted! You can only submit once per semester.")
-                    else:
-                        file_path = save_seminar_file(course_code, student_name, student_matric, seminar_file)
-                        if file_path:
-                            log_seminar_submission(course_code, student_matric, student_name,
-                                                   seminar_topic, seminar_file.name)
-                            st.success(f"✅ Seminar submitted successfully: {seminar_file.name}")
-
-        # ============ TAB 6: Announcements ============
-        elif selected_tab == "📢 Announcements":
-            display_pdf_announcements_student(course_code)
-
-        # ============ TAB 7: Seminar Feedback ============
-        elif selected_tab == "📝 Seminar Feedback":
-            st.subheader("📥 Seminar Feedback")
-            feedback = get_seminar_feedback(student_matric, course_code)
-            if feedback:
-                st.success("You have feedback for your seminar!")
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write("**Instructor Feedback:**")
-                    if isinstance(feedback, str) and feedback != "Feedback file provided":
-                        st.info(feedback)
-                    else:
-                        st.info("Check the downloaded feedback file for detailed comments")
-                with col2:
-                    feedback_file_path = get_seminar_feedback_file_path(student_matric, course_code)
-                    if feedback_file_path and os.path.exists(feedback_file_path):
-                        with open(feedback_file_path, "rb") as file:
-                            st.download_button("📥 Download Feedback PDF", data=file,
-                                               file_name="Seminar_Feedback.pdf", mime="application/pdf")
-            else:
-                st.info("No feedback available for your seminar yet")
-
-        # ============ TAB 8: My Progress ============
-        elif selected_tab == "📊 My Progress":
-            st.header("📊 My Scores & Grades")
-            student_scores = load_student_scores(course_code, student_name, student_matric)
-            if not student_scores.empty:
-                st.subheader("📋 Weekly Scores")
-                display_columns = ["Week", "Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]
-                available_columns = [col for col in display_columns if col in student_scores.columns]
-                st.dataframe(student_scores[available_columns], use_container_width=True)
-                st.subheader("🎓 Final Grade Calculation")
-                result = calculate_final_grade(student_scores)
-                if result[0] is not None:
-                    final_total, final_grade, assignment_avg, test_avg, practical_avg, classwork_avg, exam_score = result
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("📝 Assignment Average", f"{assignment_avg:.1f}%")
-                        st.metric("📊 Test Average", f"{test_avg:.1f}%")
-                        st.metric("🔬 Practical Average", f"{practical_avg:.1f}%")
-                        st.metric("🧩 Classwork Average", f"{classwork_avg:.1f}%")
-                    with col2:
-                        st.metric("📚 Exam Score", f"{exam_score:.1f}%")
-                        ca_total = assignment_avg*0.08 + test_avg*0.08 + practical_avg*0.05 + classwork_avg*0.09
-                        st.metric("📈 CA Contribution (30%)", f"{ca_total:.1f}%")
-                        st.metric("🎯 Exam Contribution (70%)", f"{exam_score*0.70:.1f}%")
-                    st.success(f"## 🎉 Final Grade: {final_total:.1f}% - {final_grade}")
-                else:
-                    st.info("📊 Complete your 15 weeks + exam to see your final grade.")
-            else:
-                st.info("📊 No scores recorded yet.")
-
-            st.header("📈 My Activity Summary")
-            activity_summary = get_student_activity_summary(course_code, student_name, student_matric)
-            col1, col2, col3, col4, col5 = st.columns(5)
-            with col1:
-                st.metric("Weeks Attended", activity_summary["attendance_count"])
-            with col2:
-                st.metric("Classwork Submitted", activity_summary["classwork_count"])
-            with col3:
-                st.metric("Assignments", activity_summary["assignment_count"])
-            with col4:
-                st.metric("Drawings", activity_summary["drawing_count"])
-            with col5:
-                st.metric("Seminars", activity_summary["seminar_count"])
-            if activity_summary["recent_activity"]:
-                st.subheader("🕒 Recent Activity")
-                for activity in activity_summary["recent_activity"][-5:]:
-                    st.write(f"• {activity}")
-
-        st.markdown("---")
-        st.markdown(f"*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-
-    except Exception as e:
-        st.error(f"An error occurred in the student dashboard: {str(e)}")
-        st.info("Please refresh the page and try again.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER: AI-powered short answer grader
-# ─────────────────────────────────────────────────────────────────────────────
-
-def grade_short_answer_with_ai(question: str, model_answer: str, student_answer: str, max_marks: int = 5) -> dict:
-    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-
-    prompt = f"""You are an academic examiner grading a short-answer question. Grade the student's response fairly and provide constructive feedback.
-
-QUESTION: {question}
-
-MODEL ANSWER / KEY POINTS: {model_answer}
-
-STUDENT'S ANSWER: {student_answer}
-
-Maximum marks available: {max_marks}
-
-Instructions:
-- Award marks (0 to {max_marks}) based on how well the student's answer captures the key points.
-- Partial credit is allowed.
-- Be fair but rigorous.
-- Respond ONLY in valid JSON format with no extra text:
-{{
-  "score": <integer>,
-  "feedback": "<2-3 sentence constructive feedback>",
-  "key_points_covered": ["<point 1>", "<point 2>"],
-  "key_points_missed": ["<point 1>", "<point 2>"]
-}}"""
-
-    try:
-        response = client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        result = json.loads(response.content[0].text.strip())
-        result["max_score"] = max_marks
-        result["percentage"] = round((result["score"] / max_marks) * 100, 1)
-        return result
-    except Exception as e:
-        return {
-            "score": 0,
-            "max_score": max_marks,
-            "feedback": f"Grading failed: {str(e)}",
-            "key_points_covered": [],
-            "key_points_missed": [],
-            "percentage": 0
-        }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER: parse bulk question import
-# ─────────────────────────────────────────────────────────────────────────────
-
-def parse_bulk_questions(text: str) -> list:
-    questions = []
-    blocks = re.split(r'\n(?=MCQ:|GAP:|SHORT:)', text.strip())
-
-    for block in blocks:
-        lines = [l.strip() for l in block.strip().split('\n') if l.strip()]
-        if not lines:
-            continue
-
-        if lines[0].upper().startswith("MCQ:"):
-            q_text = lines[0][4:].strip()
-            options = {}
-            correct = ""
-            for line in lines[1:]:
-                m = re.match(r'^([A-E])[.)]\s*(.+)', line, re.IGNORECASE)
-                if m:
-                    options[m.group(1).upper()] = m.group(2).strip()
-                elif line.lower().startswith("correct:"):
-                    correct = line.split(":", 1)[1].strip().upper()
-            if q_text and options and correct:
-                questions.append({
-                    "type": "mcq",
-                    "question": q_text,
-                    "options": options,
-                    "correct_answer": correct,
-                    "model_answer": "",
-                    "marks": 1
-                })
-
-        elif lines[0].upper().startswith("GAP:"):
-            q_text = lines[0][4:].strip()
-            correct = ""
-            for line in lines[1:]:
-                if line.lower().startswith("correct:"):
-                    correct = line.split(":", 1)[1].strip()
-            if q_text and correct:
-                questions.append({
-                    "type": "gap_fill",
-                    "question": q_text,
-                    "options": {},
-                    "correct_answer": correct,
-                    "model_answer": "",
-                    "marks": 1
-                })
-
-        elif lines[0].upper().startswith("SHORT:"):
-            q_text = lines[0][6:].strip()
-            model_answer = ""
-            marks = 5
-            for line in lines[1:]:
-                if line.lower().startswith("model:"):
-                    model_answer = line.split(":", 1)[1].strip()
-                elif line.lower().startswith("marks:"):
-                    try:
-                        marks = int(line.split(":", 1)[1].strip())
-                    except ValueError:
-                        marks = 5
-            if q_text and model_answer:
-                questions.append({
-                    "type": "short_answer",
-                    "question": q_text,
-                    "options": {},
-                    "correct_answer": model_answer,
-                    "model_answer": model_answer,
-                    "marks": marks
-                })
-
-    return questions
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN RENDER FUNCTION
-# ─────────────────────────────────────────────────────────────────────────────
-
-def render_question_manager(course_code, week, row_idx, get_file,
-                             load_mcq_questions, save_mcq_questions):
-  
-    st.markdown("---")
-    st.subheader("🧩 Automated Questions")
-    existing_questions = load_mcq_questions(course_code, week) or []
-
-    # ── Bulk Import ──────────────────────────────────────────────────────────
-    st.markdown("#### 📥 Bulk Import Questions")
-    with st.expander("Click to expand bulk import"):
-        st.markdown("""
-**MCQ format:**
-```
-MCQ: Question text?
-A. Option 1
-B. Option 2
-C. Option 3
-D. Option 4
-Correct: A
-```
-**GAP format:**
-```
-GAP: The answer is ________.
-Correct: answer|alternative
-```
-**SHORT ANSWER format:**
-```
-SHORT: Explain the role of acetylcholine in memory.
-Model: Acetylcholine is a neurotransmitter involved in encoding and retrieval of memories...
-Marks: 5
-```
-        """)
-        bulk_text = st.text_area(
-            "Paste your questions here:", height=300,
-            placeholder="Paste multiple questions in the format shown above...",
-            key=f"bulk_import_{week}"
-        )
-        if st.button("📥 Import Questions", key=f"import_{week}"):
-            if bulk_text.strip():
-                new_questions = parse_bulk_questions(bulk_text)
-                if new_questions:
-                    existing_questions.extend(new_questions)
-                    if save_mcq_questions(course_code, week, existing_questions):
-                        st.success(f"✅ Imported {len(new_questions)} questions!")
-                        st.rerun()
-                else:
-                    st.error("❌ No valid questions found. Check the format.")
-            else:
-                st.warning("⚠️ Please paste some questions first.")
-
-    # ── Creation Form ────────────────────────────────────────────────────────
-    st.markdown("#### ➕ Create New Question")
-    with st.form(f"mcq_creation_form_{week}"):
-        question_type = st.selectbox(
-            "Question Type",
-            ["Multiple Choice (MCQ)", "Gap Filling", "Short Answer"],
-            key=f"question_type_{week}"
-        )
-        question_text = st.text_area(
-            "Question Text",
-            placeholder="Enter your question here...",
-            key=f"question_text_{week}"
-        )
-
-        if question_type == "Multiple Choice (MCQ)":
-            col1, col2 = st.columns(2)
-            with col1:
-                option_a = st.text_input("Option A", key=f"option_a_{week}")
-                option_b = st.text_input("Option B", key=f"option_b_{week}")
-                option_e = st.text_input("Option E (optional)", key=f"option_e_{week}")
-            with col2:
-                option_c = st.text_input("Option C", key=f"option_c_{week}")
-                option_d = st.text_input("Option D", key=f"option_d_{week}")
-            correct_answer = st.selectbox(
-                "Correct Answer", ["A", "B", "C", "D", "E"],
-                key=f"correct_answer_{week}"
-            )
-            options = {"A": option_a, "B": option_b, "C": option_c,
-                       "D": option_d, "E": option_e}
-            model_answer_val = ""
-            marks_val = 1
-
-        elif question_type == "Gap Filling":
-            correct_answer = st.text_input(
-                "Correct Answer(s)",
-                placeholder="Use | for multiple acceptable answers",
-                key=f"gap_answer_{week}"
-            )
-            options = {}
-            model_answer_val = ""
-            marks_val = 1
-
-        else:  # Short Answer
-            model_answer_val = st.text_area(
-                "Model Answer / Key Points",
-                placeholder="Write the ideal answer or list the key points Claude should check for...",
-                key=f"model_answer_{week}",
-                height=120
-            )
-            marks_val = st.number_input(
-                "Maximum Marks", min_value=1, max_value=20, value=5,
-                key=f"marks_{week}"
-            )
-            correct_answer = model_answer_val
-            options = {}
-
-        add_question = st.form_submit_button("➕ Add Question")
-        if add_question and question_text:
-            new_question = {
-                "type": (
-                    "mcq" if question_type == "Multiple Choice (MCQ)"
-                    else "gap_fill" if question_type == "Gap Filling"
-                    else "short_answer"
-                ),
-                "question": question_text,
-                "options": options,
-                "correct_answer": correct_answer,
-                "model_answer": model_answer_val,
-                "marks": int(marks_val)
-            }
-            existing_questions.append(new_question)
-            if save_mcq_questions(course_code, week, existing_questions):
-                st.success("✅ Question added!")
-                st.rerun()
-
-    # ── Display Existing Questions ───────────────────────────────────────────
-    if existing_questions:
-        st.write(f"**Existing Questions for {week}:**")
-        for i, question in enumerate(existing_questions):
-            with st.container():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    q_type = question.get("type", "mcq")
-                    type_label = {
-                        "mcq": "Multiple Choice",
-                        "gap_fill": "Gap Fill",
-                        "short_answer": "Short Answer"
-                    }.get(q_type, q_type.replace("_", " ").title())
-
-                    st.write(f"**Q{i+1}:** {question['question']}")
-                    st.write(f"*Type:* {type_label}")
-
-                    if q_type == "mcq":
-                        for opt, text in question.get("options", {}).items():
-                            if text:
-                                st.write(f"  {opt}: {text}")
-                        st.write(f"*Correct:* **{question['correct_answer']}**")
-
-                    elif q_type == "gap_fill":
-                        st.write(f"*Correct:* `{question['correct_answer']}`")
-
-                    elif q_type == "short_answer":
-                        st.write(f"*Max Marks:* {question.get('marks', 5)}")
-                        with st.expander("View model answer"):
-                            st.write(question.get("model_answer", question.get("correct_answer", "")))
-
-                        st.markdown("**🎓 Grade a student response:**")
-                        student_ans = st.text_area(
-                            "Paste student's answer here",
-                            key=f"student_ans_{week}_{i}",
-                            height=80,
-                            placeholder="Paste the student's written response..."
-                        )
-                        if st.button("🤖 Grade with AI", key=f"grade_{week}_{i}"):
-                            if student_ans.strip():
-                                with st.spinner("Claude is grading..."):
-                                    result = grade_short_answer_with_ai(
-                                        question=question["question"],
-                                        model_answer=question.get("model_answer", question.get("correct_answer", "")),
-                                        student_answer=student_ans,
-                                        max_marks=question.get("marks", 5)
-                                    )
-                                score_color = (
-                                    "🟢" if result["percentage"] >= 70
-                                    else "🟡" if result["percentage"] >= 40
-                                    else "🔴"
-                                )
-                                st.success(
-                                    f"{score_color} **Score: {result['score']} / {result['max_score']}** "
-                                    f"({result['percentage']}%)"
-                                )
-                                st.info(f"**Feedback:** {result['feedback']}")
-                                if result.get("key_points_covered"):
-                                    st.markdown("✅ **Points covered:** " +
-                                                ", ".join(result["key_points_covered"]))
-                                if result.get("key_points_missed"):
-                                    st.markdown("❌ **Points missed:** " +
-                                                ", ".join(result["key_points_missed"]))
-                            else:
-                                st.warning("⚠️ Paste a student answer first.")
-
-                    st.markdown("---")
-
-                with col2:
-                    if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                        existing_questions.pop(i)
-                        save_mcq_questions(course_code, week, existing_questions)
-                        st.success("✅ Question deleted!")
-                        st.rerun()
-
-        if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-            if save_mcq_questions(course_code, week, []):
-                st.success("✅ All questions cleared!")
-                st.rerun()
-    else:
-        st.info("No questions added for this week yet.")
-
-    # ── Save All ─────────────────────────────────────────────────────────────
-    st.markdown("---")
-    if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}",
-                 type="primary", use_container_width=True):
-        try:
-            lectures_df.at[row_idx, "Topic"] = topic
-            lectures_df.at[row_idx, "Brief"] = brief
-            lectures_df.at[row_idx, "Assignment"] = assignment
-            lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-            st.session_state["lectures_df"] = lectures_df
-            st.success("🎉 All lecture materials saved!")
-            st.balloons()
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error saving: {e}")
-
-# ===============================================================
-# 👩‍🏫 ADMIN VIEW
-# ===============================================================
-
-def admin_view(course_code, course_name):
-    """Admin dashboard view"""
-    try:
-        st.subheader(f"🔐 Admin Access - {course_name}")
-        password = st.text_input("Enter Admin Password", type="password", key=f"admin_password_{course_code}")
-        if not password:
-            st.warning(f"Enter the admin password for {course_name} to continue.")
-            return
-        if not verify_admin_password(course_code, password):
-            st.error("❌ Incorrect password. Please try again.")
-            return
-
-        st.session_state["role"] = "Admin"
-        st.session_state["current_course"] = course_code
-        st.success(f"✅ Logged in as Admin - {course_name}")
-        ensure_directories()
-        st.title(f"👩‍🏫 {course_name} Admin Dashboard")
-
-        with st.expander("🔐 Password Management", expanded=False):
-            st.subheader("Change Course Password")
-            current_password = get_course_password(course_code)
-            st.info(f"Current password: **{current_password}**")
-            col1, col2 = st.columns(2)
-            with col1:
-                new_password = st.text_input("New Password", type="password", key=f"new_pass_admin_{course_code}")
-            with col2:
-                confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_pass_admin_{course_code}")
-            if st.button("🔄 Change Password", type="primary", key=f"change_pass_btn_{course_code}"):
-                if new_password and confirm_password:
-                    if new_password == confirm_password:
-                        if set_course_password(course_code, new_password):
-                            st.success("✅ Password changed successfully!")
-                            st.rerun()
-                    else:
-                        st.error("❌ Passwords don't match!")
-                else:
-                    st.error("❌ Please enter and confirm new password!")
-
-        # ===============================================================
-        # 🎨 VERTICAL SIDE TABS STYLING
-        # ===============================================================
-        st.markdown("""
-            <style>
-            section[data-testid="stSidebar"] div[role="radiogroup"] {
-                flex-direction: column;
-                gap: 6px;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label {
-                background-color: #020617;
-                padding: 12px 16px;
-                border-radius: 8px;
-                border-left: 4px solid transparent;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                margin: 0 !important;
-                width: 100%;
-                font-weight: 500;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-                background-color: #e1e5ec;
-                border-left: 4px solid #4a90e2;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-                background-color: #4a90e2 !important;
-                color: white !important;
-                border-left: 4px solid #1f5aa8;
-            }
-            section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-                display: none;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        st.sidebar.header("🛠️ Admin Menu")
-        admin_tabs = [
-            "📚 Course Manager",
-            "📖 Lecture Management",
-            "🎥 Video Management",
-            "🕒 Attendance Control",
-            "📊 Attendance Records",
-            "🧩 Classwork Control",
-            "📝 MCQ Management",
-            "📝 Classwork Submissions",
-            "📝 Grading System",
-            "📂 Student Submissions",
-            "📢 Announcements",
-            "📊 Seminar Submissions"
-        ]
-        selected_admin_tab = st.sidebar.radio(
-            "Navigate",
-            admin_tabs,
-            label_visibility="collapsed",
-            key=f"admin_vertical_tab_{course_code}"
-        )
-        
-        # ============ TAB 1: Course Manager ============
-        if selected_admin_tab == "📚 Course Manager":
-            show_course_manager(course_code, course_name)
-
-        # ============ TAB 2: Lecture Management ============
-        elif selected_admin_tab == "📖 Lecture Management":
-            st.header("📖 Lecture Management")
-            lectures_df = load_lectures(course_code)
-            st.session_state["lectures_df"] = lectures_df
-            st.subheader("📘 Add / Edit Lecture Materials & Assignment")
-            week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)], key="lecture_week_select")
-
-            if week in lectures_df["Week"].values:
-                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-            else:
-                new_row = {"Week": week, "Topic": "", "Brief": "", "Assignment": "", "PDF_File": ""}
-                lectures_df = pd.concat([lectures_df, pd.DataFrame([new_row])], ignore_index=True)
-                row_idx = lectures_df[lectures_df["Week"] == week].index[0]
-                st.session_state["lectures_df"] = lectures_df
-
-            topic = st.text_input("Topic", value=lectures_df.at[row_idx, "Topic"], key=f"topic_{week}")
-            brief = st.text_area("Brief Description", value=lectures_df.at[row_idx, "Brief"], key=f"brief_{week}")
-            assignment = st.text_area("Assignment", value=lectures_df.at[row_idx, "Assignment"], key=f"assignment_{week}")
-
-            st.markdown("**Upload PDF Files (Permanent Storage)**")
-            pdf_dir = get_persistent_path("pdf", course_code)
-            os.makedirs(pdf_dir, exist_ok=True)
-            lecture_pdf = st.file_uploader("Lecture PDF", type=["pdf"], key=f"pdf_{week}")
-
-            current_pdf = str(lectures_df.at[row_idx, "PDF_File"] or "").strip()
-            if current_pdf and os.path.exists(current_pdf):
-                st.success(f"📎 Current PDF: {os.path.basename(current_pdf)}")
-                with open(current_pdf, "rb") as pdf_file:
-                    file_size = os.path.getsize(current_pdf) / (1024 * 1024)
-                    st.download_button(f"📥 Download Current PDF ({file_size:.1f}MB)", data=pdf_file,
-                                       file_name=os.path.basename(current_pdf),
-                                       mime="application/pdf", key=f"download_{week}")
-                if st.button("🗑️ Remove PDF", key=f"remove_{week}"):
-                    try:
-                        if os.path.exists(current_pdf):
-                            os.remove(current_pdf)
-                        lectures_df.at[row_idx, "PDF_File"] = ""
-                        st.session_state["lectures_df"] = lectures_df
-                        lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                        st.success("✅ PDF removed successfully!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error removing PDF: {e}")
-
-            if lecture_pdf is not None:
-                safe_name = "".join(c for c in lecture_pdf.name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip().replace(' ', '_')
-                pdf_filename = f"{course_code}_{week.replace(' ', '')}_{safe_name}"
-                pdf_path = get_persistent_path("pdf", course_code, pdf_filename)
-                try:
-                    with st.spinner("Uploading PDF to permanent storage..."):
-                        with open(pdf_path, "wb") as f:
-                            f.write(lecture_pdf.getbuffer())
-                    lectures_df.at[row_idx, "PDF_File"] = pdf_path
-                    st.session_state["lectures_df"] = lectures_df
-                    lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                    st.success(f"✅ PDF uploaded successfully: {lecture_pdf.name}")
-                except Exception as e:
-                    st.error(f"Error saving PDF: {str(e)}")
-
-            # Bulk MCQ Import
-            st.markdown("---")
-            st.subheader("🧩 Automated MCQ Questions")
-            existing_questions = load_mcq_questions(course_code, week) or []
-
-            st.markdown("#### 📥 Bulk Import Questions")
-            with st.expander("Click to expand bulk import"):
-                st.markdown("""
-                **MCQ format:**
-                ```
-                MCQ: Question text?
-                A. Option 1
-                B. Option 2
-                C. Option 3
-                D. Option 4
-                Correct: A
-                ```
-                **GAP format:**
-                ```
-                GAP: The answer is ________.
-                Correct: answer|alternative
-                ```
-                """)
-                bulk_text = st.text_area("Paste your questions here:", height=300,
-                                         placeholder="Paste multiple questions in the format shown above...",
-                                         key=f"bulk_import_{week}")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("📥 Import Questions", key=f"import_{week}"):
-                        if bulk_text.strip():
-                            new_questions = parse_bulk_questions(bulk_text)
-                            if new_questions:
-                                existing_questions.extend(new_questions)
-                                if save_mcq_questions(course_code, week, existing_questions):
-                                    st.success(f"✅ Imported {len(new_questions)} questions!")
-                                    st.rerun()
-                            else:
-                                st.error("❌ No valid questions found. Check the format.")
-                        else:
-                            st.warning("⚠️ Please paste some questions first.")
-
-            # MCQ Creation Form
-            st.markdown("#### Create New Question")
-            with st.form(f"mcq_creation_form_{week}"):
-                question_type = st.selectbox("Question Type", ["Multiple Choice (MCQ)", "Gap Filling"], key=f"question_type_{week}")
-                question_text = st.text_area("Question Text", placeholder="Enter your question here...", key=f"question_text_{week}")
-                if question_type == "Multiple Choice (MCQ)":
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        option_a = st.text_input("Option A", key=f"option_a_{week}")
-                        option_b = st.text_input("Option B", key=f"option_b_{week}")
-                        option_e = st.text_input("Option E", key=f"option_e_{week}")
-                    with col2:
-                        option_c = st.text_input("Option C", key=f"option_c_{week}")
-                        option_d = st.text_input("Option D", key=f"option_d_{week}")
-                    correct_answer = st.selectbox("Correct Answer", ["A", "B", "C", "D", "E"], key=f"correct_answer_{week}")
-                    options = {"A": option_a, "B": option_b, "C": option_c, "D": option_d, "E": option_e}
-                else:
-                    correct_answer = st.text_input("Correct Answer(s)", placeholder="Use | for multiple answers",
-                                                   key=f"gap_answer_{week}")
-                    options = {}
-                add_question = st.form_submit_button("➕ Add Question")
-                if add_question and question_text:
-                    new_question = {
-                        "type": "mcq" if question_type == "Multiple Choice (MCQ)" else "gap_fill",
-                        "question": question_text,
-                        "options": options,
-                        "correct_answer": correct_answer
-                    }
-                    existing_questions.append(new_question)
-                    if save_mcq_questions(course_code, week, existing_questions):
-                        st.success("✅ Question added!")
-                        st.rerun()
-
-            # Display existing questions
-            if existing_questions:
-                st.write(f"**Existing Questions for {week}:**")
-                for i, question in enumerate(existing_questions):
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"**Q{i+1}:** {question['question']}")
-                            st.write(f"*Type:* {question['type'].replace('_', ' ').title()}")
-                            if question['type'] == 'mcq':
-                                for opt, text in question['options'].items():
-                                    st.write(f"  {opt}: {text}")
-                            st.write(f"*Correct:* {question['correct_answer']}")
-                            st.markdown("---")
-                        with col2:
-                            if st.button("🗑️ Delete", key=f"delete_q_{week}_{i}"):
-                                existing_questions.pop(i)
-                                save_mcq_questions(course_code, week, existing_questions)
-                                st.success("✅ Question deleted!")
-                                st.rerun()
-                if st.button("🚨 Clear All Questions", key=f"clear_all_{week}", type="secondary"):
-                    if save_mcq_questions(course_code, week, []):
-                        st.success("✅ All questions cleared!")
-                        st.rerun()
-            else:
-                st.info("No MCQ questions added for this week yet.")
-
-            st.markdown("---")
-            if st.button("💾 SAVE ALL LECTURE MATERIALS", key=f"save_all_{week}", type="primary", use_container_width=True):
-                try:
-                    lectures_df.at[row_idx, "Topic"] = topic
-                    lectures_df.at[row_idx, "Brief"] = brief
-                    lectures_df.at[row_idx, "Assignment"] = assignment
-                    lectures_df.to_csv(get_file(course_code, "lectures"), index=False)
-                    st.session_state["lectures_df"] = lectures_df
-                    st.success("🎉 All lecture materials saved!")
-                    st.balloons()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error saving: {e}")
-
-        # ============ TAB 3: Video Management ============
-        elif selected_admin_tab == "🎥 Video Management":
-            st.header("🎥 Video Lecture Management")
-            uploaded_video = st.file_uploader("Upload Lecture Video (MP4 recommended, max 200MB)",
-                                              type=["mp4", "mov", "avi", "mkv"],
-                                              key=f"{course_code}_video_upload")
-            if uploaded_video is not None:
-                file_size = uploaded_video.size / (1024 * 1024)
-                st.write(f"**File:** {uploaded_video.name}")
-                st.write(f"**Size:** {file_size:.2f} MB")
-                if file_size > 200:
-                    st.error("❌ File too large! Please upload videos under 200MB.")
-                else:
-                    success, message = upload_video(course_code, uploaded_video)
-                    if success:
-                        st.success(message)
-                        st.rerun()
-                    else:
-                        st.error(message)
-
-            st.subheader("📚 Video Library")
-            video_files = get_video_files(course_code)
-            if video_files:
-                for i, video in enumerate(video_files):
-                    video_path = get_persistent_path("video", course_code, video)
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"**🎬 {video}**")
-                            try:
-                                st.video(video_path, start_time=0)
-                                file_size = os.path.getsize(video_path) / (1024 * 1024)
-                                st.caption(f"Size: {file_size:.2f} MB")
-                            except Exception as e:
-                                st.error(f"Cannot preview: {str(e)}")
-                        with col2:
-                            try:
-                                with open(video_path, "rb") as vid_file:
-                                    st.download_button("📥 Download", data=vid_file,
-                                                       file_name=video, mime="video/mp4",
-                                                       key=f"download_video_{i}")
-                            except Exception as e:
-                                st.error(f"Download unavailable")
-                            if st.button("🗑️ Delete", key=f"delete_video_{i}"):
-                                try:
-                                    os.remove(video_path)
-                                    st.success(f"✅ Video deleted: {video}")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Failed to delete: {str(e)}")
-                        st.markdown("---")
-            else:
-                st.info("No videos in storage yet.")
-
-        # ============ TAB 4: Attendance Control ============
-        elif selected_admin_tab == "🕒 Attendance Control":
-            st.header("🎛 Attendance Control")
-            selected_week = st.selectbox("Select Week", [f"Week {i}" for i in range(1, 16)],
-                                         key=f"{course_code}_attendance_week_select")
-            current_status = get_attendance_status(course_code, selected_week)
-            is_currently_open = current_status.get("is_open", False)
-            if is_currently_open:
-                st.success(f"✅ Attendance is CURRENTLY OPEN for {course_code} - {selected_week}")
-            else:
-                st.warning(f"🚫 Attendance is CURRENTLY CLOSED for {course_code} - {selected_week}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔓 OPEN Attendance", use_container_width=True, type="primary", key="open_attendance_btn"):
-                    if set_attendance_status(course_code, selected_week, True, datetime.now()):
-                        st.success(f"✅ Attendance OPENED for {course_code} - {selected_week}")
-                        st.rerun()
-            with col2:
-                if st.button("🔒 CLOSE Attendance", use_container_width=True, type="secondary", key="close_attendance_btn"):
-                    if set_attendance_status(course_code, selected_week, False):
-                        st.warning(f"🚫 Attendance CLOSED for {course_code} - {selected_week}")
-                        st.rerun()
-            if is_currently_open and current_status.get("open_time"):
-                try:
-                    open_time = datetime.fromisoformat(current_status["open_time"])
-                    remaining = max(0, 600 - (datetime.now() - open_time).total_seconds())
-                    if remaining <= 0:
-                        set_attendance_status(course_code, selected_week, False)
-                        st.error("⏰ Attendance has automatically closed after 10 minutes.")
-                        st.rerun()
-                    else:
-                        st.info(f"⏳ Auto-closes in {int(remaining//60):02d}:{int(remaining%60):02d}")
-                except Exception as e:
-                    st.error(f"Error in auto-close: {e}")
-
-        # ============ TAB 5: Attendance Records ============
-        elif selected_admin_tab == "📊 Attendance Records":
-            st.header("📊 Attendance Records")
-            att_tab1, att_tab2, att_tab3 = st.tabs(["👥 Student Details", "📈 Weekly Summary", "📋 Complete History"])
-            with att_tab1:
-                view_week = st.selectbox("Select Week to View", [f"Week {i}" for i in range(1, 16)],
-                                         key=f"{course_code}_attendance_view_week")
-                view_student_attendance_details(course_code, view_week)
-            with att_tab2:
-                show_attendance_summary(course_code)
-            with att_tab3:
-                view_all_students_attendance(course_code)
-            st.header("🌐 Global Attendance Overview")
-            if st.button("🔄 Refresh Global Overview", type="secondary", key="refresh_global_attendance"):
-                global_df = get_global_attendance_summary()
-                if not global_df.empty:
-                    st.dataframe(global_df, use_container_width=True)
-                    st.metric("Total Attendance Across All Courses", global_df["Total Attendance Records"].sum())
-                else:
-                    st.info("No attendance data found.")
-
-        # ============ TAB 6: Classwork Control ============
-        elif selected_admin_tab == "🧩 Classwork Control":
-            st.header("🎛 Classwork Control")
-            classwork_week = st.selectbox("Select Week for Classwork", [f"Week {i}" for i in range(1, 16)],
-                                          key=f"{course_code}_classwork_control_week")
-            current_classwork_status = get_classwork_status(course_code, classwork_week)
-            is_classwork_currently_open = current_classwork_status.get("is_open", False)
-            answers_released = current_classwork_status.get("answers_released", False)
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if is_classwork_currently_open:
-                    st.success("✅ Classwork OPEN")
-                else:
-                    st.warning("🚫 Classwork CLOSED")
-            with col2:
-                if answers_released:
-                    st.success("📚 Answers RELEASED")
-                else:
-                    st.info("🔒 Answers HIDDEN")
-            with col3:
-                if is_classwork_currently_open or answers_released:
-                    st.success("👀 Visible to Students")
-                else:
-                    st.error("🙈 Hidden from Students")
-            st.subheader("Control Classwork Visibility")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔓 OPEN Classwork", use_container_width=True, type="primary", key="open_classwork_btn"):
-                    if set_classwork_status(course_code, classwork_week, True, datetime.now()):
-                        st.success(f"✅ Classwork OPENED for {course_code} - {classwork_week}")
-                        st.rerun()
-            with col2:
-                if st.button("🔒 CLOSE Classwork", use_container_width=True, type="secondary", key="close_classwork_btn"):
-                    if set_classwork_status(course_code, classwork_week, False):
-                        st.warning(f"🚫 Classwork CLOSED for {course_code} - {classwork_week}")
-                        st.rerun()
-            st.subheader("Control Answer Visibility")
-            col3, col4 = st.columns(2)
-            with col3:
-                if st.button("📚 RELEASE Answers", use_container_width=True, type="primary", key="release_answers_btn"):
-                    if set_classwork_answers_released(course_code, classwork_week, True):
-                        st.success(f"✅ Answers RELEASED for {course_code} - {classwork_week}")
-                        st.rerun()
-            with col4:
-                if st.button("🔒 HIDE Answers", use_container_width=True, type="secondary", key="hide_answers_btn"):
-                    if set_classwork_answers_released(course_code, classwork_week, False):
-                        st.warning(f"🔒 Answers HIDDEN for {course_code} - {classwork_week}")
-                        st.rerun()
-            if is_classwork_currently_open and current_classwork_status.get("open_time"):
-                try:
-                    open_time = datetime.fromisoformat(current_classwork_status["open_time"])
-                    remaining = max(0, 1200 - (datetime.now() - open_time).total_seconds())
-                    if remaining <= 0:
-                        set_classwork_status(course_code, classwork_week, False)
-                        st.error("⏰ Classwork has automatically closed after 20 minutes.")
-                        st.rerun()
-                    else:
-                        st.info(f"⏳ Auto-closes in {int(remaining//60):02d}:{int(remaining%60):02d}")
-                except Exception as e:
-                    st.error(f"Error in classwork auto-close: {e}")
-
-        # ============ TAB 7: MCQ Management ============
-        elif selected_admin_tab == "📝 MCQ Management":
-            # Then in the MCQ tab:
-            week = st.session_state.get("week")
-            row_idx = st.session_state.get("row_idx")
-            render_question_manager(
-                course_code=course_code,
-                week=week,
-                row_idx=row_idx,
-                get_file=get_file,
-                load_mcq_questions=load_mcq_questions,
-                save_mcq_questions=save_mcq_questions,
-    )
-
-        # ============ TAB 8: Classwork Submissions ============
-        elif selected_admin_tab == "📝 Classwork Submissions":
-            st.header("📝 Classwork Submissions")
-            cw_tab1, cw_tab2 = st.tabs(["📅 Weekly Submissions", "📚 All Submissions"])
-            with cw_tab1:
-                cw_week = st.selectbox("Select Week to View", [f"Week {i}" for i in range(1, 16)],
-                                       key=f"{course_code}_classwork_view_week")
-                view_classwork_submissions(course_code, cw_week)
-            with cw_tab2:
-                classwork_file = get_file(course_code, "classwork")
-                if os.path.exists(classwork_file):
-                    df = pd.read_csv(classwork_file)
-                    if not df.empty:
-                        st.dataframe(df, use_container_width=True)
-                        st.download_button("📥 Download All Classwork", df.to_csv(index=False),
-                                           f"classwork_{course_code}_all.csv", "text/csv")
-                    else:
-                        st.info("No classwork submissions yet.")
-                else:
-                    st.info("No classwork submissions yet.")
-
-        # ============ TAB 9: Grading System ============
-        elif selected_admin_tab == "📝 Grading System":
-            st.header("📝 Grading System")
-            st.info("""
-            **Grading Weights (After 15 Weeks + Exam):**
-            - Assignment & Seminar: 8% (average of 15 weeks)
-            - Test: 8% (average of 15 weeks)
-            - Practical: 5% (average of 15 weeks)
-            - Classwork: 9% (average of 15 weeks)
-            - Exam (After 15 weeks): 70%
-            """)
-            scores_df = ensure_scores_file(course_code)
-            scores_file = get_file(course_code, "scores")
-            st.subheader("📋 Manual Grade Entry")
-            with st.form("manual_grading_form"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    g_student_name = st.text_input("Student Name", key="grade_name")
-                    g_week = st.selectbox("Week", [f"Week {i}" for i in range(1, 16)] + ["Exam"], key="grade_week")
-                    g_assignment = st.number_input("Assignment Score (0-100)", 0, 100, 0, key="assignment_score")
-                    g_test = st.number_input("Test Score (0-100)", 0, 100, 0, key="test_score")
-                with col2:
-                    g_matric = st.text_input("Matric Number", key="grade_matric")
-                    g_practical = st.number_input("Practical Score (0-100)", 0, 100, 0, key="practical_score")
-                    g_exam = st.number_input("Exam Score (0-100)", 0, 100, 0, key="exam_score")
-                    g_classwork = st.number_input("Classwork Score (0-100)", 0, 100, 0, key="classwork_score")
-                submit_grade = st.form_submit_button("💾 Save Grade", use_container_width=True)
-                if submit_grade:
-                    if not g_student_name or not g_matric:
-                        st.error("Please enter student name and matric number.")
-                    else:
-                        if g_week != "Exam":
-                            weekly_total = round(g_assignment*0.08 + g_test*0.08 + g_practical*0.05 + g_classwork*0.09, 1)
-                            weekly_grade = compute_grade(weekly_total)
-                        else:
-                            weekly_total = 0
-                            weekly_grade = ""
-                        current_df = pd.read_csv(scores_file)
-                        mask = (
-                            (current_df["StudentName"].astype(str).str.lower() == g_student_name.lower()) &
-                            (current_df["MatricNo"].astype(str).str.lower() == g_matric.lower()) &
-                            (current_df["Week"].astype(str).str.lower() == g_week.lower())
-                        )
-                        if mask.any():
-                            current_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]] = [
-                                g_assignment, g_test, g_practical, g_exam, g_classwork, weekly_total, weekly_grade]
-                        else:
-                            new_row = {
-                                "StudentName": g_student_name.title(), "MatricNo": g_matric.upper(),
-                                "Week": g_week, "Assignment": g_assignment, "Test": g_test,
-                                "Practical": g_practical, "Exam": g_exam, "Classwork": g_classwork,
-                                "Total": weekly_total, "Grade": weekly_grade
-                            }
-                            current_df = pd.concat([current_df, pd.DataFrame([new_row])], ignore_index=True)
-                        current_df.to_csv(scores_file, index=False)
-                        st.success(f"✅ Grade saved for {g_student_name} ({g_matric}) - {g_week}")
-
-            # CSV Upload
-            st.subheader("📁 Bulk Grade Upload (CSV)")
-            uploaded_csv = st.file_uploader(
-                "Upload CSV with columns: StudentName, MatricNo, Week, Assignment, Test, Practical, Exam, Classwork",
-                type=["csv"], key="grade_csv_upload")
-            if uploaded_csv is not None:
-                try:
-                    uploaded_df = pd.read_csv(uploaded_csv)
-                    required_cols = ["StudentName", "MatricNo", "Week", "Assignment", "Test", "Practical", "Exam", "Classwork"]
-                    if all(col in uploaded_df.columns for col in required_cols):
-                        def calc_row_total(row):
-                            if row['Week'] != 'Exam':
-                                return round(row['Assignment']*0.08 + row['Test']*0.08 + row['Practical']*0.05 + row['Classwork']*0.09, 1)
-                            return 0
-                        uploaded_df["Total"] = uploaded_df.apply(calc_row_total, axis=1)
-                        uploaded_df["Grade"] = uploaded_df["Total"].apply(compute_grade)
-                        existing_df = pd.read_csv(scores_file) if os.path.exists(scores_file) else pd.DataFrame(columns=required_cols + ["Total", "Grade"])
-                        for _, row in uploaded_df.iterrows():
-                            mask = (
-                                (existing_df["StudentName"].astype(str).str.lower() == str(row["StudentName"]).lower()) &
-                                (existing_df["MatricNo"].astype(str).str.lower() == str(row["MatricNo"]).lower()) &
-                                (existing_df["Week"].astype(str).str.lower() == str(row["Week"]).lower())
-                            )
-                            if mask.any():
-                                existing_df.loc[mask, ["Assignment", "Test", "Practical", "Exam", "Classwork", "Total", "Grade"]] = [
-                                    row["Assignment"], row["Test"], row["Practical"], row["Exam"], row["Classwork"], row["Total"], row["Grade"]]
-                            else:
-                                existing_df = pd.concat([existing_df, pd.DataFrame([row])], ignore_index=True)
-                        existing_df.to_csv(scores_file, index=False)
-                        st.success(f"✅ Processed {len(uploaded_df)} grade records!")
-                        st.dataframe(existing_df, use_container_width=True)
-                    else:
-                        missing = [col for col in required_cols if col not in uploaded_df.columns]
-                        st.error(f"❌ CSV missing columns: {', '.join(missing)}")
-                except Exception as e:
-                    st.error(f"❌ Error processing CSV: {e}")
-
-            # Display grades
-            st.subheader("📊 Current Grades & Final Calculations")
-            if os.path.exists(scores_file):
-                try:
-                    scores_df = pd.read_csv(scores_file)
-                    if not scores_df.empty:
-                        st.dataframe(scores_df, use_container_width=True)
-                        st.subheader("🎓 Final Grade Calculations")
-                        students = scores_df[['StudentName', 'MatricNo']].drop_duplicates()
-                        final_grades_data = []
-                        for _, student in students.iterrows():
-                            s_name = student['StudentName']
-                            s_matric = student['MatricNo']
-                            s_scores = scores_df[(scores_df['StudentName'] == s_name) & (scores_df['MatricNo'] == s_matric)]
-                            result = calculate_final_grade(s_scores)
-                            if result[0] is not None:
-                                ft, fg, aa, ta, pa, ca, es = result
-                                final_grades_data.append({
-                                    'StudentName': s_name, 'MatricNo': s_matric,
-                                    'CA_Assignment_Avg': round(aa, 1), 'CA_Test_Avg': round(ta, 1),
-                                    'CA_Practical_Avg': round(pa, 1), 'CA_Classwork_Avg': round(ca, 1),
-                                    'Exam_Score': es, 'Final_Total': ft, 'Final_Grade': fg
-                                })
-                        if final_grades_data:
-                            final_df = pd.DataFrame(final_grades_data)
-                            st.dataframe(final_df, use_container_width=True)
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.download_button("📥 Download All Scores", scores_df.to_csv(index=False),
-                                                   f"{course_code}_all_scores.csv", "text/csv",
-                                                   use_container_width=True, key="download_all_scores")
-                            with col2:
-                                st.download_button("📥 Download Final Grades", final_df.to_csv(index=False),
-                                                   f"{course_code}_final_grades.csv", "text/csv",
-                                                   use_container_width=True, key="download_final_grades")
-                        else:
-                            st.info("No complete data for final grade calculation.")
-                    else:
-                        st.info("No grades recorded yet.")
-                except Exception as e:
-                    st.error(f"Error loading grades: {e}")
-
-        # ============ TAB 10: Student Submissions ============
-        elif selected_admin_tab == "📂 Student Submissions":
-            st.header("📂 View Student Submissions")
-            upload_types = ["assignment", "drawing", "seminar"]
-            for upload_type in upload_types:
-                st.subheader(f"📄 {upload_type.capitalize()} Submissions")
-                upload_dir = os.path.join(PERSISTENT_DATA_DIR, "student_uploads", course_code, upload_type)
-                if not os.path.exists(upload_dir):
-                    st.info(f"No {upload_type} submissions yet.")
-                    continue
-                files = sorted([f for f in os.listdir(upload_dir) if os.path.isfile(os.path.join(upload_dir, f))])
-                if not files:
-                    st.info(f"No {upload_type} submissions yet.")
-                    continue
-                for file in files:
-                    file_path = os.path.join(upload_dir, file)
-                    with st.container():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"**📎 {file}**")
-                            try:
-                                file_size = os.path.getsize(file_path) / (1024 * 1024)
-                                st.write(f"*Size:* {file_size:.2f} MB")
-                                parts = file.split('_')
-                                if len(parts) >= 2:
-                                    st.write(f"*Student:* {parts[0]}")
-                            except:
-                                pass
-                        with col2:
-                            try:
-                                with open(file_path, "rb") as fh:
-                                    st.download_button("⬇️ Download", data=fh, file_name=file,
-                                                       mime="application/octet-stream",
-                                                       key=f"{course_code}_{upload_type}_{file}_download")
-                            except Exception:
-                                st.warning("⚠️ Cannot open file for download.")
-                        st.markdown("---")
-
-            st.subheader("📊 Submission Management")
-            if 'student_list_data' not in st.session_state:
-                st.session_state.student_list_data = None
-            if 'student_list_filename' not in st.session_state:
-                st.session_state.student_list_filename = None
-            if st.button("📥 Generate Student List CSV"):
-                csv_data, filename = get_student_list_csv(course_code)
-                if csv_data:
-                    st.session_state.student_list_data = csv_data
-                    st.session_state.student_list_filename = filename
-                    st.success("✅ Student list generated!")
-                else:
-                    st.warning("No student data available")
-            if st.session_state.student_list_data:
-                st.download_button("⬇️ Download Student List", data=st.session_state.student_list_data,
-                                   file_name=st.session_state.student_list_filename, mime="text/csv")
-
-            st.write("### Weekly Submissions")
-            weeks = [f"Week {i}" for i in range(1, 16)]
-            selected_week_dl = st.selectbox("Select Week for Download", weeks, key="weekly_download")
-            if 'weekly_data' not in st.session_state:
-                st.session_state.weekly_data = None
-            if 'weekly_filename' not in st.session_state:
-                st.session_state.weekly_filename = None
-            if st.button("📥 Generate Weekly Submissions CSV"):
-                csv_data, filename = get_weekly_submissions_csv(course_code, selected_week_dl)
-                if csv_data:
-                    st.session_state.weekly_data = csv_data
-                    st.session_state.weekly_filename = filename
-                    st.success(f"✅ {selected_week_dl} submissions generated!")
-                else:
-                    st.warning(f"No submissions found for {selected_week_dl}")
-            if st.session_state.weekly_data:
-                st.download_button(f"⬇️ Download {selected_week_dl} Submissions",
-                                   data=st.session_state.weekly_data,
-                                   file_name=st.session_state.weekly_filename, mime="text/csv")
-
-        # ============ TAB 11: Announcements ============
-        elif selected_admin_tab == "📢 Announcements":
-            display_pdf_announcements_admin(course_code)
-
-        # ============ TAB 12: Seminar Submissions ============
-        elif selected_admin_tab == "📊 Seminar Submissions":
-            st.subheader("📊 Seminar Submissions Management")
-            all_courses = [v["code"] if isinstance(v, dict) else v for v in load_courses_config().values()]
-            admin_course = st.selectbox("Select Course", all_courses, key="seminar_course_admin")
-            submissions = get_seminar_submissions(admin_course)
-            if submissions:
-                st.write(f"**Found {len(submissions)} seminar submissions**")
-                for i, submission in enumerate(submissions):
-                    with st.expander(f"📝 {submission['student_name']} - {submission['topic']}", expanded=False):
-                        col1, col2, col3 = st.columns([2, 1, 1])
-                        with col1:
-                            st.write(f"**Matric:** {submission['student_matric']}")
-                            st.write(f"**Topic:** {submission['topic']}")
-                            st.write(f"**File:** {submission['file_name']}")
-                            st.write(f"**Submitted:** {submission['timestamp']}")
-                            file_path = submission.get('file_path', '')
-                            if file_path and os.path.exists(file_path):
-                                with open(file_path, "rb") as fh:
-                                    st.download_button("📥 Download Submission", data=fh,
-                                                       file_name=submission['file_name'],
-                                                       mime="application/octet-stream",
-                                                       key=f"download_seminar_{i}")
-                            else:
-                                st.info("File not available for download")
-                        with col2:
-                            st.write("**Current Feedback:**")
-                            current_feedback = get_seminar_feedback(submission['student_matric'], admin_course)
-                            if current_feedback:
-                                st.info(current_feedback)
-                            else:
-                                st.write("No feedback yet")
-                        with col3:
-                            with st.form(key=f"seminar_feedback_form_{i}"):
-                                feedback_file = st.file_uploader("Upload Feedback PDF", type=["pdf"],
-                                                                  key=f"seminar_feedback_pdf_{i}")
-                                feedback_text = st.text_area("Or write feedback:", key=f"seminar_feedback_text_{i}")
-                                send_feedback = st.form_submit_button("📤 Send Feedback")
-                                if send_feedback:
-                                    if feedback_file or feedback_text:
-                                        success = save_seminar_feedback(
-                                            submission['student_matric'], admin_course,
-                                            feedback_file, feedback_text)
-                                        if success:
-                                            st.success("✅ Feedback sent!")
-                                        else:
-                                            st.error("❌ Failed to send feedback")
-                                    else:
-                                        st.error("❌ Please provide feedback")
-            else:
-                st.info(f"No seminar submissions found for {admin_course}")
-
-    except Exception as e:
-        st.error(f"An error occurred in admin view: {str(e)}")
-
-                
-# ===============================================================
-# 🚀 MAIN APPLICATION
-# ===============================================================
-
-def main():
-    """Main application"""
-    
-    # ===============================================================
-    # 🔐 SESSION STATE INITIALIZATION
-    # ===============================================================
-    if "role" not in st.session_state:
-        st.session_state["role"] = None
-    
-    
-    
-    st.sidebar.title("🎓 Navigation")
-    
-    role = st.sidebar.radio(
-        "Select Role", 
-        ["Select", "Student", "Admin", "System Admin"], 
-        key="role_selector",
-        on_change=handle_role_change
-    )
-    
-    # Update session state based on selection
-    if role != "Select":
-        st.session_state["role"] = role
-    else:
-        st.session_state["role"] = None
-
-    COURSES = load_courses_config()
-
-    # Route to appropriate view based on role
-    if st.session_state["role"] == "System Admin":
-        show_system_admin_dashboard()
-    elif st.session_state["role"] == "Admin" and COURSES:
-        course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
-        course_code = COURSES[course]["code"] if isinstance(COURSES[course], dict) else COURSES[course]
-        admin_view(course_code, course)
-    elif st.session_state["role"] == "Student" and COURSES:
-        course = st.sidebar.selectbox("Select Course:", list(COURSES.keys()))
-        course_code = COURSES[course]["code"] if isinstance(COURSES[course], dict) else COURSES[course]
-        student_view(course_code, course)
-    else:
-        if not COURSES:
-            st.warning("⚠️ No courses available. Please contact system administrator.")
-        elif st.session_state["role"] is None:
-            st.info("👆 Please select your role from the sidebar to continue.")
-
-    # Footer (always shown)
-    st.markdown("""
-        <style>
-        .custom-footer {
-            position: relative; left: 0; bottom: 0; width: 100%;
-            background-color: #f0f2f6; color: #333; text-align: center;
-            padding: 8px; font-size: 18px; font-weight: 500;
-            border-top: 1px solid #ccc; margin-top: 2rem;
-        }
-        </style>
-        <div class="custom-footer">
-            Developed by <b>Adebimpe-John Omolola</b> | © 2026 | Advanced LMS with System Monitoring
+  });
+  const pct=autoTotal?Math.round(autoScore/autoTotal*100):0;
+  const submission={name:APP.student.name,matric:APP.student.matric,answers:answerLog,
+    auto_score:autoScore,auto_total:autoTotal,score:autoScore,total:autoTotal,pct,pending_short:pendingShort,ts:new Date().toISOString()};
+  S.set(`nm_cw_${APP.course.code}_${APP.week}_${APP.student.matric}`,submission);
+  logStu('Classwork submitted',{week:APP.week,score:pct});
+  const msg=pendingShort.length
+    ?`Submitted! Auto-graded: ${pct}% (${pendingShort.length} short answer(s) pending review)`
+    :`Submitted! Score: ${pct}%`;
+  toast(msg,'success');renderTab('lecture');
+}
+
+function cwReview(sub){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(!qs.length||!sub?.answers) return '';
+  return '<div class="card" style="border-color:rgba(16,185,129,.3)"><div class="ct">📋 Your Submission Review</div>'+
+  sub.answers.map((a,i)=>{
+    const q=qs[i];if(!q)return'';
+    let status='',detail='';
+    if(a.type==='mcq'){
+      const ok=a.ans===a.correct;
+      status=ok?'<span class="badge bg">✅ Correct</span>':'<span class="badge br">❌ Wrong</span>';
+      detail=ok?'':`<div style="font-size:.75rem;color:var(--green);margin-top:.3rem">Correct: ${a.correct} — ${(a.options&&a.options[a.correct])||q.options?.[a.correct]||''}</div>`;
+    } else if(a.type==='gap_fill'){
+      const accepted=(a.correct||'').split('|').map(x=>x.trim().toLowerCase());
+      const ok=accepted.includes((a.ans||'').trim().toLowerCase());
+      status=ok?'<span class="badge bg">✅ Correct</span>':'<span class="badge br">❌ Wrong</span>';
+      if(!ok) detail=`<div style="font-size:.75rem;color:var(--green);margin-top:.3rem">Correct: ${a.correct}</div>`;
+    } else {
+      status='<span class="badge ba">⏳ Pending Review</span>';
+      detail=`<div style="font-size:.75rem;color:var(--dim);margin-top:.3rem">Model: ${a.model||''}</div>`;
+    }
+    return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.25rem">Q${i+1}. ${a.q}</div>
+      <div style="font-size:.78rem;color:var(--dim)">Your answer: <b>${a.ans||'—'}</b> ${status}</div>${detail}</div>`;
+  }).join('')+'</div>';
+}
+
+function rSubmissions(){
+  return requireIdent(()=>istrip()+ph('📤 Submissions',APP.course.name+' · '+APP.week)+
+    `<div class="card"><div class="ct">📝 Assignment Submission</div>${subWidget('assignment','pdf,doc,docx,txt,zip')}</div>
+     <div class="card"><div class="ct">🎨 Drawing / Diagram</div>${subWidget('drawing','jpg,jpeg,png,gif,pdf')}</div>
+     <div class="card"><div class="ct">🎤 Seminar <span class="badge bv sm" style="margin-left:.4rem">Once/Semester</span></div>${semWidget()}</div>`);
+}
+
+function subWidget(type,accept){
+  const k=`nm_sub_${APP.course.code}_${APP.week}_${APP.student.matric}_${type}`;
+  const ex=S.get(k,null);
+  if(ex) return `<div class="al as">✅ ${type.charAt(0).toUpperCase()+type.slice(1)} submitted for ${APP.week}:<br><b>${ex.filename}</b> · ${new Date(ex.ts).toLocaleString()}</div>`;
+  return `<div class="field"><label>Select file (${accept})</label>
+    <input type="file" id="sub-file-${type}" accept=".${accept.split(',').join(',.')}" style="color:var(--text)"></div>
+    <button class="btn btn-p" onclick="realUpload('${type}','${k}')">📤 Submit ${type.charAt(0).toUpperCase()+type.slice(1)}</button>`;
+}
+
+function realUpload(type,k){
+  const inp=document.getElementById('sub-file-'+type);
+  if(!inp||!inp.files.length){toast('Select a file first','error');return}
+  const file=inp.files[0];
+  if(file.size>10*1024*1024){toast('File too large (max 10MB)','error');return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    S.set(k,{filename:file.name,size:file.size,b64:e.target.result,ts:new Date().toISOString()});
+    logStu(`${type} submitted`,{week:APP.week,file:file.name});
+    toast(`${file.name} uploaded ✅`,'success');renderTab('submissions');
+  };
+  reader.onerror=()=>toast('Upload failed','error');
+  reader.readAsDataURL(file);
+}
+
+function semWidget(){
+  const k=`nm_seminar_${APP.course.code}_${APP.student.matric}`;
+  const ex=S.get(k,null);
+  if(ex) return `<div class="al as">✅ Seminar submitted: <b>${ex.filename}</b><br>Topic: ${ex.topic}<br>${new Date(ex.ts).toLocaleString()}</div>`;
+  return `<div class="field"><label>Seminar Topic *</label><input id="sem-topic" placeholder="Enter your seminar topic…"></div>
+    <div class="field"><label>Upload Seminar File</label>
+      <input type="file" id="sem-file" accept=".pdf,.ppt,.pptx,.doc,.docx" style="color:var(--text)"></div>
+    <button class="btn btn-p" onclick="realSemUpload()">📤 Submit Seminar</button>`;
+}
+
+function realSemUpload(){
+  const topic=document.getElementById('sem-topic')?.value.trim();
+  const inp=document.getElementById('sem-file');
+  if(!topic){toast('Enter seminar topic','error');return}
+  if(!inp||!inp.files.length){toast('Select a file','error');return}
+  const file=inp.files[0];
+  if(file.size>15*1024*1024){toast('File too large (max 15MB)','error');return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const k=`nm_seminar_${APP.course.code}_${APP.student.matric}`;
+    S.set(k,{filename:file.name,topic,size:file.size,b64:e.target.result,ts:new Date().toISOString()});
+    logStu('Seminar submitted',{topic,file:file.name});
+    toast('Seminar submitted ✅','success');renderTab('submissions');
+  };
+  reader.onerror=()=>toast('Upload failed','error');
+  reader.readAsDataURL(file);
+}
+
+function rAnnouncements(){
+  const anns=S.get('nm_announcements_'+APP.course.code,[]).filter(a=>a.active);
+  return ph('📢 Announcements',APP.course.name)+
+    (!anns.length?'<div class="al ai">No announcements yet.</div>':
+    anns.map(a=>`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.45rem">
+        <div class="ct" style="margin:0">${a.title}</div>
+        <span class="badge bc" style="font-size:.62rem">${new Date(a.ts).toLocaleDateString()}</span>
+      </div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7">${a.body}</p></div>`).join(''));
+}
+
+function rFeedback(){
+  return requireIdent(()=>{
+    const fb=S.get(`nm_sem_fb_${APP.course.code}_${APP.student.matric}`,null);
+    return istrip()+ph('💬 Seminar Feedback')+
+      (fb?`<div class="card"><div class="ct">Instructor Feedback</div>
+        <div class="al as">${fb.text}</div>
+        <p style="font-size:.72rem;color:var(--dim)">From: ${fb.from} · ${new Date(fb.ts).toLocaleDateString()}</p></div>`
+      :`<div class="al ai">No feedback received yet.</div>`);
+  });
+}
+
+function rProgress(){
+  return requireIdent(()=>{
+    let attCnt=0;const cwList=[];
+    WEEKS.forEach(w=>{
+      if(S.get(`nm_att_${APP.course.code}_${w}_${APP.student.matric}`,null))attCnt++;
+      if(S.get(`nm_cw_${APP.course.code}_${w}_${APP.student.matric}`,null))cwList.push(w);
+    });
+    const pct=Math.round(attCnt/15*100);
+    return istrip()+ph('📊 My Progress','NeuroMatrix LMS')+
+    `<div class="metrics">
+      <div class="metric"><div class="mv">${attCnt}</div><div class="ml">Weeks Attended</div></div>
+      <div class="metric"><div class="mv">${cwList.length}</div><div class="ml">Classwork Done</div></div>
+      <div class="metric"><div class="mv">${pct}%</div><div class="ml">Attendance Rate</div></div>
+    </div>
+    <div class="card"><div class="ct">Attendance Tracker</div>
+      <div style="font-size:.78rem;color:var(--dim);margin-bottom:.5rem">${attCnt}/15 weeks</div>
+      <div class="pbw"><div class="pbf" style="width:${pct}%"></div></div>
+      <div class="wstrip" style="margin-top:.8rem">${WEEKS.map(w=>{
+        const done=S.get(`nm_att_${APP.course.code}_${w}_${APP.student.matric}`,null);
+        return `<div class="wc ${done?'on':''}">${w.replace('Week','W')}</div>`;}).join('')}</div></div>`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO ADMIN TABS
+// ═══════════════════════════════════════════════════════════
+function rAdmCourseMgr(){
+  const info=S.get('nm_about_'+APP.course.code,{});
+  return ph('📚 Course Manager',APP.course.name,APP.course.code)+`
+  <div class="card"><div class="ct">📋 Course Info</div>
+    <div class="field"><label>Description</label><textarea id="ai-desc">${info.description||''}</textarea></div>
+    <div class="field"><label>Learning Objectives</label><textarea id="ai-obj">${info.objectives||''}</textarea></div>
+    <div class="field"><label>Lecturer</label><input id="ai-lec" value="${info.lecturer||''}"></div>
+    <button class="btn btn-p" onclick="saveAbout()">💾 Save</button></div>
+  <div class="card"><div class="ct">🔐 Change Password</div>
+    <div class="fr">
+      <div class="field"><label>New Password</label><input type="password" id="ap1"></div>
+      <div class="field"><label>Confirm</label><input type="password" id="ap2"></div>
+    </div>
+    <button class="btn btn-s" onclick="admChangePW()">🔄 Change Password</button></div>`;
+}
+function saveAbout(){
+  S.set('nm_about_'+APP.course.code,{description:document.getElementById('ai-desc')?.value,objectives:document.getElementById('ai-obj')?.value,lecturer:document.getElementById('ai-lec')?.value});
+  logLec('Course info updated');toast('Saved ✅','success');
+}
+function admChangePW(){
+  const p1=document.getElementById('ap1')?.value,p2=document.getElementById('ap2')?.value;
+  if(!p1){toast('Enter password','error');return}if(p1!==p2){toast('Passwords do not match','error');return}
+  const pw=getPasswords();pw[APP.course.code]=p1;S.set('nm_passwords',pw);toast('Password changed ✅','success');
+}
+
+function rAdmLecture(){
+  const lectures=S.get('nm_lectures_'+APP.course.code,{});
+  const lec=lectures[APP.week]||{};
+  return ph('📖 Lecture Management',APP.course.name,APP.week)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setLW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Edit ${APP.week}</div>
+    <div class="field"><label>Topic</label><input id="lt" value="${lec.topic||''}" placeholder="Topic…"></div>
+    <div class="field"><label>Brief</label><textarea id="lb">${lec.brief||''}</textarea></div>
+    <div class="field"><label>Assignment</label><textarea id="la">${lec.assignment||''}</textarea></div>
+    <button class="btn btn-p" onclick="saveLec()">💾 Save</button></div>
+  <div class="card"><div class="ct">All Weeks</div><div class="tw"><table>
+    <thead><tr><th>Week</th><th>Topic</th><th>Assignment</th></tr></thead>
+    <tbody>${WEEKS.map(w=>{const l=lectures[w]||{};return`<tr><td>${w}</td><td>${l.topic||'—'}</td><td>${l.assignment?'✅':'—'}</td></tr>`}).join('')}</tbody>
+  </table></div></div>`;
+}
+function setLW(w){APP.week=w;const ws=document.getElementById('sb-week');if(ws)ws.value=w;renderTab('lecture-mgmt')}
+function saveLec(){
+  const l=S.get('nm_lectures_'+APP.course.code,{});
+  l[APP.week]={topic:document.getElementById('lt')?.value,brief:document.getElementById('lb')?.value,assignment:document.getElementById('la')?.value};
+  S.set('nm_lectures_'+APP.course.code,l);logLec('Lecture posted '+APP.week);toast(APP.week+' saved ✅','success');
+}
+
+function rAdmAttCtrl(){
+  const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
+  return ph('🕒 Attendance Control',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>{const st=S.get(`nm_att_status_${APP.course.code}_${w}`,{is_open:false});
+    return`<div class="wc ${w===APP.week?'on':''}" onclick="setAW('${w}')">${w} ${st.is_open?'🟢':''}</div>`}).join('')}</div>
+  <div class="card"><div class="ct">Status — ${APP.week}</div>
+    <span class="badge ${status.is_open?'bg':'br'}" style="margin-bottom:1rem;display:inline-flex">${status.is_open?'🟢 OPEN':'🔴 CLOSED'}</span>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="setAttStatus(true)">🟢 Open Attendance</button>
+      <button class="btn btn-d" onclick="setAttStatus(false)">🔴 Close Attendance</button>
+    </div></div>
+  <div class="card"><div class="ct">Who Attended ${APP.week}</div>${attListPreview(APP.week)}</div>`;
+}
+function setAW(w){APP.week=w;renderTab('att-ctrl')}
+function setAttStatus(open){
+  S.set(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:open,ts:new Date().toISOString()});
+  logLec(`Attendance ${open?'opened':'closed'} for ${APP.week}`);
+  toast(`Attendance ${open?'opened 🟢':'closed 🔴'}`,open?'success':'info');renderTab('att-ctrl');
+}
+function attListPreview(week){
+  const list=S.get(`nm_att_list_${APP.course.code}_${week}`,[]);
+  if(!list.length)return`<div class="al ai">No attendance yet for ${week}.</div>`;
+  return`<div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Time</th></tr></thead>
+    <tbody>${list.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.matric}</td><td>${new Date(a.ts).toLocaleTimeString()}</td></tr>`).join('')}</tbody>
+  </table></div><p style="font-size:.72rem;color:var(--dim);margin-top:.4rem">${list.length} student(s)</p>`;
+}
+
+function rAdmAttRec(){
+  const totals={};
+  WEEKS.forEach(w=>{S.get(`nm_att_list_${APP.course.code}_${w}`,[]).forEach(a=>{
+    if(!totals[a.matric])totals[a.matric]={name:a.name,matric:a.matric,count:0};totals[a.matric].count++;});});
+  return ph('📊 Attendance Records',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setARW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Attendance — ${APP.week}</div>${attListPreview(APP.week)}</div>
+  <div class="card"><div class="ct">All-Weeks Summary</div>
+    ${Object.keys(totals).length?`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Present</th><th>Rate</th></tr></thead>
+      <tbody>${Object.values(totals).map(t=>`<tr><td>${t.name}</td><td>${t.matric}</td><td>${t.count}/15</td><td>${Math.round(t.count/15*100)}%</td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No data yet.</div>'}</div>`;
+}
+function setARW(w){APP.week=w;renderTab('att-rec')}
+
+// ── Admin: Classwork Control (single definition)
+function rAdmCWCtrl(){
+  const status=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{is_open:false,release_answers:false});
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  const typeLabels={mcq:'MCQ',gap_fill:'Gap Fill',short_answer:'Short Answer'};
+  const typeBadge={mcq:'bc',gap_fill:'bv',short_answer:'ba'};
+  return ph('🧩 Classwork Control',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setCWW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Gate Control — ${APP.week}</div>
+    <span class="badge ${status.is_open?'bg':'br'}" style="margin-bottom:.8rem;display:inline-flex">${status.is_open?'🟢 Open':'🔴 Closed'}</span>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.7rem">
+      <button class="btn btn-g" onclick="setCWStatus(true)">🟢 Open Classwork</button>
+      <button class="btn btn-d" onclick="setCWStatus(false)">🔴 Close Classwork</button>
+      <button class="btn btn-v" onclick="setCWAnswerRelease(${!status.release_answers})">${status.release_answers?'🔒 Hide Answers':'📖 Release Answers'}</button>
+    </div>
+    <p style="font-size:.72rem;color:var(--dim)">Release answers after closing so students can review correct responses.</p>
+  </div>
+  <div class="card"><div class="ct">📥 Bulk Import Questions</div>
+    <div class="al ai" style="font-size:.75rem;line-height:1.85">
+      <b>MCQ:</b> <code>MCQ: Question?</code> then A.–E. options then <code>Correct: A</code><br>
+      <b>GAP:</b> <code>GAP: The _____ is key.</code> then <code>Correct: answer|alternative</code><br>
+      <b>SHORT:</b> <code>SHORT: Explain X.</code> then <code>Model: key points</code> then <code>Marks: 5</code>
+    </div>
+    <textarea id="bulk-q" placeholder="Paste multiple questions here…" style="min-height:140px"></textarea>
+    <button class="btn btn-p" style="margin-top:.7rem" onclick="bulkImportQs()">📥 Import All Questions</button>
+  </div>
+  <div class="card"><div class="ct">➕ Add Single Question</div>
+    <div class="field"><label>Question Type</label>
+      <select id="q-type" onchange="toggleQFields()">
+        <option value="mcq">Multiple Choice (MCQ)</option>
+        <option value="gap_fill">Gap Fill</option>
+        <option value="short_answer">Short Answer</option>
+      </select></div>
+    <div class="field"><label>Question Text</label><textarea id="q-text" placeholder="Enter question…" style="min-height:60px"></textarea></div>
+    <div id="qf-mcq">
+      <div class="fr"><div class="field"><label>Option A</label><input id="q-a"></div><div class="field"><label>Option B</label><input id="q-b"></div></div>
+      <div class="fr"><div class="field"><label>Option C</label><input id="q-c"></div><div class="field"><label>Option D</label><input id="q-d"></div></div>
+      <div class="field"><label>Option E (optional)</label><input id="q-e" placeholder="Leave blank if not needed"></div>
+      <div class="field"><label>Correct Answer</label>
+        <select id="q-correct"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-mcq" value="1" min="1"></div>
+    </div>
+    <div id="qf-gap" class="hidden">
+      <div class="field"><label>Correct Answer(s) — separate alternatives with |</label>
+        <input id="q-gap-ans" placeholder="e.g. mitochondria|Mitochondria"></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-gap" value="1" min="1"></div>
+    </div>
+    <div id="qf-short" class="hidden">
+      <div class="field"><label>Model Answer / Key Points</label>
+        <textarea id="q-model" placeholder="Key points students should cover…" style="min-height:80px"></textarea></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-short" value="5" min="1"></div>
+    </div>
+    <button class="btn btn-p" style="margin-top:.5rem" onclick="addCWQ()">➕ Add Question</button>
+  </div>
+  <div class="card"><div class="ct">Questions — ${APP.week} (${qs.length})</div>
+    ${!qs.length?'<div class="al ai">No questions yet. Add above or use bulk import.</div>':
+    qs.map((q,i)=>`<div class="crow">
+      <div style="flex:1">
+        <div class="crn">${i+1}. ${q.question}</div>
+        <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
+          <span class="badge ${typeBadge[q.type]||'bc'}">${typeLabels[q.type]||q.type}</span>
+          ${q.type==='mcq'?`<span class="badge bg">Ans: ${q.correct_answer}</span>`:''}
+          ${q.marks?`<span class="badge ba">${q.marks}mk</span>`:''}
         </div>
-    """, unsafe_allow_html=True)
+      </div>
+      <button class="btn btn-d sm" onclick="rmCWQ(${i})">🗑</button>
+    </div>`).join('')}
+    ${qs.length?`<button class="btn btn-d" style="margin-top:.5rem" onclick="clearAllCWQ()">🗑 Clear All</button>`:''}</div>`;
+}
 
-def handle_role_change():
-    """Callback when role changes"""
-    pass
+function toggleQFields(){
+  const t=document.getElementById('q-type')?.value;
+  ['qf-mcq','qf-gap','qf-short'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  if(t==='mcq') document.getElementById('qf-mcq')?.classList.remove('hidden');
+  else if(t==='gap_fill') document.getElementById('qf-gap')?.classList.remove('hidden');
+  else document.getElementById('qf-short')?.classList.remove('hidden');
+}
+function clearAllCWQ(){
+  if(!confirm('Clear all questions for '+APP.week+'?'))return;
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);renderTab('cw-ctrl');
+}
+function setCWW(w){APP.week=w;renderTab('cw-ctrl')}
+function setCWStatus(open){
+  const s=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{});
+  s.is_open=open;if(open)s.open_time=new Date().toISOString();
+  S.set(`nm_cw_status_${APP.course.code}_${APP.week}`,s);
+  logLec(`Classwork ${open?'opened':'closed'} for ${APP.week}`);
+  toast(`Classwork ${open?'opened 🟢':'closed 🔴'}`,open?'success':'info');renderTab('cw-ctrl');
+}
+function setCWAnswerRelease(release){
+  const s=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{});
+  s.release_answers=release;S.set(`nm_cw_status_${APP.course.code}_${APP.week}`,s);
+  toast(release?'Answers released 📖':'Answers hidden 🔒',release?'success':'info');renderTab('cw-ctrl');
+}
+function addCWQ(){
+  const type=document.getElementById('q-type')?.value||'mcq';
+  const qtext=document.getElementById('q-text')?.value.trim();
+  if(!qtext){toast('Enter question text','error');return}
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(type==='mcq'){
+    const a=document.getElementById('q-a')?.value.trim(),b=document.getElementById('q-b')?.value.trim();
+    const c=document.getElementById('q-c')?.value.trim(),d=document.getElementById('q-d')?.value.trim();
+    const e=document.getElementById('q-e')?.value.trim();
+    const correct=document.getElementById('q-correct')?.value||'A';
+    const marks=parseInt(document.getElementById('q-marks-mcq')?.value||'1');
+    if(!a||!b||!c||!d){toast('Fill options A–D','error');return}
+    const opts={A:a,B:b,C:c,D:d};if(e)opts.E=e;
+    qs.push({type:'mcq',question:qtext,options:opts,correct_answer:correct,marks});
+  } else if(type==='gap_fill'){
+    const ans=document.getElementById('q-gap-ans')?.value.trim();
+    const marks=parseInt(document.getElementById('q-marks-gap')?.value||'1');
+    if(!ans){toast('Enter correct answer','error');return}
+    qs.push({type:'gap_fill',question:qtext,options:{},correct_answer:ans,marks});
+  } else {
+    const model=document.getElementById('q-model')?.value.trim();
+    const marks=parseInt(document.getElementById('q-marks-short')?.value||'5');
+    if(!model){toast('Enter model answer','error');return}
+    qs.push({type:'short_answer',question:qtext,options:{},correct_answer:model,model_answer:model,marks});
+  }
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);
+  toast('Question added ✅','success');renderTab('cw-ctrl');
+}
+function rmCWQ(i){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);qs.splice(i,1);
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);renderTab('cw-ctrl');
+}
+function bulkImportQs(){
+  const text=document.getElementById('bulk-q')?.value.trim();
+  if(!text){toast('Paste questions first','error');return}
+  const blocks=text.split(/\n(?=MCQ:|GAP:|SHORT:)/i);
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  let added=0;
+  blocks.forEach(block=>{
+    const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(!lines.length)return;
+    const head=lines[0];
+    if(/^MCQ:/i.test(head)){
+      const qtext=head.slice(4).trim();
+      const opts={};let correct='';let marks=1;
+      lines.slice(1).forEach(l=>{
+        const m=l.match(/^([A-E])[.)]\s*(.+)/i);
+        if(m)opts[m[1].toUpperCase()]=m[2].trim();
+        else if(/^correct:/i.test(l))correct=l.split(':')[1].trim().toUpperCase();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||1;
+      });
+      if(qtext&&Object.keys(opts).length&&correct){qs.push({type:'mcq',question:qtext,options:opts,correct_answer:correct,marks});added++;}
+    } else if(/^GAP:/i.test(head)){
+      const qtext=head.slice(4).trim();
+      let correct='';let marks=1;
+      lines.slice(1).forEach(l=>{
+        if(/^correct:/i.test(l))correct=l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||1;
+      });
+      if(qtext&&correct){qs.push({type:'gap_fill',question:qtext,options:{},correct_answer:correct,marks});added++;}
+    } else if(/^SHORT:/i.test(head)){
+      const qtext=head.slice(6).trim();
+      let model='';let marks=5;
+      lines.slice(1).forEach(l=>{
+        if(/^model:/i.test(l))model=l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||5;
+      });
+      if(qtext&&model){qs.push({type:'short_answer',question:qtext,options:{},correct_answer:model,model_answer:model,marks});added++;}
+    }
+  });
+  if(!added){toast('No valid questions found — check format','error');return}
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);
+  toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');renderTab('cw-ctrl');
+}
 
-if __name__ == "__main__":
-    main()
+function rAdmCWSubs(){
+  const list=S.get(`nm_att_list_${APP.course.code}_${APP.week}`,[]);
+  const subs=list.map(a=>{const s=S.get(`nm_cw_${APP.course.code}_${APP.week}_${a.matric}`,null);return s?{...s}:null}).filter(Boolean);
+  return ph('📝 Classwork Submissions',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setCWSW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Submissions — ${APP.week} (${subs.length})</div>
+    ${!subs.length?'<div class="al ai">No submissions yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Auto Score</th><th>%</th><th>Pending</th><th>Time</th></tr></thead>
+      <tbody>${subs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.auto_score||s.score||0}/${s.auto_total||s.total||0}</td><td>${s.pct||0}%</td><td>${s.pending_short?.length||0}</td><td>${new Date(s.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>`;
+}
+function setCWSW(w){APP.week=w;renderTab('cw-subs')}
+
+function rAdmGrading(){
+  return ph('🏅 Grading System',APP.course.name)+`
+  <div class="card"><div class="ct">Enter Scores</div>
+    <div class="fr"><div class="field"><label>Matric Number</label><input id="gm" placeholder="Matric…"></div>
+    <div class="field"><label>Student Name</label><input id="gn" placeholder="Full name…"></div></div>
+    <div class="field"><label>Week</label><select id="gw">${WEEKS.map(w=>`<option>${w}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;margin-bottom:.9rem">
+      <div class="field"><label>Assignment /100</label><input type="number" id="ga" value="0" min="0" max="100"></div>
+      <div class="field"><label>Test /100</label><input type="number" id="gt" value="0" min="0" max="100"></div>
+      <div class="field"><label>Practical /100</label><input type="number" id="gpr" value="0" min="0" max="100"></div>
+      <div class="field"><label>Classwork /100</label><input type="number" id="gc" value="0" min="0" max="100"></div>
+      <div class="field"><label>Exam /100</label><input type="number" id="ge" value="0" min="0" max="100"></div>
+    </div>
+    <button class="btn btn-p" onclick="saveScore()">💾 Save Score</button></div>`;
+}
+function saveScore(){
+  const m=document.getElementById('gm')?.value.trim(),n=document.getElementById('gn')?.value.trim();
+  const w=document.getElementById('gw')?.value;
+  if(!m||!n){toast('Enter student details','error');return}
+  const k='nm_scores_'+APP.course.code+'_'+m;const sc=S.get(k,{weeks:{}});
+  sc.weeks[w]={assignment:+document.getElementById('ga')?.value,test:+document.getElementById('gt')?.value,
+    practical:+document.getElementById('gpr')?.value,classwork:+document.getElementById('gc')?.value,exam:+document.getElementById('ge')?.value};
+  sc.name=n;sc.matric=m;S.set(k,sc);logLec(`Score saved: ${n} (${m}) ${w}`);toast('Score saved ✅','success');
+}
+
+function rAdmStuSubs(){
+  return ph('📂 Student Submissions',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setSSW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Assignments — ${APP.week}</div>${subList('assignment')}</div>
+  <div class="card"><div class="ct">Drawings — ${APP.week}</div>${subList('drawing')}</div>`;
+}
+function setSSW(w){APP.week=w;renderTab('stu-subs')}
+function subList(type){
+  const list=S.get(`nm_att_list_${APP.course.code}_${APP.week}`,[]);
+  const subs=list.map(a=>{const s=S.get(`nm_sub_${APP.course.code}_${APP.week}_${a.matric}_${type}`,null);return s?{...s,name:a.name,matric:a.matric}:null}).filter(Boolean);
+  if(!subs.length)return`<div class="al ai">No ${type} submissions for ${APP.week}.</div>`;
+  return`<div class="tw"><table><thead><tr><th>Name</th><th>Matric</th><th>File</th><th>Submitted</th></tr></thead>
+  <tbody>${subs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.filename}</td><td>${new Date(s.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function rAdmAnn(){
+  const anns=S.get('nm_announcements_'+APP.course.code,[]);
+  return ph('📢 Announcements',APP.course.name)+`
+  <div class="card"><div class="ct">Post Announcement</div>
+    <div class="field"><label>Title</label><input id="an-t" placeholder="Announcement title…"></div>
+    <div class="field"><label>Body</label><textarea id="an-b" placeholder="Message…"></textarea></div>
+    <button class="btn btn-p" onclick="postAnn()">📢 Post</button></div>
+  <div class="card"><div class="ct">All (${anns.length})</div>
+    ${!anns.length?'<div class="al ai">No announcements yet.</div>':anns.map((a,i)=>`
+    <div class="crow"><div><div class="crn">${a.title}</div>
+    <div class="crc">${new Date(a.ts).toLocaleDateString()} · ${a.active?'Active':'Inactive'}</div></div>
+    <div class="cra">
+      <button class="btn btn-s sm" onclick="tglAnn(${i})">${a.active?'Deactivate':'Activate'}</button>
+      <button class="btn btn-d sm" onclick="delAnn(${i})">🗑</button>
+    </div></div>`).join('')}</div>`;
+}
+function postAnn(){
+  const t=document.getElementById('an-t')?.value.trim(),b=document.getElementById('an-b')?.value.trim();
+  if(!t||!b){toast('Fill all fields','error');return}
+  const anns=S.get('nm_announcements_'+APP.course.code,[]);
+  anns.unshift({title:t,body:b,active:true,ts:new Date().toISOString()});
+  S.set('nm_announcements_'+APP.course.code,anns);logLec('Announcement: '+t);toast('Posted ✅','success');renderTab('ann-admin');
+}
+function tglAnn(i){const anns=S.get('nm_announcements_'+APP.course.code,[]);anns[i].active=!anns[i].active;S.set('nm_announcements_'+APP.course.code,anns);renderTab('ann-admin')}
+function delAnn(i){if(!confirm('Delete?'))return;const anns=S.get('nm_announcements_'+APP.course.code,[]);anns.splice(i,1);S.set('nm_announcements_'+APP.course.code,anns);renderTab('ann-admin')}
+
+function rAdmSeminar(){
+  const logs=S.get('nm_stu_log',[]).filter(l=>l.course===APP.course.code&&l.action==='Seminar submitted');
+  return ph('🎤 Seminar Submissions',APP.course.name)+`
+  <div class="card"><div class="ct">Submissions (${logs.length})</div>
+    ${!logs.length?'<div class="al ai">No seminar submissions yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Topic</th><th>Date</th><th>Action</th></tr></thead>
+      <tbody>${logs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.topic||'—'}</td>
+        <td>${new Date(s.ts).toLocaleDateString()}</td>
+        <td><button class="btn btn-s sm" onclick="semFbOpen('${s.matric}')">💬 Feedback</button></td></tr>`).join('')}</tbody>
+    </table></div>`}
+  </div>
+  <div class="card hidden" id="sem-fb-card"><div class="ct">Give Feedback</div>
+    <input id="sem-fb-matric" style="display:none">
+    <div class="field"><label>Feedback</label><textarea id="sem-fb-text" placeholder="Write feedback…"></textarea></div>
+    <button class="btn btn-p" onclick="saveSemFb()">💾 Save Feedback</button></div>`;
+}
+function semFbOpen(m){
+  document.getElementById('sem-fb-card')?.classList.remove('hidden');
+  document.getElementById('sem-fb-matric').value=m;
+}
+function saveSemFb(){
+  const m=document.getElementById('sem-fb-matric')?.value,t=document.getElementById('sem-fb-text')?.value.trim();
+  if(!m||!t){toast('Enter feedback','error');return}
+  S.set(`nm_sem_fb_${APP.course.code}_${m}`,{text:t,from:'Instructor',ts:new Date().toISOString()});
+  toast('Feedback saved ✅','success');document.getElementById('sem-fb-card')?.classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO SYSADMIN TABS
+// ═══════════════════════════════════════════════════════════
+function rSysOverview(){
+  const courses=getCourses();const logs=S.get('nm_stu_log',[]);const llogs=S.get('nm_lec_log',[]);
+  const today=new Date().toDateString();
+  return ph('🌐 System Overview','NeuroMatrix LMS','Live','bg')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${Object.keys(courses).length}</div><div class="ml">Courses</div></div>
+    <div class="metric"><div class="mv">${logs.length}</div><div class="ml">Student Actions</div></div>
+    <div class="metric"><div class="mv">${llogs.length}</div><div class="ml">Lecturer Actions</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>new Date(l.ts).toDateString()===today).length}</div><div class="ml">Today</div></div>
+  </div>
+  <div class="card"><div class="ct">Courses</div><div class="tw"><table>
+    <thead><tr><th>Course</th><th>Code</th><th>Password</th></tr></thead>
+    <tbody>${Object.entries(courses).map(([n,v])=>`<tr><td>${n}</td><td><span class="badge bc">${v.code}</span></td>
+      <td>${getPasswords()[v.code]?'Custom 🔐':'Default'}</td></tr>`).join('')}</tbody>
+  </table></div></div>
+  <div class="card"><div class="ct">Recent Activity</div>
+    ${[...logs].reverse().slice(0,8).map(l=>`
+    <div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.77rem">
+      <span><b>${l.name}</b> · ${l.action}</span>
+      <span style="color:var(--dim)">${new Date(l.ts).toLocaleString()}</span>
+    </div>`).join('')||'<div class="al ai">No activity yet.</div>'}</div>`;
+}
+
+function rSysCourses(){
+  const courses=getCourses();
+  return ph('📚 Course Management','Add, edit, remove courses')+`
+  <div class="card"><div class="ct">Add New Course</div>
+    <div class="fr"><div class="field"><label>Course Name</label><input id="sc-n" placeholder="e.g. Cell Biology…"></div>
+    <div class="field"><label>Course Code</label><input id="sc-c" placeholder="e.g. BIO401"></div></div>
+    <div class="field"><label>Interactive Notes URL</label><input id="sc-u" placeholder="https://…"></div>
+    <button class="btn btn-p" onclick="addSysCourse()">➕ Add Course</button></div>
+  <div class="card"><div class="ct">All Courses (${Object.keys(courses).length})</div>
+    ${Object.entries(courses).map(([n,v])=>`<div class="crow">
+      <div><div class="crn">${n}</div><div class="crc">${v.code}</div></div>
+      <button class="btn btn-d sm" onclick="rmSysCourse('${n.replace(/'/g,"\\'")}')">🗑</button>
+    </div>`).join('')}
+  <button class="btn btn-s" style="margin-top:.8rem" onclick="if(confirm('Reset to defaults?')){saveCourses({...DEFAULT_COURSES});toast('Reset ✅','info');renderTab('sys-courses')}">🔄 Reset to Default</button>
+  </div>`;
+}
+function addSysCourse(){
+  const n=document.getElementById('sc-n')?.value.trim(),c=document.getElementById('sc-c')?.value.trim().toUpperCase(),u=document.getElementById('sc-u')?.value.trim();
+  if(!n||!c){toast('Enter name and code','error');return}
+  const courses=getCourses();courses[n]={code:c,url:u||'https://neuromatrixbiosystems.com/'};
+  saveCourses(courses);toast('Course added ✅','success');renderTab('sys-courses');
+}
+function rmSysCourse(name){
+  if(!confirm(`Remove "${name}"?`))return;
+  const courses=getCourses();delete courses[name];saveCourses(courses);renderTab('sys-courses');
+}
+
+function rSysLogs(){
+  const llogs=S.get('nm_lec_log',[]),slogs=S.get('nm_stu_log',[]);
+  return ph('📋 Activity Logs')+`
+  <div class="itabs"><div class="itab on" onclick="switchLog(this,'ll')">Lecturer (${llogs.length})</div>
+    <div class="itab" onclick="switchLog(this,'sl')">Student (${slogs.length})</div></div>
+  <div id="ll" class="card"><div class="ct">Lecturer Activity</div>
+    ${!llogs.length?'<div class="al ai">No lecturer logs yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Course</th><th>Action</th><th>Time</th></tr></thead>
+      <tbody>${[...llogs].reverse().slice(0,50).map(l=>`<tr><td><span class="badge bv">${l.course}</span></td><td>${l.action}</td><td>${new Date(l.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>
+  <div id="sl" class="hidden card"><div class="ct">Student Activity</div>
+    ${!slogs.length?'<div class="al ai">No student logs yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Course</th><th>Action</th><th>Time</th></tr></thead>
+      <tbody>${[...slogs].reverse().slice(0,50).map(l=>`<tr><td>${l.name}</td><td>${l.matric}</td>
+        <td><span class="badge bc">${l.course}</span></td><td>${l.action}</td><td>${new Date(l.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>`;
+}
+function switchLog(el,id){
+  document.querySelectorAll('.itab').forEach(e=>e.classList.remove('on'));el.classList.add('on');
+  ['ll','sl'].forEach(i=>document.getElementById(i)?.classList.add('hidden'));
+  document.getElementById(id)?.classList.remove('hidden');
+}
+
+function rSysAnalytics(){
+  const courses=getCourses(),logs=S.get('nm_stu_log',[]);
+  const stats={};Object.values(courses).forEach(v=>{stats[v.code]={code:v.code,att:0,cw:0,sub:0}});
+  logs.forEach(l=>{if(!stats[l.course])return;if(l.action==='Attendance marked')stats[l.course].att++;
+    if(l.action==='Classwork submitted')stats[l.course].cw++;if(l.action?.includes('submitted'))stats[l.course].sub++;});
+  return ph('📈 Analytics')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action==='Attendance marked').length}</div><div class="ml">Total Attendances</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action==='Classwork submitted').length}</div><div class="ml">Classwork</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action?.includes('submitted')).length}</div><div class="ml">Total Submissions</div></div>
+  </div>
+  <div class="card"><div class="ct">Per-Course Engagement</div><div class="tw"><table>
+    <thead><tr><th>Code</th><th>Attendance</th><th>Classwork</th><th>Submissions</th></tr></thead>
+    <tbody>${Object.values(stats).map(s=>`<tr><td><span class="badge bc">${s.code}</span></td><td>${s.att}</td><td>${s.cw}</td><td>${s.sub}</td></tr>`).join('')}</tbody>
+  </table></div></div>`;
+}
+
+function rSysSettings(){
+  return ph('⚙️ Settings','System Administration')+`
+  <div class="card"><div class="ct">System Admin Password</div>
+    <div class="fr"><div class="field"><label>New Password</label><input type="password" id="sp1"></div>
+    <div class="field"><label>Confirm</label><input type="password" id="sp2"></div></div>
+    <button class="btn btn-p" onclick="changeSysPW()">🔄 Change</button></div>
+  <div class="card"><div class="ct">Bulk Course Password Reset</div>
+    <div class="field"><label>New password for all courses</label><input type="password" id="bp"></div>
+    <button class="btn btn-s" onclick="bulkPW()">🔑 Apply to All</button></div>
+  <div class="card"><div class="ct" style="color:var(--red)">⚠️ Danger Zone</div>
+    <button class="btn btn-d" onclick="if(confirm('Clear all logs?')){S.set('nm_stu_log',[]);S.set('nm_lec_log',[]);toast('Logs cleared','info')}">🗑 Clear All Logs</button></div>`;
+}
+function changeSysPW(){const p1=document.getElementById('sp1')?.value,p2=document.getElementById('sp2')?.value;
+  if(!p1){toast('Enter password','error');return}if(p1!==p2){toast('No match','error');return}
+  S.set('nm_sysadmin_pw',p1);toast('Password changed ✅','success');}
+function bulkPW(){const pw=document.getElementById('bp')?.value;if(!pw){toast('Enter password','error');return}
+  const pws=getPasswords();Object.values(getCourses()).forEach(v=>{pws[v.code]=pw});S.set('nm_passwords',pws);toast('All updated ✅','success');}
+
+// ═══════════════════════════════════════════════════════════
+// VOS 102 SYSTEM
+// ═══════════════════════════════════════════════════════════
+function vosRegisterScreen(){
+  hideAll();
+  const dept=document.getElementById('reg-dept');
+  dept.innerHTML='<option value="">Select department</option>'+VOS_DEPTS.map(d=>`<option>${d}</option>`).join('');
+  const lvl=document.getElementById('reg-level');
+  lvl.innerHTML=VOS_LEVELS.map(l=>`<option>${l}</option>`).join('');
+  showEl('vos-register','flex');
+}
+
+function vosLoginScreen(type){
+  hideAll();
+  VAPP.loginType=type;
+  document.getElementById('vos-login-title').textContent=type==='admin'?'🛠️ Admin Login':'🎓 Student Login';
+  document.getElementById('vos-login-label').textContent=type==='admin'?'Admin Username':'Matric Number';
+  document.getElementById('vos-un').value='';
+  document.getElementById('vos-pw').value='';
+  hideEl('vos-err');
+  showEl('vos-login','flex');
+}
+
+function vosRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const matric=document.getElementById('reg-matric').value.trim();
+  const dept=document.getElementById('reg-dept').value;
+  const level=document.getElementById('reg-level').value;
+  const phone=document.getElementById('reg-phone').value.trim();
+  const pw1=document.getElementById('reg-pw').value;
+  const pw2=document.getElementById('reg-pw2').value;
+  const err=document.getElementById('reg-err'),ok=document.getElementById('reg-ok');
+  hideEl('reg-err');hideEl('reg-ok');
+  if(!name||!matric||!dept||!pw1){err.textContent='❌ Fill all required fields.';showEl('reg-err');return;}
+  if(pw1!==pw2){err.textContent='❌ Passwords do not match.';showEl('reg-err');return;}
+  const students=S.get('vos_students',[]);
+  if(students.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){
+    err.textContent='❌ Matric number already registered.';showEl('reg-err');return;
+  }
+  students.push({id:'s_'+Date.now(),name,matric,dept,level,phone,pw:pw1,createdAt:new Date().toISOString()});
+  S.set('vos_students',students);
+  ok.textContent='✅ Registration successful! Redirecting to login…';showEl('reg-ok');
+  setTimeout(()=>vosLoginScreen('student'),1400);
+}
+
+function vosLogin(){
+  const id=document.getElementById('vos-un').value.trim();
+  const pw=document.getElementById('vos-pw').value;
+  if(!id||!pw){showEl('vos-err');return;}
+  if(VAPP.loginType==='admin'){
+    const admins=S.get('vos_admins',[]);
+    const a=admins.find(x=>x.username.toLowerCase()===id.toLowerCase()&&x.pw===pw);
+    if(!a){showEl('vos-err');return;}
+    VAPP.user={...a,type:'admin'};
+    buildVOSAdminShell();
+  } else {
+    const students=S.get('vos_students',[]);
+    const s=students.find(x=>x.matric.toUpperCase()===id.toUpperCase()&&x.pw===pw);
+    if(!s){showEl('vos-err');return;}
+    VAPP.user={...s,type:'student'};
+    buildVOSStudentShell();
+  }
+}
+
+function vosLogout(){VAPP.user=null;backToLanding();}
+
+const VOS_STUDENT_TABS=[
+  {id:'v-dashboard',ico:'🏠',label:'Dashboard'},
+  {id:'v-attendance',ico:'✅',label:'Mark Attendance'},
+  {id:'v-quiz',ico:'📝',label:'CBT Quiz'},
+  {id:'v-results',ico:'📊',label:'My Results'},
+  {id:'v-portfolio',ico:'🖼️',label:'Portfolio'},
+  {id:'v-notices',ico:'📢',label:'Announcements'},
+  {id:'v-profile',ico:'👤',label:'My Profile'},
+];
+const VOS_ADMIN_TABS=[
+  {id:'va-dashboard',ico:'🏠',label:'Dashboard'},
+  {id:'va-attendance',ico:'⏱️',label:'Attendance Control'},
+  {id:'va-students',ico:'👥',label:'Students'},
+  {id:'va-quiz',ico:'📋',label:'Quiz Manager'},
+  {id:'va-results',ico:'📊',label:'Results'},
+  {id:'va-notices',ico:'📢',label:'Announcements'},
+  {id:'va-export',ico:'📤',label:'Export Data'},
+];
+
+function buildVOSStudentShell(){
+  document.getElementById('vos-user-name').textContent=VAPP.user.name;
+  document.getElementById('vos-user-meta').textContent=`${VAPP.user.matric} · ${VAPP.user.dept} · L${VAPP.user.level}`;
+  buildNav('vos-sb-nav',VOS_STUDENT_TABS,'vos');
+  hideAll();
+  showEl('vos-shell','flex');
+  showEl('footer','');
+  vosSetTab('v-dashboard');
+}
+
+function buildVOSAdminShell(){
+  document.getElementById('vos-user-name').textContent=VAPP.user.full_name||VAPP.user.name;
+  document.getElementById('vos-user-meta').textContent=(VAPP.user.role||'admin').toUpperCase();
+  buildNav('vos-sb-nav',VOS_ADMIN_TABS,'vos');
+  hideAll();
+  showEl('vos-shell','flex');
+  showEl('footer','');
+  vosSetTab('va-dashboard');
+}
+
+function vosSetTab(id){
+  VAPP.tab=id;
+  document.querySelectorAll('#vos-sb-nav .ni').forEach(el=>el.classList.remove('active'));
+  document.getElementById('vni-'+id)?.classList.add('active');
+  vosRender(id);
+}
+
+function vosRender(id){
+  const c=document.getElementById('vos-tab-content');
+  const map={
+    'v-dashboard':vDashboard,'v-attendance':vAttendance,'v-quiz':vQuiz,
+    'v-results':vResults,'v-portfolio':vPortfolio,'v-notices':vNotices,'v-profile':vProfile,
+    'va-dashboard':vaDashboard,'va-attendance':vaAttendance,'va-students':vaStudents,
+    'va-quiz':vaQuiz,'va-results':vaResults,'va-notices':vaNotices,'va-export':vaExport,
+  };
+  c.innerHTML=`<div class="tab-panel">${(map[id]||(()=>'<div class="al ai">Coming soon.</div>'))()}</div>`;
+}
+
+// ── VOS STUDENT
+function vDashboard(){
+  const u=VAPP.user;
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===u.matric);
+  const qr=S.get('vos_quiz_results',[]).filter(r=>r.matric===u.matric);
+  const ports=S.get('vos_portfolios',[]).filter(p=>p.matric===u.matric);
+  return ph('🏠 Welcome, '+u.name.split(' ')[0],u.dept+' · Level '+u.level)+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Present').length}</div><div class="ml">Present</div></div>
+    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Late').length}</div><div class="ml">Late</div></div>
+    <div class="metric"><div class="mv">${qr.length}</div><div class="ml">Quizzes Taken</div></div>
+    <div class="metric"><div class="mv">${ports.length}</div><div class="ml">Portfolio Items</div></div>
+  </div>
+  <div class="card"><div class="ct">🎯 My Modules</div>
+    ${VOS_MODULES.map(m=>{
+      const cnt=att.filter(a=>a.module===m.id).length;
+      return `<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${cnt} session(s)</div></div></div>`;
+    }).join('')}
+  </div>`;
+}
+
+function vAttendance(){
+  const settings=S.get('vos_att_settings',{});
+  const att=S.get('vos_attendance',[]);
+  const today=new Date().toDateString();
+  let html=ph('✅ Mark Attendance','Select your module');
+  VOS_MODULES.forEach(m=>{
+    const s=settings[m.id]||{open:false};
+    const already=att.find(a=>a.matric===VAPP.user.matric&&a.module===m.id&&new Date(a.date).toDateString()===today);
+    let body='';
+    if(already){
+      body=`<div class="al as">✅ Already marked today as ${already.status} at ${already.time}</div>`;
+    } else if(!s.open){
+      body=`<div class="al ae">🔴 Attendance is CLOSED</div>`;
+    } else {
+      body=`<div class="al as">🟢 Attendance is OPEN</div>
+        <button class="btn btn-p" onclick="vMarkAtt('${m.id}','Present')">✅ Mark Present</button>
+        <button class="btn btn-s" onclick="vMarkAtt('${m.id}','Late')">🟡 Mark Late</button>`;
+    }
+    html+=`<div class="card"><div class="ct">${m.icon} ${m.name}</div>${body}</div>`;
+  });
+  return html;
+}
+
+function vMarkAtt(moduleId,status){
+  const att=S.get('vos_attendance',[]);
+  att.push({
+    id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,
+    module:moduleId,date:new Date().toISOString(),
+    time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),
+    status,
+  });
+  S.set('vos_attendance',att);
+  toast(`Marked ${status} ✅`,'success');
+  vosRender('v-attendance');
+}
+
+function vQuiz(){
+  const quizzes=S.get('vos_quizzes',[]).filter(q=>q.published);
+  const results=S.get('vos_quiz_results',[]).filter(r=>r.matric===VAPP.user.matric);
+  if(!quizzes.length) return ph('📝 CBT Quiz')+'<div class="al ai">No quizzes available right now.</div>';
+  return ph('📝 CBT Quiz','Available quizzes')+
+    quizzes.map(q=>{
+      const done=results.find(r=>r.quizId===q.id);
+      const m=VOS_MODULES.find(mm=>mm.id===q.module);
+      return `<div class="card"><div class="ct">${m?m.icon:'📝'} ${q.title}</div>
+        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} · ${q.questions.length} questions · ${q.duration} mins</p>
+        ${done?`<div class="al as">✅ Completed — Score: ${done.score}/${done.total} (${done.percent}%)</div>`
+              :`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz →</button>`}
+      </div>`;
+    }).join('');
+}
+
+let vQuizState=null;
+function vStartQuiz(id){
+  const q=S.get('vos_quizzes',[]).find(x=>x.id===id);
+  if(!q)return;
+  vQuizState={quiz:q,current:0,answers:{},timeLeft:q.duration*60};
+  vRenderQ();
+  vQuizState.timer=setInterval(()=>{
+    vQuizState.timeLeft--;
+    const t=document.getElementById('v-timer');
+    if(t){
+      const mn=Math.floor(vQuizState.timeLeft/60),sc=vQuizState.timeLeft%60;
+      t.textContent=`${mn}:${String(sc).padStart(2,'0')}`;
+    }
+    if(vQuizState.timeLeft<=0){clearInterval(vQuizState.timer);vSubmitQuiz();}
+  },1000);
+}
+function vRenderQ(){
+  const {quiz,current,answers,timeLeft}=vQuizState;
+  const q=quiz.questions[current];
+  const mn=Math.floor(timeLeft/60),sc=timeLeft%60;
+  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
+        <span style="font-size:.75rem;color:var(--dim)">Question ${current+1} of ${quiz.questions.length}</span>
+        <span id="v-timer" class="badge ba">${mn}:${String(sc).padStart(2,'0')}</span>
+      </div>
+      <div class="mqt" style="margin-top:.5rem">${current+1}. ${q.text}</div>
+      <div class="mopts">
+        ${q.options.map((opt,i)=>`<div class="mopt ${answers[current]===i?'sel':''}" onclick="vSelectAns(${i})">
+          <b>${String.fromCharCode(65+i)}.</b> ${opt}</div>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem">
+        ${current>0?`<button class="btn btn-s" onclick="vNavQ(-1)">← Previous</button>`:'<span></span>'}
+        ${current<quiz.questions.length-1?
+          `<button class="btn btn-p" onclick="vNavQ(1)">Next →</button>`:
+          `<button class="btn btn-g" onclick="vSubmitQuiz()">Submit ✓</button>`}
+      </div>
+    </div></div>`;
+}
+function vSelectAns(i){vQuizState.answers[vQuizState.current]=i;vRenderQ();}
+function vNavQ(d){vQuizState.current+=d;vRenderQ();}
+function vSubmitQuiz(){
+  if(vQuizState.timer)clearInterval(vQuizState.timer);
+  const {quiz,answers}=vQuizState;
+  let score=0;
+  quiz.questions.forEach((q,i)=>{if(answers[i]===q.correct)score++;});
+  const result={id:'qr_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
+    quizId:quiz.id,quizTitle:quiz.title,module:quiz.module,score,total:quiz.questions.length,
+    percent:Math.round(score/quiz.questions.length*100),date:new Date().toISOString()};
+  const results=S.get('vos_quiz_results',[]);results.push(result);S.set('vos_quiz_results',results);
+  vQuizState=null;
+  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel">
+    <div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:3rem">${result.percent>=70?'🏆':result.percent>=50?'👍':'📚'}</div>
+      <h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted</h2>
+      <p style="color:var(--dim)">${result.quizTitle}</p>
+      <div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">${score}/${result.total}</div>
+      <div style="font-size:1.2rem">${result.percent}%</div>
+      <button class="btn btn-p" style="margin-top:1.2rem" onclick="vosSetTab('v-quiz')">Back to Quizzes</button>
+    </div></div>`;
+}
+
+function vResults(){
+  const results=S.get('vos_quiz_results',[]).filter(r=>r.matric===VAPP.user.matric);
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===VAPP.user.matric);
+  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percent,0)/results.length):0;
+  return ph('📊 My Results')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${results.length}</div><div class="ml">Quizzes</div></div>
+    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Average</div></div>
+    <div class="metric"><div class="mv">${att.length}</div><div class="ml">Attendance</div></div>
+  </div>
+  <div class="card"><div class="ct">Quiz Results</div>
+    ${results.length?`<div class="tw"><table>
+      <thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
+      <tbody>${results.map(r=>`<tr><td>${r.quizTitle}</td><td>${VOS_MODULES.find(m=>m.id===r.module)?.name||'—'}</td>
+        <td>${r.score}/${r.total}</td><td>${r.percent}%</td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No quiz results yet.</div>'}
+  </div>
+  <div class="card"><div class="ct">Attendance</div>
+    ${att.length?`<div class="tw"><table>
+      <thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody>${att.map(a=>`<tr><td>${VOS_MODULES.find(m=>m.id===a.module)?.name||a.module}</td>
+        <td>${new Date(a.date).toLocaleDateString()}</td><td>${a.time}</td>
+        <td><span class="badge ${a.status==='Present'?'bg':'ba'}">${a.status}</span></td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No attendance records yet.</div>'}
+  </div>`;
+}
+
+function vPortfolio(){
+  const ports=S.get('vos_portfolios',[]).filter(p=>p.matric===VAPP.user.matric);
+  return ph('🖼️ My Portfolio','Upload practical work photos')+`
+  <div class="card"><div class="ct">➕ Upload Practical Work</div>
+    <div class="field"><label>Module</label>
+      <select id="port-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
+    <div class="field"><label>Caption</label><input id="port-caption" placeholder="What did you make?"></div>
+    <div class="field"><label>Photo</label><input type="file" id="port-file" accept="image/*"></div>
+    <button class="btn btn-p" onclick="vUploadPort()">📸 Upload</button>
+  </div>
+  <div class="card"><div class="ct">🖼️ My Items (${ports.length})</div>
+    ${ports.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem">
+      ${ports.map(p=>`<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        ${p.thumb?`<img src="${p.thumb}" style="width:100%;height:120px;object-fit:cover">`:'<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--panel)">🖼️</div>'}
+        <div style="padding:.5rem;font-size:.7rem"><b>${p.caption}</b><br><span style="color:var(--dim)">${VOS_MODULES.find(m=>m.id===p.module)?.icon||''} ${new Date(p.date).toLocaleDateString()}</span></div>
+      </div>`).join('')}
+    </div>`:'<div class="al ai">No items yet.</div>'}
+  </div>`;
+}
+function vUploadPort(){
+  const moduleId=document.getElementById('port-module').value;
+  const caption=document.getElementById('port-caption').value.trim();
+  const file=document.getElementById('port-file').files[0];
+  if(!caption){toast('Add a caption','error');return}
+  const save=thumb=>{
+    const ports=S.get('vos_portfolios',[]);
+    ports.push({id:'p_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
+      module:moduleId,caption,thumb,date:new Date().toISOString()});
+    S.set('vos_portfolios',ports);
+    toast('Uploaded ✅','success');vosRender('v-portfolio');
+  };
+  if(file){
+    if(file.size>5*1024*1024){toast('Max 5MB','error');return}
+    const r=new FileReader();r.onload=e=>save(e.target.result);r.readAsDataURL(file);
+  } else save('');
+}
+
+function vNotices(){
+  const ann=S.get('vos_announcements',[]).slice().reverse();
+  return ph('📢 Announcements')+(ann.length?ann.map(a=>`
+    <div class="card" style="${a.priority==='urgent'?'border-color:rgba(239,68,68,.4)':''}">
+      <div class="ct">${a.priority==='urgent'?'🔴 ':''}${a.title}</div>
+      <p style="font-size:.78rem;color:var(--dim);margin-bottom:.4rem">${new Date(a.createdAt).toLocaleString()} · ${a.author}</p>
+      <p style="font-size:.83rem;line-height:1.6">${a.body}</p>
+    </div>`).join(''):'<div class="al ai">No announcements yet.</div>');
+}
+
+function vProfile(){
+  const u=VAPP.user;
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===u.matric);
+  return ph('👤 My Profile')+`
+  <div class="card">
+    <div class="istrip">
+      <div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+      <div><div class="in">${u.name}</div><div class="im">${u.dept} · Level ${u.level}</div></div>
+    </div>
+    <div class="fr">
+      <div><div class="ml">Matric</div><div class="crn">${u.matric}</div></div>
+      <div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div>
+      <div><div class="ml">Total Attendance</div><div class="crn">${att.length} sessions</div></div>
+      <div><div class="ml">Member Since</div><div class="crn">${new Date(u.createdAt).toLocaleDateString()}</div></div>
+    </div>
+  </div>`;
+}
+
+// ── VOS ADMIN
+function vaDashboard(){
+  const students=S.get('vos_students',[]);
+  const att=S.get('vos_attendance',[]);
+  const today=new Date().toDateString();
+  return ph('🏠 Admin Dashboard','VOS 102 Overview')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${students.length}</div><div class="ml">Students</div></div>
+    <div class="metric"><div class="mv">${att.filter(a=>new Date(a.date).toDateString()===today).length}</div><div class="ml">Today</div></div>
+    <div class="metric"><div class="mv">${S.get('vos_quizzes',[]).filter(q=>q.published).length}</div><div class="ml">Active Quizzes</div></div>
+    <div class="metric"><div class="mv">${S.get('vos_announcements',[]).length}</div><div class="ml">Announcements</div></div>
+  </div>
+  <div class="card"><div class="ct">📋 Module Attendance</div>
+    ${VOS_MODULES.map(m=>{
+      const ma=att.filter(a=>a.module===m.id);
+      return `<div class="crow">
+        <div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${ma.length} entries</div></div>
+        <div><span class="badge bg">${ma.filter(a=>a.status==='Present').length} P</span> 
+          <span class="badge ba">${ma.filter(a=>a.status==='Late').length} L</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function vaAttendance(){
+  const settings=S.get('vos_att_settings',{});
+  return ph('⏱️ Attendance Control','Open/close per module')+
+    VOS_MODULES.map(m=>{
+      const s=settings[m.id]||{open:false};
+      return `<div class="card">
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem">
+          <span style="font-size:1.6rem">${m.icon}</span>
+          <div style="flex:1"><div class="crn">${m.name}</div></div>
+          <span class="badge ${s.open?'bg':'br'}">${s.open?'OPEN':'CLOSED'}</span>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <button class="btn btn-g" onclick="vaSetAtt('${m.id}',true)">🟢 Open</button>
+          <button class="btn btn-d" onclick="vaSetAtt('${m.id}',false)">🔴 Close</button>
+          <button class="btn btn-s" onclick="vaViewRoll('${m.id}')">📋 View Roll</button>
+        </div>
+      </div>`;
+    }).join('');
+}
+function vaSetAtt(id,open){
+  const s=S.get('vos_att_settings',{});s[id]={...(s[id]||{}),open};S.set('vos_att_settings',s);
+  toast(`${open?'Opened':'Closed'} ✅`,open?'success':'info');vosRender('va-attendance');
+}
+function vaViewRoll(id){
+  const att=S.get('vos_attendance',[]).filter(a=>a.module===id);
+  const m=VOS_MODULES.find(x=>x.id===id);
+  alert(`${m.name} — ${att.length} entries\n\n`+att.slice(0,20).map(a=>`${a.name} (${a.matric}) · ${a.status} · ${new Date(a.date).toLocaleDateString()}`).join('\n')||'No entries');
+}
+
+function vaStudents(){
+  const students=S.get('vos_students',[]);
+  const att=S.get('vos_attendance',[]);
+  return ph('👥 Students',`${students.length} registered`)+
+  `<div class="card"><div class="tw"><table>
+    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Level</th><th>Phone</th><th>Att.</th></tr></thead>
+    <tbody>${students.length?students.map((s,i)=>`<tr>
+      <td>${i+1}</td><td>${s.name}</td><td>${s.matric}</td><td>${s.dept}</td>
+      <td>${s.level}</td><td>${s.phone||'—'}</td>
+      <td>${att.filter(a=>a.matric===s.matric).length}</td>
+    </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--dim);padding:2rem">No students registered yet</td></tr>'}</tbody>
+  </table></div></div>`;
+}
+
+let vQuizDraft=[];
+function vaQuiz(){
+  const quizzes=S.get('vos_quizzes',[]);
+  vQuizDraft=[];
+  return ph('📋 Quiz Manager')+`
+  <div class="card"><div class="ct">➕ Create Quiz</div>
+    <div class="field"><label>Title</label><input id="qm-title" placeholder="Quiz title"></div>
+    <div class="fr">
+      <div class="field"><label>Module</label>
+        <select id="qm-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
+      <div class="field"><label>Duration (mins)</label><input type="number" id="qm-dur" value="20" min="1"></div>
+    </div>
+    <div id="qm-questions"></div>
+    <button class="btn btn-s sm" onclick="vAddQ()">+ Add Question</button>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-p" onclick="vSaveQuiz(false)">💾 Save Draft</button>
+      <button class="btn btn-g" onclick="vSaveQuiz(true)">📢 Publish</button>
+    </div>
+  </div>
+  <div class="card"><div class="ct">All Quizzes (${quizzes.length})</div>
+    ${quizzes.length?quizzes.map(q=>`<div class="crow">
+      <div><div class="crn">${q.title}</div>
+        <div class="crc">${VOS_MODULES.find(m=>m.id===q.module)?.name} · ${q.questions.length} Qs · ${q.duration}min</div></div>
+      <div class="cra">
+        <span class="badge ${q.published?'bg':'bv'}">${q.published?'Published':'Draft'}</span>
+        ${!q.published?`<button class="btn btn-g sm" onclick="vPubQuiz('${q.id}')">Publish</button>`:''}
+        <button class="btn btn-d sm" onclick="vDelQuiz('${q.id}')">🗑</button>
+      </div>
+    </div>`).join(''):'<div class="al ai">No quizzes yet.</div>'}
+  </div>`;
+}
+function vAddQ(){
+  const idx=vQuizDraft.length;
+  vQuizDraft.push({text:'',options:['','','',''],correct:0});
+  const div=document.createElement('div');
+  div.id='qm-q-'+idx;
+  div.className='card';
+  div.style.background='var(--panel)';
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
+      <b style="color:var(--cyan);font-size:.8rem">QUESTION ${idx+1}</b>
+      <button class="btn btn-d sm" onclick="vRmQ(${idx})">✕</button>
+    </div>
+    <input placeholder="Question text" style="margin-bottom:.4rem" onchange="vQuizDraft[${idx}].text=this.value">
+    ${['A','B','C','D'].map((l,i)=>`
+      <div style="display:flex;gap:.4rem;margin-bottom:.3rem;align-items:center">
+        <input type="radio" name="c-${idx}" value="${i}" ${i===0?'checked':''} onchange="vQuizDraft[${idx}].correct=${i}">
+        <input placeholder="Option ${l}" onchange="vQuizDraft[${idx}].options[${i}]=this.value" style="flex:1">
+      </div>`).join('')}`;
+  document.getElementById('qm-questions').appendChild(div);
+}
+function vRmQ(i){document.getElementById('qm-q-'+i)?.remove();vQuizDraft.splice(i,1);}
+function vSaveQuiz(publish){
+  const title=document.getElementById('qm-title').value.trim();
+  const module=document.getElementById('qm-module').value;
+  const duration=parseInt(document.getElementById('qm-dur').value)||20;
+  if(!title){toast('Enter title','error');return}
+  if(!vQuizDraft.length){toast('Add at least 1 question','error');return}
+  const quizzes=S.get('vos_quizzes',[]);
+  quizzes.push({id:'q_'+Date.now(),title,module,duration,
+    questions:vQuizDraft.map(q=>({...q})),published:publish,createdAt:new Date().toISOString(),
+    author:VAPP.user.full_name||VAPP.user.name});
+  S.set('vos_quizzes',quizzes);
+  toast(publish?'Published ✅':'Draft saved','success');
+  vosRender('va-quiz');
+}
+function vPubQuiz(id){
+  const qs=S.get('vos_quizzes',[]);const q=qs.find(x=>x.id===id);
+  if(q){q.published=true;S.set('vos_quizzes',qs);toast('Published ✅','success');vosRender('va-quiz');}
+}
+function vDelQuiz(id){
+  if(!confirm('Delete?'))return;
+  S.set('vos_quizzes',S.get('vos_quizzes',[]).filter(q=>q.id!==id));
+  vosRender('va-quiz');
+}
+
+function vaResults(){
+  const results=S.get('vos_quiz_results',[]);
+  return ph('📊 Results',`${results.length} attempts`)+`
+  <div class="card"><div class="tw"><table>
+    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Quiz</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
+    <tbody>${results.length?results.sort((a,b)=>b.percent-a.percent).map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${r.name}</td><td>${r.matric}</td><td>${r.dept||'—'}</td>
+      <td>${r.quizTitle}</td><td>${r.score}/${r.total}</td>
+      <td><b>${r.percent}%</b></td><td>${new Date(r.date).toLocaleDateString()}</td>
+    </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:2rem">No results yet</td></tr>'}</tbody>
+  </table></div></div>`;
+}
+
+function vaNotices(){
+  const ann=S.get('vos_announcements',[]).slice().reverse();
+  return ph('📢 Announcements')+`
+  <div class="card"><div class="ct">✍️ New Announcement</div>
+    <div class="field"><label>Title</label><input id="an-title" placeholder="Title"></div>
+    <div class="field"><label>Body</label><textarea id="an-body" placeholder="Message…"></textarea></div>
+    <div class="field"><label>Priority</label>
+      <select id="an-pri"><option value="normal">Normal</option><option value="urgent">Urgent</option></select></div>
+    <button class="btn btn-p" onclick="vaPostAnn()">📢 Post</button>
+  </div>
+  <div class="card"><div class="ct">Posted (${ann.length})</div>
+    ${ann.length?ann.map(a=>`<div class="crow">
+      <div><div class="crn">${a.priority==='urgent'?'🔴 ':''}${a.title}</div>
+        <div class="crc">${new Date(a.createdAt).toLocaleString()} · ${a.author}</div></div>
+      <button class="btn btn-d sm" onclick="vaDelAnn('${a.id}')">🗑</button>
+    </div>`).join(''):'<div class="al ai">No announcements yet.</div>'}
+  </div>`;
+}
+function vaPostAnn(){
+  const title=document.getElementById('an-title').value.trim();
+  const body=document.getElementById('an-body').value.trim();
+  const priority=document.getElementById('an-pri').value;
+  if(!title||!body){toast('Fill all fields','error');return}
+  const ann=S.get('vos_announcements',[]);
+  ann.push({id:'a_'+Date.now(),title,body,priority,
+    author:VAPP.user.full_name||VAPP.user.name,createdAt:new Date().toISOString()});
+  S.set('vos_announcements',ann);
+  toast('Posted ✅','success');vosRender('va-notices');
+}
+function vaDelAnn(id){
+  S.set('vos_announcements',S.get('vos_announcements',[]).filter(a=>a.id!==id));
+  vosRender('va-notices');
+}
+
+function vaExport(){
+  return ph('📤 Export Data','Download as Excel (.xlsx)')+`
+  <div class="card"><div class="ct">📋 Export Attendance</div>
+    <button class="btn btn-p" onclick="vaExportAtt()">⬇️ Download Attendance</button></div>
+  <div class="card"><div class="ct">📊 Export Quiz Results</div>
+    <button class="btn btn-p" onclick="vaExportRes()">⬇️ Download Results</button></div>
+  <div class="card"><div class="ct">👥 Export Students</div>
+    <button class="btn btn-p" onclick="vaExportStu()">⬇️ Download Students</button></div>`;
+}
+function vaExportAtt(){
+  const rows=S.get('vos_attendance',[]).map(a=>({
+    Matric:a.matric,Name:a.name,Department:a.dept||'',Level:a.level||'',
+    Module:VOS_MODULES.find(m=>m.id===a.module)?.name||a.module,
+    Date:new Date(a.date).toLocaleDateString('en-NG'),Time:a.time,Status:a.status,
+  }));
+  vaXlsx(rows,'VOS102_Attendance');
+}
+function vaExportRes(){
+  const rows=S.get('vos_quiz_results',[]).map(r=>({
+    Matric:r.matric,Name:r.name,Department:r.dept||'',Quiz:r.quizTitle,
+    Module:VOS_MODULES.find(m=>m.id===r.module)?.name||r.module,
+    Score:r.score,Total:r.total,Percent:r.percent+'%',
+    Date:new Date(r.date).toLocaleDateString('en-NG'),
+  }));
+  vaXlsx(rows,'VOS102_Results');
+}
+function vaExportStu(){
+  const att=S.get('vos_attendance',[]);
+  const rows=S.get('vos_students',[]).map(s=>({
+    Name:s.name,Matric:s.matric,Department:s.dept,Level:s.level,
+    Phone:s.phone||'',Attendance:att.filter(a=>a.matric===s.matric).length,
+    Registered:new Date(s.createdAt).toLocaleDateString('en-NG'),
+  }));
+  vaXlsx(rows,'VOS102_Students');
+}
+function vaXlsx(rows,filename){
+  if(!rows.length){toast('No data','error');return}
+  if(typeof XLSX==='undefined'){toast('XLSX not loaded','error');return}
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Data');
+  XLSX.writeFile(wb,filename+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Downloaded ✅','success');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+initVOSDefaults();
+</script>
+</body>
+</html>
