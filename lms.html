@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroMatrix LMS — Sikiru Adetona College of Education Science and Technology</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --ink:#080d18;--surface:#0f1724;--panel:#141e30;--border:#1c2d44;
+  --muted:#2a4060;--dim:#6a8aaa;--text:#ddeeff;--bright:#ffffff;
+  --cyan:#00d4ff;--violet:#7c3aed;--green:#10b981;--amber:#f59e0b;
+  --red:#ef4444;--pink:#ec4899;
+  --head:'Syne', sans-serif;--mono:'DM Mono', monospace;--serif:'Fraunces', serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--mono);background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);
+  background-size:64px 64px}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+.shell{display:none;flex-direction:row;min-height:100vh}
+.sb{width:252px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:1.4rem .9rem;gap:0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
+.sb-logo{font-family:var(--head);font-size:1.05rem;font-weight:800;color:var(--cyan);
+  display:flex;align-items:center;gap:.55rem;padding:.4rem .4rem 1.4rem;letter-spacing:-.02em}
+.sb-logo span{font-size:1.35rem}
+.sb-sect{font-size:.62rem;color:var(--muted);letter-spacing:.13em;text-transform:uppercase;padding:.8rem .4rem .35rem}
+.sb-nav{display:flex;flex-direction:column;gap:.18rem;flex:1}
+.ni{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:9px;
+  cursor:pointer;font-size:.8rem;color:var(--dim);transition:all .18s;border:1px solid transparent}
+.ni:hover{background:var(--panel);color:var(--text)}
+.ni.active{background:rgba(0,212,255,.1);color:var(--cyan);border-color:rgba(0,212,255,.22)}
+.ni .ico{font-size:.95rem;flex-shrink:0;width:1.1rem;text-align:center}
+.sb-sel{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);font-family:var(--mono);font-size:.8rem;padding:.5rem .85rem;width:100%;cursor:pointer;outline:none;margin-bottom:.45rem}
+.sb-sel:focus{border-color:var(--cyan)}
+.sb-foot{margin-top:auto;padding-top:1rem;border-top:1px solid var(--border)}
+.back-btn{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.75rem;
+  color:var(--dim);padding:.45rem .5rem;border-radius:8px;transition:all .18s}
+.back-btn:hover{color:var(--red);background:rgba(239,68,68,.06)}
+.content{flex:1;padding:2rem 2.4rem;overflow-y:auto}
+.tab-panel{animation:fadeUp .22s ease}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.8rem;gap:1rem;flex-wrap:wrap}
+.pt{font-family:var(--head);font-size:1.6rem;font-weight:800;color:var(--bright);line-height:1.1;letter-spacing:-.025em}
+.ps{font-size:.76rem;color:var(--dim);margin-top:.25rem}
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .85rem;border-radius:40px;font-size:.7rem;font-weight:600}
+.bc{background:rgba(0,212,255,.09);color:var(--cyan);border:1px solid rgba(0,212,255,.22)}
+.bg{background:rgba(16,185,129,.09);color:var(--green);border:1px solid rgba(16,185,129,.22)}
+.ba{background:rgba(245,158,11,.09);color:var(--amber);border:1px solid rgba(245,158,11,.22)}
+.br{background:rgba(239,68,68,.09);color:var(--red);border:1px solid rgba(239,68,68,.22)}
+.bv{background:rgba(124,58,237,.09);color:#a78bfa;border:1px solid rgba(124,58,237,.22)}
+.bp{background:rgba(236,72,153,.09);color:var(--pink);border:1px solid rgba(236,72,153,.22)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.1rem}
+.ct{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright);margin-bottom:.9rem}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.4rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:1rem}
+.mv{font-family:var(--head);font-size:1.65rem;font-weight:800;color:var(--cyan)}
+.ml{font-size:.7rem;color:var(--dim);margin-top:.2rem}
+.field{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.9rem}
+label{font-size:.74rem;color:var(--dim);letter-spacing:.04em}
+input,textarea,select{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+  padding:.65rem .95rem;color:var(--text);font-family:var(--mono);font-size:.82rem;width:100%;outline:none;transition:border-color .18s}
+input:focus,textarea:focus,select:focus{border-color:var(--cyan)}
+textarea{resize:vertical;min-height:80px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  padding:.6rem 1.3rem;border-radius:9px;border:none;cursor:pointer;
+  font-family:var(--mono);font-size:.8rem;font-weight:500;transition:all .18s}
+.btn-p{background:var(--cyan);color:var(--ink)}
+.btn-p:hover{background:#00bbd8;transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,212,255,.22)}
+.btn-s{background:var(--panel);color:var(--text);border:1px solid var(--border)}
+.btn-s:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-d{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.28)}
+.btn-d:hover{background:rgba(239,68,68,.22)}
+.btn-g{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.28)}
+.btn-g:hover{background:rgba(16,185,129,.22)}
+.btn-v{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.28)}
+.sm{padding:.38rem .8rem;font-size:.73rem;border-radius:7px}
+.full{width:100%}
+.al{padding:.8rem 1rem;border-radius:11px;font-size:.8rem;margin-bottom:.9rem;display:flex;align-items:flex-start;gap:.55rem;line-height:1.5}
+.ai{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.18);color:var(--cyan)}
+.as{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);color:var(--green)}
+.aw{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.18);color:var(--amber)}
+.ae{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.18);color:var(--red)}
+.tw{overflow-x:auto;border-radius:11px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.77rem}
+th{background:var(--panel);color:var(--dim);font-size:.67rem;letter-spacing:.08em;text-transform:uppercase;padding:.75rem .95rem;text-align:left}
+td{padding:.7rem .95rem;border-top:1px solid var(--border);color:var(--text)}
+tr:hover td{background:var(--panel)}
+.itabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1.4rem;flex-wrap:wrap}
+.itab{padding:.55rem .95rem;font-size:.77rem;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;transition:all .18s}
+.itab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.itab:hover{color:var(--text)}
+.wstrip{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:1.4rem}
+.wc{padding:.32rem .78rem;border-radius:7px;font-size:.72rem;cursor:pointer;
+  background:var(--panel);border:1px solid var(--border);color:var(--dim);transition:all .13s}
+.wc.on{background:rgba(0,212,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.wc:hover{border-color:var(--cyan);color:var(--cyan)}
+.mq{margin-bottom:1.4rem}
+.mqt{font-size:.87rem;color:var(--text);margin-bottom:.7rem;font-weight:500}
+.mopts{display:flex;flex-direction:column;gap:.45rem}
+.mopt{display:flex;align-items:center;gap:.75rem;padding:.65rem .95rem;
+  border-radius:9px;border:1px solid var(--border);cursor:pointer;transition:all .13s;font-size:.8rem}
+.mopt:hover{border-color:var(--cyan);background:rgba(0,212,255,.04)}
+.mopt.sel{border-color:var(--cyan);background:rgba(0,212,255,.09);color:var(--cyan)}
+.mopt.ok{border-color:var(--green);background:rgba(16,185,129,.09);color:var(--green)}
+.mopt.wrong{border-color:var(--red);background:rgba(239,68,68,.09);color:var(--red)}
+.pbw{background:var(--panel);border-radius:99px;height:7px;overflow:hidden}
+.pbf{height:100%;border-radius:99px;transition:width .5s ease;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+.istrip{display:flex;align-items:center;gap:.9rem;background:var(--panel);
+  border-radius:13px;padding:.9rem 1.1rem;border:1px solid var(--border);margin-bottom:1.4rem}
+.iav{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--violet));
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.in{font-family:var(--head);font-size:.9rem;font-weight:700}
+.im{font-size:.72rem;color:var(--dim)}
+.crow{display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1.05rem;border-radius:11px;background:var(--panel);
+  border:1px solid var(--border);margin-bottom:.55rem;gap:.9rem}
+.crn{font-size:.85rem;font-weight:600;color:var(--text)}
+.crc{font-size:.7rem;color:var(--cyan)}
+.cra{display:flex;gap:.45rem}
+.timer{font-family:var(--head);font-size:2.5rem;font-weight:800;color:var(--amber);text-align:center;margin:1rem 0}
+.timer.urgent{color:var(--red);animation:pulse 1s infinite}
+#landing{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:2rem;text-align:center;gap:1.8rem}
+.hero-badge{display:inline-flex;align-items:center;gap:.45rem;
+  background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.28);border-radius:40px;
+  padding:.38rem 1.1rem;font-size:.72rem;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;
+  animation:fadeUp .5s ease both}
+.hero-title{font-family:var(--head);font-size:clamp(2.6rem,7vw,5.5rem);font-weight:800;line-height:.93;
+  letter-spacing:-.035em;background:linear-gradient(135deg,#fff 0%,var(--cyan) 38%,var(--violet) 75%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:fadeUp .6s .08s ease both}
+.hero-sub{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim);
+  max-width:440px;line-height:1.75;animation:fadeUp .6s .18s ease both}
+.portal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:.9rem;width:100%;max-width:720px;animation:fadeUp .6s .28s ease both}
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:15px;
+  padding:1.7rem 1.3rem;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;gap:.75rem}
+.pcard::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 0%,var(--cc,var(--cyan)) 0%,transparent 70%);
+  opacity:0;transition:opacity .3s}
+.pcard:hover{border-color:var(--cc,var(--cyan));transform:translateY(-4px);box-shadow:0 18px 36px rgba(0,0,0,.4)}
+.pcard:hover::before{opacity:.07}
+.pcard .pico{font-size:2rem}
+.pcard .plabel{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright)}
+.pcard .pdesc{font-size:.7rem;color:var(--dim);text-align:center;line-height:1.5}
+#gate{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);
+  backdrop-filter:blur(14px);align-items:center;justify-content:center}
+.gbox{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:2.2rem;width:370px;max-width:95vw;display:flex;flex-direction:column;gap:1.1rem;animation:fadeUp .3s ease}
+.gt{font-family:var(--head);font-size:1.2rem;font-weight:800;color:var(--bright)}
+#toast{position:fixed;bottom:1.8rem;right:1.8rem;z-index:999;background:var(--surface);
+  border:1px solid var(--border);border-radius:13px;padding:.85rem 1.2rem;font-size:.8rem;
+  box-shadow:0 18px 44px rgba(0,0,0,.5);opacity:0;transform:translateY(10px);
+  transition:all .28s;max-width:310px;display:flex;align-items:center;gap:.65rem}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ts{border-color:rgba(16,185,129,.4);color:var(--green)}
+#toast.te{border-color:rgba(239,68,68,.4);color:var(--red)}
+#toast.ti{border-color:rgba(0,212,255,.4);color:var(--cyan)}
+footer{border-top:1px solid var(--border);padding:.9rem 2rem;font-size:.7rem;
+  color:var(--dim);text-align:center;background:var(--surface)}
+.sys-pill{display:flex;gap:.5rem;background:var(--panel);border-radius:12px;padding:.4rem;margin-bottom:1.2rem}
+.sp{padding:.45rem 1.1rem;border-radius:8px;font-size:.78rem;cursor:pointer;color:var(--dim);transition:all .18s}
+.sp.on{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
+.sp:hover{color:var(--text)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
+.hidden{display:none!important}
+@media(max-width:680px){
+  .sb{width:200px}
+  .content{padding:1rem}
+  .fr,.fr3{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- LANDING -->
+<div id="landing">
+  <div class="hero-badge">🧠 NeuroMatrix Biosystems · Unified LMS</div>
+  <h1 class="hero-title">One Portal.<br>Two Systems.<br>Zero Hassle.</h1>
+  <p class="hero-sub">Sikiru Adetona College of Education, Science & Technology — powered by NeuroMatrix.</p>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:.7rem;width:100%;max-width:720px">
+    <div class="sys-pill" id="sys-pill">
+      <div class="sp on" data-sys="neuro" onclick="setSys('neuro',event)">🧬 NeuroMatrix LMS</div>
+      <div class="sp" data-sys="vos" onclick="setSys('vos',event)">🎓 VOS 102 Practical Skills</div>
+    </div>
+
+    <div id="portal-neuro" class="portal-grid">
+      <div class="pcard" style="--cc:var(--cyan)" onclick="selectRole('Student')">
+        <div class="pico">🎓</div><div class="plabel">Student</div>
+        <div class="pdesc">View lectures, mark attendance, submit assignments & track progress</div>
+      </div>
+      <div class="pcard" style="--cc:var(--violet)" onclick="enterGate('admin')">
+        <div class="pico">👩‍🏫</div><div class="plabel">Lecturer / Admin</div>
+        <div class="pdesc">Manage courses, classwork, grades & announcements</div>
+      </div>
+      <div class="pcard" style="--cc:var(--amber)" onclick="enterGate('sysadmin')">
+        <div class="pico">⚙️</div><div class="plabel">System Admin</div>
+        <div class="pdesc">Global oversight — courses, logs, analytics & settings</div>
+      </div>
+    </div>
+
+    <div id="portal-vos" class="portal-grid hidden">
+      <div class="pcard" style="--cc:var(--green)" onclick="vosRegisterScreen()">
+        <div class="pico">📋</div><div class="plabel">Register</div>
+        <div class="pdesc">New student? Create your account with matric number</div>
+      </div>
+      <div class="pcard" style="--cc:var(--cyan)" onclick="vosLoginScreen('student')">
+        <div class="pico">🎓</div><div class="plabel">Student Login</div>
+        <div class="pdesc">Attendance, CBT tests, results & practical uploads</div>
+      </div>
+      <div class="pcard" style="--cc:var(--violet)" onclick="vosLoginScreen('admin')">
+        <div class="pico">🛠️</div><div class="plabel">Admin Login</div>
+        <div class="pdesc">Manage sessions, CBT, grades & student records</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEURO GATE -->
+<div id="gate">
+  <div class="gbox">
+    <div class="gt" id="gate-title">🔐 Login</div>
+    <p style="font-size:.8rem;color:var(--dim)" id="gate-sub">Enter credentials to continue.</p>
+    <div class="field" id="gate-course-wrap">
+      <label>Select Course</label>
+      <select id="gate-course" class="sb-sel"></select>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="gate-pw" placeholder="Enter password…" onkeydown="if(event.key==='Enter')gateSubmit()">
+    </div>
+    <div class="ae al hidden" id="gate-err">❌ Incorrect password. Try again.</div>
+    <div style="display:flex;gap:.65rem">
+      <button class="btn btn-p full" onclick="gateSubmit()">🔓 Enter</button>
+      <button class="btn btn-s" onclick="gateClose()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- VOS REGISTER -->
+<div id="vos-register" class="hidden" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+  <div style="width:100%;max-width:500px">
+    <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:1.8rem;cursor:pointer" onclick="backToLanding()">
+      <span style="color:var(--dim);font-size:.8rem">← Back</span>
+    </div>
+    <div class="pt" style="margin-bottom:.4rem">📋 Student Registration</div>
+    <div class="ps" style="margin-bottom:1.5rem">VOS 102 Practical Skills · Sikiru Adetona COEST</div>
+    <div class="card">
+      <div class="fr">
+        <div class="field"><label>Full Name *</label><input id="reg-name" placeholder="e.g. Adebimpe John Omolola"></div>
+        <div class="field"><label>Matric Number *</label><input id="reg-matric" placeholder="e.g. SCI/2022/001"></div>
+      </div>
+      <div class="fr">
+        <div class="field"><label>Department *</label><select id="reg-dept"></select></div>
+        <div class="field"><label>Level *</label><select id="reg-level"></select></div>
+      </div>
+      <div class="field"><label>Phone (optional)</label><input id="reg-phone" placeholder="+234…"></div>
+      <div class="fr">
+        <div class="field"><label>Password *</label><input type="password" id="reg-pw"></div>
+        <div class="field"><label>Confirm Password *</label><input type="password" id="reg-pw2"></div>
+      </div>
+      <div class="ae al hidden" id="reg-err"></div>
+      <div class="as al hidden" id="reg-ok"></div>
+      <button class="btn btn-p full" onclick="vosRegister()" style="margin-top:.3rem">✅ Create Account</button>
+    </div>
+    <p style="text-align:center;font-size:.75rem;color:var(--dim);margin-top:.8rem">
+      Already registered? <span style="color:var(--cyan);cursor:pointer" onclick="vosLoginScreen('student')">Login here</span>
+    </p>
+  </div>
+</div>
+
+<!-- VOS LOGIN -->
+<div id="vos-login" class="hidden" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem">
+  <div style="width:100%;max-width:400px">
+    <div style="cursor:pointer;margin-bottom:1.8rem" onclick="backToLanding()"><span style="color:var(--dim);font-size:.8rem">← Back</span></div>
+    <div class="pt" style="margin-bottom:.4rem" id="vos-login-title">🎓 Student Login</div>
+    <div class="ps" style="margin-bottom:1.5rem">VOS 102 · Sikiru Adetona COEST</div>
+    <div class="card">
+      <div class="field"><label id="vos-login-label">Matric Number</label><input id="vos-un" placeholder="Your matric number or admin username"></div>
+      <div class="field"><label>Password</label><input type="password" id="vos-pw" onkeydown="if(event.key==='Enter')vosLogin()" placeholder="Your password"></div>
+      <div class="ae al hidden" id="vos-err">❌ Invalid credentials.</div>
+      <button class="btn btn-p full" onclick="vosLogin()" style="margin-top:.3rem">🔓 Login</button>
+    </div>
+    <p style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem">Demo admin: <b>adebimpe</b> / <b>ChangeMe123</b></p>
+  </div>
+</div>
+
+<!-- NEURO SHELL -->
+<div class="shell" id="shell">
+  <nav class="sb" id="sb">
+    <div class="sb-logo"><span>🧠</span>NeuroMatrix</div>
+    <div id="sb-course-wrap">
+      <div class="sb-sect">Course</div>
+      <select class="sb-sel" id="sb-course" onchange="onCourseChange()"></select>
+    </div>
+    <div id="sb-week-wrap" class="hidden">
+      <div class="sb-sect">Week</div>
+      <select class="sb-sel" id="sb-week" onchange="APP.week=this.value;renderTab(APP.tab)"></select>
+    </div>
+    <div class="sb-sect">Menu</div>
+    <div class="sb-nav" id="sb-nav"></div>
+    <div class="sb-foot">
+      <div class="back-btn" onclick="backToLanding()">← Switch Portal</div>
+    </div>
+  </nav>
+  <main class="content"><div id="tab-content"></div></main>
+</div>
+
+<!-- VOS SHELL -->
+<div class="shell" id="vos-shell">
+  <nav class="sb" id="vos-sb">
+    <div class="sb-logo"><span>🎓</span>VOS 102</div>
+    <div id="vos-user-strip" style="background:var(--panel);border-radius:10px;padding:.65rem .8rem;margin-bottom:.8rem;font-size:.75rem;border:1px solid var(--border)">
+      <div id="vos-user-name" style="font-family:var(--head);font-weight:700;color:var(--bright)"></div>
+      <div id="vos-user-meta" style="color:var(--dim);font-size:.68rem;margin-top:.15rem"></div>
+    </div>
+    <div class="sb-sect">Menu</div>
+    <div class="sb-nav" id="vos-sb-nav"></div>
+    <div class="sb-foot">
+      <div class="back-btn" onclick="vosLogout()">← Logout</div>
+    </div>
+  </nav>
+  <main class="content"><div id="vos-tab-content"></div></main>
+</div>
+
+<footer id="footer" class="hidden">
+  Developed by <b>Adebimpe-John Omolola</b> · © 2026 · NeuroMatrix Biosystems · Sikiru Adetona COEST
+</footer>
+<div id="toast"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STORAGE & UTILITIES
+// ═══════════════════════════════════════════════════════════
+const S={
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v!=null?JSON.parse(v):(d===undefined?{}:d)}catch{return d===undefined?{}:d}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+  push:(k,item)=>{const a=S.get(k,[]);a.push(item);S.set(k,a)},
+  del:(k)=>{localStorage.removeItem(k)},
+};
+
+function showEl(id,disp){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.remove('hidden');
+  el.style.display=disp||'';
+}
+function hideEl(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.add('hidden');
+  el.style.display='none';
+}
+function toast(msg,type='info'){
+  const t=document.getElementById('toast');if(!t)return;
+  t.className='';
+  t.classList.add(type==='success'?'ts':type==='error'?'te':'ti');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO CONFIG
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_COURSES={
+  "General Microbiology":           {code:"MCB221",url:"https://neuromatrixbiosystems.com/MCB221_Interactive_Lecture_Notes#"},
+  "General Biochemistry":           {code:"BCH201",url:"https://neuromatrixbiosystems.com/BCH201_Interactive_Lecture_Notes#"},
+  "General Physiology":             {code:"BIO203",url:"https://neuromatrixbiosystems.com/BIO203_Interactive_Lecture_Notes#"},
+  "Virus Bacteria Lower Plants":    {code:"BIO113",url:"https://neuromatrixbiosystems.com/BIO113_Interactive_Lecture_Notes#"},
+  "Diversity of Invertebrate":      {code:"BIO121",url:"https://neuromatrixbiosystems.com/BIO121_Interactive_Lecture_Notes#"},
+  "Plant Physiology":               {code:"BIO221",url:"https://neuromatrixbiosystems.com/BIO221_Interactive_Lecture_Notes#"},
+  "Vertebrate Anatomy & Physiology":{code:"BIO222",url:"https://neuromatrixbiosystems.com/BIO222_Interactive_Lecture_Notes#"},
+  "Systematic Biology":             {code:"BIO306",url:"https://neuromatrixbiosystems.com/BIO306_Interactive_Lecture_Notes#"},
+};
+
+// ═══════════════════════════════════════════════════════════
+// VOS CONFIG
+// ═══════════════════════════════════════════════════════════
+const VOS_MODULES=[
+  {id:'fruit-juice',name:"Fruit & Juice Making",icon:'🍊'},
+  {id:'solar-panel',name:"Solar Panel Making",icon:'☀️'},
+  {id:'interior-decor',name:"Interior Decor",icon:'🏠'},
+  {id:'catering',name:"Catering",icon:'🍽️'},
+  {id:'bead-making',name:"Bead Making",icon:'📿'},
+  {id:'textile-sewing',name:"Textile / Sewing",icon:'🧵'},
+];
+const VOS_DEPTS=["Agricultural Science","Business Education","Computer Science","Biology","Chemistry","Mathematics","Physics","English","Social Studies","Early Childhood Education","Fine & Applied Arts"];
+const VOS_LEVELS=["100","200","300","400"];
+
+function initVOSDefaults(){
+  const admins=S.get('vos_admins',[]);
+  if(!Array.isArray(admins)||!admins.find(a=>a.username==='adebimpe')){
+    S.set('vos_admins',[
+      {id:1,full_name:"Adebimpe John",username:"adebimpe",role:"super_admin",modules:VOS_MODULES.map(m=>m.id),pw:"ChangeMe123"},
+      {id:2,full_name:"Odufeko Gabriel",username:"gabriel",role:"module_admin",modules:["fruit-juice"],pw:"ChangeMe123"},
+      {id:3,full_name:"Mr Tolu Adebayo",username:"tolu",role:"module_admin",modules:["solar-panel"],pw:"ChangeMe123"},
+    ]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO APP STATE
+// ═══════════════════════════════════════════════════════════
+const APP={
+  role:null,course:null,week:'Week 1',student:{name:'',matric:''},
+  tab:null,gateMode:null,sys:'neuro',
+};
+const VAPP={user:null,loginType:'student',tab:null};
+
+function getCourses(){const c=S.get('nm_courses',null);return c&&Object.keys(c).length?c:{...DEFAULT_COURSES}}
+function saveCourses(c){S.set('nm_courses',c)}
+function getPasswords(){return S.get('nm_passwords',{})}
+function getCoursePassword(code){return getPasswords()[code]||'admin123'}
+function verifyAdmin(code,pw){return pw===getCoursePassword(code)}
+function verifySysAdmin(pw){return pw===(S.get('nm_sysadmin_pw',null)||'admin')}
+const WEEKS=Array.from({length:15},(_,i)=>`Week ${i+1}`);
+
+// ═══════════════════════════════════════════════════════════
+// SYSTEM SELECTOR / LANDING
+// ═══════════════════════════════════════════════════════════
+function setSys(sys,evt){
+  APP.sys=sys;
+  document.querySelectorAll('.sp').forEach(el=>el.classList.remove('on'));
+  if(evt&&evt.target)evt.target.classList.add('on');
+  else document.querySelector(`.sp[data-sys="${sys}"]`)?.classList.add('on');
+  if(sys==='neuro'){showEl('portal-neuro','grid');hideEl('portal-vos');}
+  else{showEl('portal-vos','grid');hideEl('portal-neuro');}
+}
+
+function hideAll(){
+  ['landing','shell','vos-shell','vos-register','vos-login','footer','gate'].forEach(id=>hideEl(id));
+}
+
+function backToLanding(){
+  hideAll();
+  showEl('landing','flex');
+}
+
+function selectRole(role){
+  APP.role=role;
+  if(role==='Student') buildNeuroStudentShell();
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO GATE
+// ═══════════════════════════════════════════════════════════
+function enterGate(mode){
+  APP.gateMode=mode;
+  const titles={admin:'👩‍🏫 Lecturer Login',sysadmin:'⚙️ System Admin Login'};
+  document.getElementById('gate-title').textContent=titles[mode];
+  document.getElementById('gate-sub').textContent=mode==='admin'?'Select course and enter admin password.':'Enter system administrator password.';
+  const cw=document.getElementById('gate-course-wrap');
+  if(mode==='admin'){
+    cw.style.display='';
+    const sel=document.getElementById('gate-course');
+    const courses=getCourses();
+    sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}">${n}</option>`).join('');
+  } else {cw.style.display='none'}
+  hideEl('gate-err');
+  document.getElementById('gate-pw').value='';
+  showEl('gate','flex');
+}
+
+function gateClose(){hideEl('gate')}
+
+function gateSubmit(){
+  const pw=document.getElementById('gate-pw').value.trim();
+  if(!pw) return;
+  if(APP.gateMode==='sysadmin'){
+    if(verifySysAdmin(pw)){gateClose();buildNeuroSysAdminShell()}
+    else showEl('gate-err');
+    return;
+  }
+  const sel=document.getElementById('gate-course');
+  const code=sel.value;
+  const name=sel.options[sel.selectedIndex]?.dataset.name||sel.options[sel.selectedIndex]?.text;
+  if(verifyAdmin(code,pw)){
+    APP.course={name,...getCourses()[name]};
+    gateClose();buildNeuroAdminShell();
+  } else showEl('gate-err');
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO SHELLS
+// ═══════════════════════════════════════════════════════════
+const STUDENT_TABS=[
+  {id:'about',ico:'📝',label:'About Course'},
+  {id:'lecture',ico:'📖',label:'Lecture & Classwork'},
+  {id:'attendance',ico:'🕒',label:'Attendance'},
+  {id:'submissions',ico:'📤',label:'Submissions'},
+  {id:'announcements',ico:'📢',label:'Announcements'},
+  {id:'feedback',ico:'💬',label:'Seminar Feedback'},
+  {id:'progress',ico:'📊',label:'My Progress'},
+];
+const ADMIN_TABS=[
+  {id:'course-mgr',ico:'📚',label:'Course Manager'},
+  {id:'lecture-mgmt',ico:'📖',label:'Lecture Management'},
+  {id:'att-ctrl',ico:'🕒',label:'Attendance Control'},
+  {id:'att-rec',ico:'📊',label:'Attendance Records'},
+  {id:'cw-ctrl',ico:'🧩',label:'Classwork Control'},
+  {id:'cw-subs',ico:'📝',label:'Classwork Submissions'},
+  {id:'grading',ico:'🏅',label:'Grading System'},
+  {id:'stu-subs',ico:'📂',label:'Student Submissions'},
+  {id:'ann-admin',ico:'📢',label:'Announcements'},
+  {id:'seminar-subs',ico:'🎤',label:'Seminar Submissions'},
+];
+const SYSADMIN_TABS=[
+  {id:'sys-overview',ico:'🌐',label:'System Overview'},
+  {id:'sys-courses',ico:'📚',label:'Course Management'},
+  {id:'sys-logs',ico:'📋',label:'Activity Logs'},
+  {id:'sys-analytics',ico:'📈',label:'Analytics'},
+  {id:'sys-settings',ico:'⚙️',label:'Settings'},
+];
+
+function buildNeuroStudentShell(){
+  APP.role='Student';
+  const courses=getCourses();
+  const first=Object.entries(courses)[0];
+  APP.course={name:first[0],...first[1]};
+  APP.week='Week 1';
+  const sel=document.getElementById('sb-course');
+  sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}">${n}</option>`).join('');
+  showEl('sb-course-wrap');
+  const ws=document.getElementById('sb-week');
+  ws.innerHTML=WEEKS.map(w=>`<option>${w}</option>`).join('');
+  showEl('sb-week-wrap');
+  buildNav('sb-nav',STUDENT_TABS,'neuro');
+  launchShell();
+  setTab('about');
+}
+
+function buildNeuroAdminShell(){
+  APP.role='Admin';
+  const courses=getCourses();
+  const sel=document.getElementById('sb-course');
+  sel.innerHTML=Object.entries(courses).map(([n,v])=>`<option value="${v.code}" data-name="${n}" ${v.code===APP.course.code?'selected':''}>${n}</option>`).join('');
+  showEl('sb-course-wrap');
+  hideEl('sb-week-wrap');
+  buildNav('sb-nav',ADMIN_TABS,'neuro');
+  launchShell();
+  setTab('course-mgr');
+}
+
+function buildNeuroSysAdminShell(){
+  APP.role='SysAdmin';
+  hideEl('sb-course-wrap');hideEl('sb-week-wrap');
+  buildNav('sb-nav',SYSADMIN_TABS,'neuro');
+  launchShell();
+  setTab('sys-overview');
+}
+
+function buildNav(navId,tabs,sys){
+  document.getElementById(navId).innerHTML=tabs.map(t=>
+    `<div class="ni" id="${sys==='neuro'?'ni-':'vni-'}${t.id}" onclick="${sys==='neuro'?`setTab('${t.id}')`:`vosSetTab('${t.id}')`}">
+      <span class="ico">${t.ico}</span>${t.label}</div>`).join('');
+}
+
+function launchShell(){
+  hideAll();
+  showEl('shell','flex');
+  showEl('footer','');
+}
+
+function onCourseChange(){
+  const sel=document.getElementById('sb-course');
+  const name=sel.options[sel.selectedIndex]?.dataset.name||sel.options[sel.selectedIndex]?.text;
+  const courses=getCourses();
+  APP.course={name,...courses[name]};
+  renderTab(APP.tab);
+  toast('Switched to '+name,'info');
+}
+
+function setTab(id){
+  APP.tab=id;
+  document.querySelectorAll('#sb-nav .ni').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('ni-'+id);
+  if(el) el.classList.add('active');
+  renderTab(id);
+}
+
+function renderTab(id){
+  const c=document.getElementById('tab-content');
+  const d=document.createElement('div');
+  d.className='tab-panel';
+  const map={
+    'about':rAbout,'lecture':rLecture,'attendance':rAttendance,
+    'submissions':rSubmissions,'announcements':rAnnouncements,'feedback':rFeedback,'progress':rProgress,
+    'course-mgr':rAdmCourseMgr,'lecture-mgmt':rAdmLecture,
+    'att-ctrl':rAdmAttCtrl,'att-rec':rAdmAttRec,'cw-ctrl':rAdmCWCtrl,
+    'cw-subs':rAdmCWSubs,'grading':rAdmGrading,'stu-subs':rAdmStuSubs,
+    'ann-admin':rAdmAnn,'seminar-subs':rAdmSeminar,
+    'sys-overview':rSysOverview,'sys-courses':rSysCourses,'sys-logs':rSysLogs,
+    'sys-analytics':rSysAnalytics,'sys-settings':rSysSettings,
+  };
+  d.innerHTML=(map[id]||(()=>`<div class="al ai">Tab "${id}" coming soon.</div>`))();
+  c.innerHTML='';c.appendChild(d);
+}
+
+// ── HELPERS
+function ph(title,sub,badge,bcls='bc'){
+  return `<div class="ph"><div><div class="pt">${title}</div>${sub?`<div class="ps">${sub}</div>`:''}</div>${badge?`<span class="badge ${bcls}">${badge}</span>`:''}</div>`;
+}
+function istrip(){
+  const s=APP.student;
+  return `<div class="istrip"><div class="iav">🎓</div>
+    <div><div class="in">${s.name}</div><div class="im">${s.matric} · ${APP.course.name}</div></div>
+    <div style="margin-left:auto"><span class="badge bc">${APP.course.code}</span></div></div>`;
+}
+function requireIdent(fn){
+  const s=S.get('nm_student',{name:'',matric:''});APP.student=s;
+  if(!s.name||!s.matric) return identForm()+`<div class="al aw">⚠️ Save your identity above to continue.</div>`;
+  return fn();
+}
+function identForm(){
+  return `<div class="card"><div class="ct">👤 Your Identity</div>
+    <div class="fr">
+      <div class="field"><label>Full Name</label><input id="si-name" value="${APP.student.name||''}" placeholder="Enter full name…"></div>
+      <div class="field"><label>Matric Number</label><input id="si-matric" value="${APP.student.matric||''}" placeholder="e.g. BIO/2022/001…"></div>
+    </div>
+    <button class="btn btn-p" onclick="saveIdent()">💾 Save Identity</button></div>`;
+}
+function saveIdent(){
+  const name=document.getElementById('si-name')?.value.trim();
+  const matric=document.getElementById('si-matric')?.value.trim();
+  if(!name||!matric){toast('Enter both name and matric number','error');return}
+  APP.student={name,matric};S.set('nm_student',APP.student);
+  toast('Identity saved ✅','success');renderTab(APP.tab);
+}
+function logLec(action){S.push('nm_lec_log',{course:APP.course?.code||'sys',action,ts:new Date().toISOString()})}
+function logStu(action,extra={}){S.push('nm_stu_log',{name:APP.student.name,matric:APP.student.matric,course:APP.course?.code||'',action,...extra,ts:new Date().toISOString()})}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO STUDENT TABS
+// ═══════════════════════════════════════════════════════════
+function rAbout(){
+  const info=S.get('nm_about_'+APP.course.code,{});
+  return ph('📝 About This Course',APP.course.name+' · '+APP.course.code,APP.course.code)+`
+  <div class="card"><div class="ct">📋 Course Description</div>
+    <p style="font-size:.85rem;color:var(--dim);line-height:1.75">${info.description||'No description posted yet.'}</p></div>
+  <div class="card"><div class="ct">🎯 Learning Objectives</div>
+    <p style="font-size:.85rem;color:var(--dim);line-height:1.75">${info.objectives||'Objectives not yet posted.'}</p></div>
+  <div class="card"><div class="ct">📚 Interactive Lecture Notes</div>
+    <p style="font-size:.8rem;color:var(--dim);margin-bottom:1rem">Access full interactive notes for this course.</p>
+    <a href="${APP.course.url}" target="_blank" class="btn btn-p">🌐 Open Interactive Notes</a></div>`;
+}
+
+function rAttendance(){
+  return requireIdent(()=>{
+    const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
+    const marked=S.get(`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`,null);
+    let body='';
+    if(marked){
+      body=`<div class="al as">✅ Attendance marked for ${APP.week} at ${new Date(marked.ts).toLocaleString()}</div>`;
+    } else if(!status.is_open){
+      body=`<div class="al aw">🔒 Attendance is closed for ${APP.week}.</div>`;
+    } else {
+      body=`<div class="al ai">🟢 Attendance is OPEN for ${APP.week}</div>
+            <button class="btn btn-p" onclick="markAtt()">✅ Mark Me Present</button>`;
+    }
+    return istrip()+ph('🕒 Attendance',APP.course.name+' · '+APP.week)+`<div class="card">${body}</div>`;
+  });
+}
+
+function markAtt(){
+  const k=`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`;
+  const rec={name:APP.student.name,matric:APP.student.matric,ts:new Date().toISOString()};
+  S.set(k,rec);
+  S.push(`nm_att_list_${APP.course.code}_${APP.week}`,rec);
+  logStu('Attendance marked',{week:APP.week});
+  toast('Attendance marked ✅','success');renderTab('attendance');
+}
+
+function rLecture(){
+  return requireIdent(()=>{
+    const lec=S.get('nm_lectures_'+APP.course.code,{})[APP.week]||{};
+    const cwStatus=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{is_open:false});
+    const myCW=S.get(`nm_cw_${APP.course.code}_${APP.week}_${APP.student.matric}`,null);
+    let cwBlock='';
+    if(myCW){
+      cwBlock=`<div class="al as">✅ Classwork submitted for ${APP.week}. Score: ${myCW.pct!=null?myCW.pct+'%':'see results'}${myCW.pending_short&&myCW.pending_short.length?` (${myCW.pending_short.length} short answer(s) pending review)`:''}</div>`;
+      if(cwStatus.release_answers) cwBlock+=cwReview(myCW);
+    } else if(cwStatus.is_open){
+      cwBlock=cwForm();
+    } else {
+      cwBlock=`<div class="al aw">🔒 Classwork is closed for ${APP.week}.</div>`;
+    }
+    return istrip()+ph('📖 Lecture & Classwork',APP.week+' · '+APP.course.name)+`
+    <div class="card"><div class="ct">📘 ${lec.topic||'Topic not posted yet'}</div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7;margin-bottom:1rem">${lec.brief||'No brief available yet.'}</p>
+      ${lec.topic?`<a href="${APP.course.url}${APP.week.replace(' ','')}" target="_blank" class="btn btn-s sm">🔗 View Full Notes</a>`:''}</div>
+    <div class="card"><div class="ct">📝 Assignment</div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7">${lec.assignment||'No assignment posted yet.'}</p></div>
+    <div class="card"><div class="ct">🧩 Classwork</div>${cwBlock}</div>`;
+  });
+}
+
+let cwSel={};
+let cwTextAnswers={};
+
+function cwForm(){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(!qs.length) return `<div class="al ai">No classwork questions posted yet.</div>`;
+  cwSel={};cwTextAnswers={};
+  return qs.map((q,i)=>{
+    if(q.type==='mcq'){
+      const entries=Object.entries(q.options||{});
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <div class="mopts">${entries.map(([key,val])=>`
+          <div class="mopt" id="cw-${i}-${key}" onclick="cwPickMCQ(${i},'${key}')">
+            <b>${key}.</b> ${val}</div>`).join('')}</div></div>`;
+    } else if(q.type==='gap_fill'){
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <div class="field" style="margin:0"><input id="cw-gap-${i}" placeholder="Type your answer…" oninput="cwTextAnswers[${i}]=this.value"></div></div>`;
+    } else {
+      return `<div class="mq"><div class="mqt">${i+1}. ${q.question}${q.marks?` <span class="badge ba" style="margin-left:.4rem">${q.marks}mk</span>`:''}</div>
+        <textarea id="cw-short-${i}" placeholder="Write your answer…" oninput="cwTextAnswers[${i}]=this.value"></textarea></div>`;
+    }
+  }).join('')+`<button class="btn btn-p" style="margin-top:1rem" onclick="cwSubmit()">📤 Submit Classwork</button>`;
+}
+
+function cwPickMCQ(q,key){
+  cwSel[q]=key;
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  const opts=Object.keys(qs[q]?.options||{});
+  opts.forEach(k=>document.getElementById(`cw-${q}-${k}`)?.classList.remove('sel'));
+  document.getElementById(`cw-${q}-${key}`)?.classList.add('sel');
+}
+
+function cwSubmit(){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  for(let i=0;i<qs.length;i++){
+    const q=qs[i];
+    if(q.type==='mcq'&&!cwSel[i]){toast(`Answer question ${i+1}`,'error');return}
+    if((q.type==='gap_fill'||q.type==='short_answer')&&!cwTextAnswers[i]?.trim()){toast(`Answer question ${i+1}`,'error');return}
+  }
+  let autoScore=0,autoTotal=0,pendingShort=[];
+  const answerLog=[];
+  qs.forEach((q,i)=>{
+    if(q.type==='mcq'){
+      const ans=cwSel[i];answerLog.push({type:'mcq',q:q.question,ans,correct:q.correct_answer,options:q.options});
+      if(ans===q.correct_answer)autoScore+=q.marks||1;
+      autoTotal+=q.marks||1;
+    } else if(q.type==='gap_fill'){
+      const ans=(cwTextAnswers[i]||'').trim().toLowerCase();
+      const accepted=(q.correct_answer||'').split('|').map(a=>a.trim().toLowerCase());
+      answerLog.push({type:'gap_fill',q:q.question,ans:cwTextAnswers[i],correct:q.correct_answer});
+      if(accepted.includes(ans))autoScore+=q.marks||1;
+      autoTotal+=q.marks||1;
+    } else {
+      pendingShort.push({idx:i,q:q.question,ans:cwTextAnswers[i],model:q.model_answer,marks:q.marks||5});
+      answerLog.push({type:'short_answer',q:q.question,ans:cwTextAnswers[i],model:q.model_answer,status:'pending'});
+      autoTotal+=q.marks||5;
+    }
+  });
+  const pct=autoTotal?Math.round(autoScore/autoTotal*100):0;
+  const submission={name:APP.student.name,matric:APP.student.matric,answers:answerLog,
+    auto_score:autoScore,auto_total:autoTotal,score:autoScore,total:autoTotal,pct,pending_short:pendingShort,ts:new Date().toISOString()};
+  S.set(`nm_cw_${APP.course.code}_${APP.week}_${APP.student.matric}`,submission);
+  logStu('Classwork submitted',{week:APP.week,score:pct});
+  const msg=pendingShort.length
+    ?`Submitted! Auto-graded: ${pct}% (${pendingShort.length} short answer(s) pending review)`
+    :`Submitted! Score: ${pct}%`;
+  toast(msg,'success');renderTab('lecture');
+}
+
+function cwReview(sub){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(!qs.length||!sub?.answers) return '';
+  return '<div class="card" style="border-color:rgba(16,185,129,.3)"><div class="ct">📋 Your Submission Review</div>'+
+  sub.answers.map((a,i)=>{
+    const q=qs[i];if(!q)return'';
+    let status='',detail='';
+    if(a.type==='mcq'){
+      const ok=a.ans===a.correct;
+      status=ok?'<span class="badge bg">✅ Correct</span>':'<span class="badge br">❌ Wrong</span>';
+      detail=ok?'':`<div style="font-size:.75rem;color:var(--green);margin-top:.3rem">Correct: ${a.correct} — ${(a.options&&a.options[a.correct])||q.options?.[a.correct]||''}</div>`;
+    } else if(a.type==='gap_fill'){
+      const accepted=(a.correct||'').split('|').map(x=>x.trim().toLowerCase());
+      const ok=accepted.includes((a.ans||'').trim().toLowerCase());
+      status=ok?'<span class="badge bg">✅ Correct</span>':'<span class="badge br">❌ Wrong</span>';
+      if(!ok) detail=`<div style="font-size:.75rem;color:var(--green);margin-top:.3rem">Correct: ${a.correct}</div>`;
+    } else {
+      status='<span class="badge ba">⏳ Pending Review</span>';
+      detail=`<div style="font-size:.75rem;color:var(--dim);margin-top:.3rem">Model: ${a.model||''}</div>`;
+    }
+    return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.25rem">Q${i+1}. ${a.q}</div>
+      <div style="font-size:.78rem;color:var(--dim)">Your answer: <b>${a.ans||'—'}</b> ${status}</div>${detail}</div>`;
+  }).join('')+'</div>';
+}
+
+function rSubmissions(){
+  return requireIdent(()=>istrip()+ph('📤 Submissions',APP.course.name+' · '+APP.week)+
+    `<div class="card"><div class="ct">📝 Assignment Submission</div>${subWidget('assignment','pdf,doc,docx,txt,zip')}</div>
+     <div class="card"><div class="ct">🎨 Drawing / Diagram</div>${subWidget('drawing','jpg,jpeg,png,gif,pdf')}</div>
+     <div class="card"><div class="ct">🎤 Seminar <span class="badge bv sm" style="margin-left:.4rem">Once/Semester</span></div>${semWidget()}</div>`);
+}
+
+function subWidget(type,accept){
+  const k=`nm_sub_${APP.course.code}_${APP.week}_${APP.student.matric}_${type}`;
+  const ex=S.get(k,null);
+  if(ex) return `<div class="al as">✅ ${type.charAt(0).toUpperCase()+type.slice(1)} submitted for ${APP.week}:<br><b>${ex.filename}</b> · ${new Date(ex.ts).toLocaleString()}</div>`;
+  return `<div class="field"><label>Select file (${accept})</label>
+    <input type="file" id="sub-file-${type}" accept=".${accept.split(',').join(',.')}" style="color:var(--text)"></div>
+    <button class="btn btn-p" onclick="realUpload('${type}','${k}')">📤 Submit ${type.charAt(0).toUpperCase()+type.slice(1)}</button>`;
+}
+
+function realUpload(type,k){
+  const inp=document.getElementById('sub-file-'+type);
+  if(!inp||!inp.files.length){toast('Select a file first','error');return}
+  const file=inp.files[0];
+  if(file.size>10*1024*1024){toast('File too large (max 10MB)','error');return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    S.set(k,{filename:file.name,size:file.size,b64:e.target.result,ts:new Date().toISOString()});
+    logStu(`${type} submitted`,{week:APP.week,file:file.name});
+    toast(`${file.name} uploaded ✅`,'success');renderTab('submissions');
+  };
+  reader.onerror=()=>toast('Upload failed','error');
+  reader.readAsDataURL(file);
+}
+
+function semWidget(){
+  const k=`nm_seminar_${APP.course.code}_${APP.student.matric}`;
+  const ex=S.get(k,null);
+  if(ex) return `<div class="al as">✅ Seminar submitted: <b>${ex.filename}</b><br>Topic: ${ex.topic}<br>${new Date(ex.ts).toLocaleString()}</div>`;
+  return `<div class="field"><label>Seminar Topic *</label><input id="sem-topic" placeholder="Enter your seminar topic…"></div>
+    <div class="field"><label>Upload Seminar File</label>
+      <input type="file" id="sem-file" accept=".pdf,.ppt,.pptx,.doc,.docx" style="color:var(--text)"></div>
+    <button class="btn btn-p" onclick="realSemUpload()">📤 Submit Seminar</button>`;
+}
+
+function realSemUpload(){
+  const topic=document.getElementById('sem-topic')?.value.trim();
+  const inp=document.getElementById('sem-file');
+  if(!topic){toast('Enter seminar topic','error');return}
+  if(!inp||!inp.files.length){toast('Select a file','error');return}
+  const file=inp.files[0];
+  if(file.size>15*1024*1024){toast('File too large (max 15MB)','error');return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const k=`nm_seminar_${APP.course.code}_${APP.student.matric}`;
+    S.set(k,{filename:file.name,topic,size:file.size,b64:e.target.result,ts:new Date().toISOString()});
+    logStu('Seminar submitted',{topic,file:file.name});
+    toast('Seminar submitted ✅','success');renderTab('submissions');
+  };
+  reader.onerror=()=>toast('Upload failed','error');
+  reader.readAsDataURL(file);
+}
+
+function rAnnouncements(){
+  const anns=S.get('nm_announcements_'+APP.course.code,[]).filter(a=>a.active);
+  return ph('📢 Announcements',APP.course.name)+
+    (!anns.length?'<div class="al ai">No announcements yet.</div>':
+    anns.map(a=>`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.45rem">
+        <div class="ct" style="margin:0">${a.title}</div>
+        <span class="badge bc" style="font-size:.62rem">${new Date(a.ts).toLocaleDateString()}</span>
+      </div>
+      <p style="font-size:.83rem;color:var(--dim);line-height:1.7">${a.body}</p></div>`).join(''));
+}
+
+function rFeedback(){
+  return requireIdent(()=>{
+    const fb=S.get(`nm_sem_fb_${APP.course.code}_${APP.student.matric}`,null);
+    return istrip()+ph('💬 Seminar Feedback')+
+      (fb?`<div class="card"><div class="ct">Instructor Feedback</div>
+        <div class="al as">${fb.text}</div>
+        <p style="font-size:.72rem;color:var(--dim)">From: ${fb.from} · ${new Date(fb.ts).toLocaleDateString()}</p></div>`
+      :`<div class="al ai">No feedback received yet.</div>`);
+  });
+}
+
+function rProgress(){
+  return requireIdent(()=>{
+    let attCnt=0;const cwList=[];
+    WEEKS.forEach(w=>{
+      if(S.get(`nm_att_${APP.course.code}_${w}_${APP.student.matric}`,null))attCnt++;
+      if(S.get(`nm_cw_${APP.course.code}_${w}_${APP.student.matric}`,null))cwList.push(w);
+    });
+    const pct=Math.round(attCnt/15*100);
+    return istrip()+ph('📊 My Progress','NeuroMatrix LMS')+
+    `<div class="metrics">
+      <div class="metric"><div class="mv">${attCnt}</div><div class="ml">Weeks Attended</div></div>
+      <div class="metric"><div class="mv">${cwList.length}</div><div class="ml">Classwork Done</div></div>
+      <div class="metric"><div class="mv">${pct}%</div><div class="ml">Attendance Rate</div></div>
+    </div>
+    <div class="card"><div class="ct">Attendance Tracker</div>
+      <div style="font-size:.78rem;color:var(--dim);margin-bottom:.5rem">${attCnt}/15 weeks</div>
+      <div class="pbw"><div class="pbf" style="width:${pct}%"></div></div>
+      <div class="wstrip" style="margin-top:.8rem">${WEEKS.map(w=>{
+        const done=S.get(`nm_att_${APP.course.code}_${w}_${APP.student.matric}`,null);
+        return `<div class="wc ${done?'on':''}">${w.replace('Week','W')}</div>`;}).join('')}</div></div>`;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO ADMIN TABS
+// ═══════════════════════════════════════════════════════════
+function rAdmCourseMgr(){
+  const info=S.get('nm_about_'+APP.course.code,{});
+  return ph('📚 Course Manager',APP.course.name,APP.course.code)+`
+  <div class="card"><div class="ct">📋 Course Info</div>
+    <div class="field"><label>Description</label><textarea id="ai-desc">${info.description||''}</textarea></div>
+    <div class="field"><label>Learning Objectives</label><textarea id="ai-obj">${info.objectives||''}</textarea></div>
+    <div class="field"><label>Lecturer</label><input id="ai-lec" value="${info.lecturer||''}"></div>
+    <button class="btn btn-p" onclick="saveAbout()">💾 Save</button></div>
+  <div class="card"><div class="ct">🔐 Change Password</div>
+    <div class="fr">
+      <div class="field"><label>New Password</label><input type="password" id="ap1"></div>
+      <div class="field"><label>Confirm</label><input type="password" id="ap2"></div>
+    </div>
+    <button class="btn btn-s" onclick="admChangePW()">🔄 Change Password</button></div>`;
+}
+function saveAbout(){
+  S.set('nm_about_'+APP.course.code,{description:document.getElementById('ai-desc')?.value,objectives:document.getElementById('ai-obj')?.value,lecturer:document.getElementById('ai-lec')?.value});
+  logLec('Course info updated');toast('Saved ✅','success');
+}
+function admChangePW(){
+  const p1=document.getElementById('ap1')?.value,p2=document.getElementById('ap2')?.value;
+  if(!p1){toast('Enter password','error');return}if(p1!==p2){toast('Passwords do not match','error');return}
+  const pw=getPasswords();pw[APP.course.code]=p1;S.set('nm_passwords',pw);toast('Password changed ✅','success');
+}
+
+function rAdmLecture(){
+  const lectures=S.get('nm_lectures_'+APP.course.code,{});
+  const lec=lectures[APP.week]||{};
+  return ph('📖 Lecture Management',APP.course.name,APP.week)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setLW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Edit ${APP.week}</div>
+    <div class="field"><label>Topic</label><input id="lt" value="${lec.topic||''}" placeholder="Topic…"></div>
+    <div class="field"><label>Brief</label><textarea id="lb">${lec.brief||''}</textarea></div>
+    <div class="field"><label>Assignment</label><textarea id="la">${lec.assignment||''}</textarea></div>
+    <button class="btn btn-p" onclick="saveLec()">💾 Save</button></div>
+  <div class="card"><div class="ct">All Weeks</div><div class="tw"><table>
+    <thead><tr><th>Week</th><th>Topic</th><th>Assignment</th></tr></thead>
+    <tbody>${WEEKS.map(w=>{const l=lectures[w]||{};return`<tr><td>${w}</td><td>${l.topic||'—'}</td><td>${l.assignment?'✅':'—'}</td></tr>`}).join('')}</tbody>
+  </table></div></div>`;
+}
+function setLW(w){APP.week=w;const ws=document.getElementById('sb-week');if(ws)ws.value=w;renderTab('lecture-mgmt')}
+function saveLec(){
+  const l=S.get('nm_lectures_'+APP.course.code,{});
+  l[APP.week]={topic:document.getElementById('lt')?.value,brief:document.getElementById('lb')?.value,assignment:document.getElementById('la')?.value};
+  S.set('nm_lectures_'+APP.course.code,l);logLec('Lecture posted '+APP.week);toast(APP.week+' saved ✅','success');
+}
+
+function rAdmAttCtrl(){
+  const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
+  return ph('🕒 Attendance Control',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>{const st=S.get(`nm_att_status_${APP.course.code}_${w}`,{is_open:false});
+    return`<div class="wc ${w===APP.week?'on':''}" onclick="setAW('${w}')">${w} ${st.is_open?'🟢':''}</div>`}).join('')}</div>
+  <div class="card"><div class="ct">Status — ${APP.week}</div>
+    <span class="badge ${status.is_open?'bg':'br'}" style="margin-bottom:1rem;display:inline-flex">${status.is_open?'🟢 OPEN':'🔴 CLOSED'}</span>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="setAttStatus(true)">🟢 Open Attendance</button>
+      <button class="btn btn-d" onclick="setAttStatus(false)">🔴 Close Attendance</button>
+    </div></div>
+  <div class="card"><div class="ct">Who Attended ${APP.week}</div>${attListPreview(APP.week)}</div>`;
+}
+function setAW(w){APP.week=w;renderTab('att-ctrl')}
+function setAttStatus(open){
+  S.set(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:open,ts:new Date().toISOString()});
+  logLec(`Attendance ${open?'opened':'closed'} for ${APP.week}`);
+  toast(`Attendance ${open?'opened 🟢':'closed 🔴'}`,open?'success':'info');renderTab('att-ctrl');
+}
+function attListPreview(week){
+  const list=S.get(`nm_att_list_${APP.course.code}_${week}`,[]);
+  if(!list.length)return`<div class="al ai">No attendance yet for ${week}.</div>`;
+  return`<div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Time</th></tr></thead>
+    <tbody>${list.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.matric}</td><td>${new Date(a.ts).toLocaleTimeString()}</td></tr>`).join('')}</tbody>
+  </table></div><p style="font-size:.72rem;color:var(--dim);margin-top:.4rem">${list.length} student(s)</p>`;
+}
+
+function rAdmAttRec(){
+  const totals={};
+  WEEKS.forEach(w=>{S.get(`nm_att_list_${APP.course.code}_${w}`,[]).forEach(a=>{
+    if(!totals[a.matric])totals[a.matric]={name:a.name,matric:a.matric,count:0};totals[a.matric].count++;});});
+  return ph('📊 Attendance Records',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setARW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Attendance — ${APP.week}</div>${attListPreview(APP.week)}</div>
+  <div class="card"><div class="ct">All-Weeks Summary</div>
+    ${Object.keys(totals).length?`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Present</th><th>Rate</th></tr></thead>
+      <tbody>${Object.values(totals).map(t=>`<tr><td>${t.name}</td><td>${t.matric}</td><td>${t.count}/15</td><td>${Math.round(t.count/15*100)}%</td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No data yet.</div>'}</div>`;
+}
+function setARW(w){APP.week=w;renderTab('att-rec')}
+
+// ── Admin: Classwork Control (single definition)
+function rAdmCWCtrl(){
+  const status=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{is_open:false,release_answers:false});
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  const typeLabels={mcq:'MCQ',gap_fill:'Gap Fill',short_answer:'Short Answer'};
+  const typeBadge={mcq:'bc',gap_fill:'bv',short_answer:'ba'};
+  return ph('🧩 Classwork Control',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setCWW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Gate Control — ${APP.week}</div>
+    <span class="badge ${status.is_open?'bg':'br'}" style="margin-bottom:.8rem;display:inline-flex">${status.is_open?'🟢 Open':'🔴 Closed'}</span>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.7rem">
+      <button class="btn btn-g" onclick="setCWStatus(true)">🟢 Open Classwork</button>
+      <button class="btn btn-d" onclick="setCWStatus(false)">🔴 Close Classwork</button>
+      <button class="btn btn-v" onclick="setCWAnswerRelease(${!status.release_answers})">${status.release_answers?'🔒 Hide Answers':'📖 Release Answers'}</button>
+    </div>
+    <p style="font-size:.72rem;color:var(--dim)">Release answers after closing so students can review correct responses.</p>
+  </div>
+  <div class="card"><div class="ct">📥 Bulk Import Questions</div>
+    <div class="al ai" style="font-size:.75rem;line-height:1.85">
+      <b>MCQ:</b> <code>MCQ: Question?</code> then A.–E. options then <code>Correct: A</code><br>
+      <b>GAP:</b> <code>GAP: The _____ is key.</code> then <code>Correct: answer|alternative</code><br>
+      <b>SHORT:</b> <code>SHORT: Explain X.</code> then <code>Model: key points</code> then <code>Marks: 5</code>
+    </div>
+    <textarea id="bulk-q" placeholder="Paste multiple questions here…" style="min-height:140px"></textarea>
+    <button class="btn btn-p" style="margin-top:.7rem" onclick="bulkImportQs()">📥 Import All Questions</button>
+  </div>
+  <div class="card"><div class="ct">➕ Add Single Question</div>
+    <div class="field"><label>Question Type</label>
+      <select id="q-type" onchange="toggleQFields()">
+        <option value="mcq">Multiple Choice (MCQ)</option>
+        <option value="gap_fill">Gap Fill</option>
+        <option value="short_answer">Short Answer</option>
+      </select></div>
+    <div class="field"><label>Question Text</label><textarea id="q-text" placeholder="Enter question…" style="min-height:60px"></textarea></div>
+    <div id="qf-mcq">
+      <div class="fr"><div class="field"><label>Option A</label><input id="q-a"></div><div class="field"><label>Option B</label><input id="q-b"></div></div>
+      <div class="fr"><div class="field"><label>Option C</label><input id="q-c"></div><div class="field"><label>Option D</label><input id="q-d"></div></div>
+      <div class="field"><label>Option E (optional)</label><input id="q-e" placeholder="Leave blank if not needed"></div>
+      <div class="field"><label>Correct Answer</label>
+        <select id="q-correct"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-mcq" value="1" min="1"></div>
+    </div>
+    <div id="qf-gap" class="hidden">
+      <div class="field"><label>Correct Answer(s) — separate alternatives with |</label>
+        <input id="q-gap-ans" placeholder="e.g. mitochondria|Mitochondria"></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-gap" value="1" min="1"></div>
+    </div>
+    <div id="qf-short" class="hidden">
+      <div class="field"><label>Model Answer / Key Points</label>
+        <textarea id="q-model" placeholder="Key points students should cover…" style="min-height:80px"></textarea></div>
+      <div class="field"><label>Marks</label><input type="number" id="q-marks-short" value="5" min="1"></div>
+    </div>
+    <button class="btn btn-p" style="margin-top:.5rem" onclick="addCWQ()">➕ Add Question</button>
+  </div>
+  <div class="card"><div class="ct">Questions — ${APP.week} (${qs.length})</div>
+    ${!qs.length?'<div class="al ai">No questions yet. Add above or use bulk import.</div>':
+    qs.map((q,i)=>`<div class="crow">
+      <div style="flex:1">
+        <div class="crn">${i+1}. ${q.question}</div>
+        <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
+          <span class="badge ${typeBadge[q.type]||'bc'}">${typeLabels[q.type]||q.type}</span>
+          ${q.type==='mcq'?`<span class="badge bg">Ans: ${q.correct_answer}</span>`:''}
+          ${q.marks?`<span class="badge ba">${q.marks}mk</span>`:''}
+        </div>
+      </div>
+      <button class="btn btn-d sm" onclick="rmCWQ(${i})">🗑</button>
+    </div>`).join('')}
+    ${qs.length?`<button class="btn btn-d" style="margin-top:.5rem" onclick="clearAllCWQ()">🗑 Clear All</button>`:''}</div>`;
+}
+
+function toggleQFields(){
+  const t=document.getElementById('q-type')?.value;
+  ['qf-mcq','qf-gap','qf-short'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  if(t==='mcq') document.getElementById('qf-mcq')?.classList.remove('hidden');
+  else if(t==='gap_fill') document.getElementById('qf-gap')?.classList.remove('hidden');
+  else document.getElementById('qf-short')?.classList.remove('hidden');
+}
+function clearAllCWQ(){
+  if(!confirm('Clear all questions for '+APP.week+'?'))return;
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);renderTab('cw-ctrl');
+}
+function setCWW(w){APP.week=w;renderTab('cw-ctrl')}
+function setCWStatus(open){
+  const s=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{});
+  s.is_open=open;if(open)s.open_time=new Date().toISOString();
+  S.set(`nm_cw_status_${APP.course.code}_${APP.week}`,s);
+  logLec(`Classwork ${open?'opened':'closed'} for ${APP.week}`);
+  toast(`Classwork ${open?'opened 🟢':'closed 🔴'}`,open?'success':'info');renderTab('cw-ctrl');
+}
+function setCWAnswerRelease(release){
+  const s=S.get(`nm_cw_status_${APP.course.code}_${APP.week}`,{});
+  s.release_answers=release;S.set(`nm_cw_status_${APP.course.code}_${APP.week}`,s);
+  toast(release?'Answers released 📖':'Answers hidden 🔒',release?'success':'info');renderTab('cw-ctrl');
+}
+function addCWQ(){
+  const type=document.getElementById('q-type')?.value||'mcq';
+  const qtext=document.getElementById('q-text')?.value.trim();
+  if(!qtext){toast('Enter question text','error');return}
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  if(type==='mcq'){
+    const a=document.getElementById('q-a')?.value.trim(),b=document.getElementById('q-b')?.value.trim();
+    const c=document.getElementById('q-c')?.value.trim(),d=document.getElementById('q-d')?.value.trim();
+    const e=document.getElementById('q-e')?.value.trim();
+    const correct=document.getElementById('q-correct')?.value||'A';
+    const marks=parseInt(document.getElementById('q-marks-mcq')?.value||'1');
+    if(!a||!b||!c||!d){toast('Fill options A–D','error');return}
+    const opts={A:a,B:b,C:c,D:d};if(e)opts.E=e;
+    qs.push({type:'mcq',question:qtext,options:opts,correct_answer:correct,marks});
+  } else if(type==='gap_fill'){
+    const ans=document.getElementById('q-gap-ans')?.value.trim();
+    const marks=parseInt(document.getElementById('q-marks-gap')?.value||'1');
+    if(!ans){toast('Enter correct answer','error');return}
+    qs.push({type:'gap_fill',question:qtext,options:{},correct_answer:ans,marks});
+  } else {
+    const model=document.getElementById('q-model')?.value.trim();
+    const marks=parseInt(document.getElementById('q-marks-short')?.value||'5');
+    if(!model){toast('Enter model answer','error');return}
+    qs.push({type:'short_answer',question:qtext,options:{},correct_answer:model,model_answer:model,marks});
+  }
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);
+  toast('Question added ✅','success');renderTab('cw-ctrl');
+}
+function rmCWQ(i){
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);qs.splice(i,1);
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);renderTab('cw-ctrl');
+}
+function bulkImportQs(){
+  const text=document.getElementById('bulk-q')?.value.trim();
+  if(!text){toast('Paste questions first','error');return}
+  const blocks=text.split(/\n(?=MCQ:|GAP:|SHORT:)/i);
+  const qs=S.get(`nm_cw_questions_${APP.course.code}_${APP.week}`,[]);
+  let added=0;
+  blocks.forEach(block=>{
+    const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(!lines.length)return;
+    const head=lines[0];
+    if(/^MCQ:/i.test(head)){
+      const qtext=head.slice(4).trim();
+      const opts={};let correct='';let marks=1;
+      lines.slice(1).forEach(l=>{
+        const m=l.match(/^([A-E])[.)]\s*(.+)/i);
+        if(m)opts[m[1].toUpperCase()]=m[2].trim();
+        else if(/^correct:/i.test(l))correct=l.split(':')[1].trim().toUpperCase();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||1;
+      });
+      if(qtext&&Object.keys(opts).length&&correct){qs.push({type:'mcq',question:qtext,options:opts,correct_answer:correct,marks});added++;}
+    } else if(/^GAP:/i.test(head)){
+      const qtext=head.slice(4).trim();
+      let correct='';let marks=1;
+      lines.slice(1).forEach(l=>{
+        if(/^correct:/i.test(l))correct=l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||1;
+      });
+      if(qtext&&correct){qs.push({type:'gap_fill',question:qtext,options:{},correct_answer:correct,marks});added++;}
+    } else if(/^SHORT:/i.test(head)){
+      const qtext=head.slice(6).trim();
+      let model='';let marks=5;
+      lines.slice(1).forEach(l=>{
+        if(/^model:/i.test(l))model=l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l))marks=parseInt(l.split(':')[1])||5;
+      });
+      if(qtext&&model){qs.push({type:'short_answer',question:qtext,options:{},correct_answer:model,model_answer:model,marks});added++;}
+    }
+  });
+  if(!added){toast('No valid questions found — check format','error');return}
+  S.set(`nm_cw_questions_${APP.course.code}_${APP.week}`,qs);
+  toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');renderTab('cw-ctrl');
+}
+
+function rAdmCWSubs(){
+  const list=S.get(`nm_att_list_${APP.course.code}_${APP.week}`,[]);
+  const subs=list.map(a=>{const s=S.get(`nm_cw_${APP.course.code}_${APP.week}_${a.matric}`,null);return s?{...s}:null}).filter(Boolean);
+  return ph('📝 Classwork Submissions',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setCWSW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Submissions — ${APP.week} (${subs.length})</div>
+    ${!subs.length?'<div class="al ai">No submissions yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Auto Score</th><th>%</th><th>Pending</th><th>Time</th></tr></thead>
+      <tbody>${subs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.auto_score||s.score||0}/${s.auto_total||s.total||0}</td><td>${s.pct||0}%</td><td>${s.pending_short?.length||0}</td><td>${new Date(s.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>`;
+}
+function setCWSW(w){APP.week=w;renderTab('cw-subs')}
+
+function rAdmGrading(){
+  return ph('🏅 Grading System',APP.course.name)+`
+  <div class="card"><div class="ct">Enter Scores</div>
+    <div class="fr"><div class="field"><label>Matric Number</label><input id="gm" placeholder="Matric…"></div>
+    <div class="field"><label>Student Name</label><input id="gn" placeholder="Full name…"></div></div>
+    <div class="field"><label>Week</label><select id="gw">${WEEKS.map(w=>`<option>${w}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;margin-bottom:.9rem">
+      <div class="field"><label>Assignment /100</label><input type="number" id="ga" value="0" min="0" max="100"></div>
+      <div class="field"><label>Test /100</label><input type="number" id="gt" value="0" min="0" max="100"></div>
+      <div class="field"><label>Practical /100</label><input type="number" id="gpr" value="0" min="0" max="100"></div>
+      <div class="field"><label>Classwork /100</label><input type="number" id="gc" value="0" min="0" max="100"></div>
+      <div class="field"><label>Exam /100</label><input type="number" id="ge" value="0" min="0" max="100"></div>
+    </div>
+    <button class="btn btn-p" onclick="saveScore()">💾 Save Score</button></div>`;
+}
+function saveScore(){
+  const m=document.getElementById('gm')?.value.trim(),n=document.getElementById('gn')?.value.trim();
+  const w=document.getElementById('gw')?.value;
+  if(!m||!n){toast('Enter student details','error');return}
+  const k='nm_scores_'+APP.course.code+'_'+m;const sc=S.get(k,{weeks:{}});
+  sc.weeks[w]={assignment:+document.getElementById('ga')?.value,test:+document.getElementById('gt')?.value,
+    practical:+document.getElementById('gpr')?.value,classwork:+document.getElementById('gc')?.value,exam:+document.getElementById('ge')?.value};
+  sc.name=n;sc.matric=m;S.set(k,sc);logLec(`Score saved: ${n} (${m}) ${w}`);toast('Score saved ✅','success');
+}
+
+function rAdmStuSubs(){
+  return ph('📂 Student Submissions',APP.course.name)+
+  `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setSSW('${w}')">${w}</div>`).join('')}</div>
+  <div class="card"><div class="ct">Assignments — ${APP.week}</div>${subList('assignment')}</div>
+  <div class="card"><div class="ct">Drawings — ${APP.week}</div>${subList('drawing')}</div>`;
+}
+function setSSW(w){APP.week=w;renderTab('stu-subs')}
+function subList(type){
+  const list=S.get(`nm_att_list_${APP.course.code}_${APP.week}`,[]);
+  const subs=list.map(a=>{const s=S.get(`nm_sub_${APP.course.code}_${APP.week}_${a.matric}_${type}`,null);return s?{...s,name:a.name,matric:a.matric}:null}).filter(Boolean);
+  if(!subs.length)return`<div class="al ai">No ${type} submissions for ${APP.week}.</div>`;
+  return`<div class="tw"><table><thead><tr><th>Name</th><th>Matric</th><th>File</th><th>Submitted</th></tr></thead>
+  <tbody>${subs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.filename}</td><td>${new Date(s.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function rAdmAnn(){
+  const anns=S.get('nm_announcements_'+APP.course.code,[]);
+  return ph('📢 Announcements',APP.course.name)+`
+  <div class="card"><div class="ct">Post Announcement</div>
+    <div class="field"><label>Title</label><input id="an-t" placeholder="Announcement title…"></div>
+    <div class="field"><label>Body</label><textarea id="an-b" placeholder="Message…"></textarea></div>
+    <button class="btn btn-p" onclick="postAnn()">📢 Post</button></div>
+  <div class="card"><div class="ct">All (${anns.length})</div>
+    ${!anns.length?'<div class="al ai">No announcements yet.</div>':anns.map((a,i)=>`
+    <div class="crow"><div><div class="crn">${a.title}</div>
+    <div class="crc">${new Date(a.ts).toLocaleDateString()} · ${a.active?'Active':'Inactive'}</div></div>
+    <div class="cra">
+      <button class="btn btn-s sm" onclick="tglAnn(${i})">${a.active?'Deactivate':'Activate'}</button>
+      <button class="btn btn-d sm" onclick="delAnn(${i})">🗑</button>
+    </div></div>`).join('')}</div>`;
+}
+function postAnn(){
+  const t=document.getElementById('an-t')?.value.trim(),b=document.getElementById('an-b')?.value.trim();
+  if(!t||!b){toast('Fill all fields','error');return}
+  const anns=S.get('nm_announcements_'+APP.course.code,[]);
+  anns.unshift({title:t,body:b,active:true,ts:new Date().toISOString()});
+  S.set('nm_announcements_'+APP.course.code,anns);logLec('Announcement: '+t);toast('Posted ✅','success');renderTab('ann-admin');
+}
+function tglAnn(i){const anns=S.get('nm_announcements_'+APP.course.code,[]);anns[i].active=!anns[i].active;S.set('nm_announcements_'+APP.course.code,anns);renderTab('ann-admin')}
+function delAnn(i){if(!confirm('Delete?'))return;const anns=S.get('nm_announcements_'+APP.course.code,[]);anns.splice(i,1);S.set('nm_announcements_'+APP.course.code,anns);renderTab('ann-admin')}
+
+function rAdmSeminar(){
+  const logs=S.get('nm_stu_log',[]).filter(l=>l.course===APP.course.code&&l.action==='Seminar submitted');
+  return ph('🎤 Seminar Submissions',APP.course.name)+`
+  <div class="card"><div class="ct">Submissions (${logs.length})</div>
+    ${!logs.length?'<div class="al ai">No seminar submissions yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Topic</th><th>Date</th><th>Action</th></tr></thead>
+      <tbody>${logs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.topic||'—'}</td>
+        <td>${new Date(s.ts).toLocaleDateString()}</td>
+        <td><button class="btn btn-s sm" onclick="semFbOpen('${s.matric}')">💬 Feedback</button></td></tr>`).join('')}</tbody>
+    </table></div>`}
+  </div>
+  <div class="card hidden" id="sem-fb-card"><div class="ct">Give Feedback</div>
+    <input id="sem-fb-matric" style="display:none">
+    <div class="field"><label>Feedback</label><textarea id="sem-fb-text" placeholder="Write feedback…"></textarea></div>
+    <button class="btn btn-p" onclick="saveSemFb()">💾 Save Feedback</button></div>`;
+}
+function semFbOpen(m){
+  document.getElementById('sem-fb-card')?.classList.remove('hidden');
+  document.getElementById('sem-fb-matric').value=m;
+}
+function saveSemFb(){
+  const m=document.getElementById('sem-fb-matric')?.value,t=document.getElementById('sem-fb-text')?.value.trim();
+  if(!m||!t){toast('Enter feedback','error');return}
+  S.set(`nm_sem_fb_${APP.course.code}_${m}`,{text:t,from:'Instructor',ts:new Date().toISOString()});
+  toast('Feedback saved ✅','success');document.getElementById('sem-fb-card')?.classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEURO SYSADMIN TABS
+// ═══════════════════════════════════════════════════════════
+function rSysOverview(){
+  const courses=getCourses();const logs=S.get('nm_stu_log',[]);const llogs=S.get('nm_lec_log',[]);
+  const today=new Date().toDateString();
+  return ph('🌐 System Overview','NeuroMatrix LMS','Live','bg')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${Object.keys(courses).length}</div><div class="ml">Courses</div></div>
+    <div class="metric"><div class="mv">${logs.length}</div><div class="ml">Student Actions</div></div>
+    <div class="metric"><div class="mv">${llogs.length}</div><div class="ml">Lecturer Actions</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>new Date(l.ts).toDateString()===today).length}</div><div class="ml">Today</div></div>
+  </div>
+  <div class="card"><div class="ct">Courses</div><div class="tw"><table>
+    <thead><tr><th>Course</th><th>Code</th><th>Password</th></tr></thead>
+    <tbody>${Object.entries(courses).map(([n,v])=>`<tr><td>${n}</td><td><span class="badge bc">${v.code}</span></td>
+      <td>${getPasswords()[v.code]?'Custom 🔐':'Default'}</td></tr>`).join('')}</tbody>
+  </table></div></div>
+  <div class="card"><div class="ct">Recent Activity</div>
+    ${[...logs].reverse().slice(0,8).map(l=>`
+    <div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.77rem">
+      <span><b>${l.name}</b> · ${l.action}</span>
+      <span style="color:var(--dim)">${new Date(l.ts).toLocaleString()}</span>
+    </div>`).join('')||'<div class="al ai">No activity yet.</div>'}</div>`;
+}
+
+function rSysCourses(){
+  const courses=getCourses();
+  return ph('📚 Course Management','Add, edit, remove courses')+`
+  <div class="card"><div class="ct">Add New Course</div>
+    <div class="fr"><div class="field"><label>Course Name</label><input id="sc-n" placeholder="e.g. Cell Biology…"></div>
+    <div class="field"><label>Course Code</label><input id="sc-c" placeholder="e.g. BIO401"></div></div>
+    <div class="field"><label>Interactive Notes URL</label><input id="sc-u" placeholder="https://…"></div>
+    <button class="btn btn-p" onclick="addSysCourse()">➕ Add Course</button></div>
+  <div class="card"><div class="ct">All Courses (${Object.keys(courses).length})</div>
+    ${Object.entries(courses).map(([n,v])=>`<div class="crow">
+      <div><div class="crn">${n}</div><div class="crc">${v.code}</div></div>
+      <button class="btn btn-d sm" onclick="rmSysCourse('${n.replace(/'/g,"\\'")}')">🗑</button>
+    </div>`).join('')}
+  <button class="btn btn-s" style="margin-top:.8rem" onclick="if(confirm('Reset to defaults?')){saveCourses({...DEFAULT_COURSES});toast('Reset ✅','info');renderTab('sys-courses')}">🔄 Reset to Default</button>
+  </div>`;
+}
+function addSysCourse(){
+  const n=document.getElementById('sc-n')?.value.trim(),c=document.getElementById('sc-c')?.value.trim().toUpperCase(),u=document.getElementById('sc-u')?.value.trim();
+  if(!n||!c){toast('Enter name and code','error');return}
+  const courses=getCourses();courses[n]={code:c,url:u||'https://neuromatrixbiosystems.com/'};
+  saveCourses(courses);toast('Course added ✅','success');renderTab('sys-courses');
+}
+function rmSysCourse(name){
+  if(!confirm(`Remove "${name}"?`))return;
+  const courses=getCourses();delete courses[name];saveCourses(courses);renderTab('sys-courses');
+}
+
+function rSysLogs(){
+  const llogs=S.get('nm_lec_log',[]),slogs=S.get('nm_stu_log',[]);
+  return ph('📋 Activity Logs')+`
+  <div class="itabs"><div class="itab on" onclick="switchLog(this,'ll')">Lecturer (${llogs.length})</div>
+    <div class="itab" onclick="switchLog(this,'sl')">Student (${slogs.length})</div></div>
+  <div id="ll" class="card"><div class="ct">Lecturer Activity</div>
+    ${!llogs.length?'<div class="al ai">No lecturer logs yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Course</th><th>Action</th><th>Time</th></tr></thead>
+      <tbody>${[...llogs].reverse().slice(0,50).map(l=>`<tr><td><span class="badge bv">${l.course}</span></td><td>${l.action}</td><td>${new Date(l.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>
+  <div id="sl" class="hidden card"><div class="ct">Student Activity</div>
+    ${!slogs.length?'<div class="al ai">No student logs yet.</div>':`<div class="tw"><table>
+      <thead><tr><th>Name</th><th>Matric</th><th>Course</th><th>Action</th><th>Time</th></tr></thead>
+      <tbody>${[...slogs].reverse().slice(0,50).map(l=>`<tr><td>${l.name}</td><td>${l.matric}</td>
+        <td><span class="badge bc">${l.course}</span></td><td>${l.action}</td><td>${new Date(l.ts).toLocaleString()}</td></tr>`).join('')}</tbody>
+    </table></div>`}</div>`;
+}
+function switchLog(el,id){
+  document.querySelectorAll('.itab').forEach(e=>e.classList.remove('on'));el.classList.add('on');
+  ['ll','sl'].forEach(i=>document.getElementById(i)?.classList.add('hidden'));
+  document.getElementById(id)?.classList.remove('hidden');
+}
+
+function rSysAnalytics(){
+  const courses=getCourses(),logs=S.get('nm_stu_log',[]);
+  const stats={};Object.values(courses).forEach(v=>{stats[v.code]={code:v.code,att:0,cw:0,sub:0}});
+  logs.forEach(l=>{if(!stats[l.course])return;if(l.action==='Attendance marked')stats[l.course].att++;
+    if(l.action==='Classwork submitted')stats[l.course].cw++;if(l.action?.includes('submitted'))stats[l.course].sub++;});
+  return ph('📈 Analytics')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action==='Attendance marked').length}</div><div class="ml">Total Attendances</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action==='Classwork submitted').length}</div><div class="ml">Classwork</div></div>
+    <div class="metric"><div class="mv">${logs.filter(l=>l.action?.includes('submitted')).length}</div><div class="ml">Total Submissions</div></div>
+  </div>
+  <div class="card"><div class="ct">Per-Course Engagement</div><div class="tw"><table>
+    <thead><tr><th>Code</th><th>Attendance</th><th>Classwork</th><th>Submissions</th></tr></thead>
+    <tbody>${Object.values(stats).map(s=>`<tr><td><span class="badge bc">${s.code}</span></td><td>${s.att}</td><td>${s.cw}</td><td>${s.sub}</td></tr>`).join('')}</tbody>
+  </table></div></div>`;
+}
+
+function rSysSettings(){
+  return ph('⚙️ Settings','System Administration')+`
+  <div class="card"><div class="ct">System Admin Password</div>
+    <div class="fr"><div class="field"><label>New Password</label><input type="password" id="sp1"></div>
+    <div class="field"><label>Confirm</label><input type="password" id="sp2"></div></div>
+    <button class="btn btn-p" onclick="changeSysPW()">🔄 Change</button></div>
+  <div class="card"><div class="ct">Bulk Course Password Reset</div>
+    <div class="field"><label>New password for all courses</label><input type="password" id="bp"></div>
+    <button class="btn btn-s" onclick="bulkPW()">🔑 Apply to All</button></div>
+  <div class="card"><div class="ct" style="color:var(--red)">⚠️ Danger Zone</div>
+    <button class="btn btn-d" onclick="if(confirm('Clear all logs?')){S.set('nm_stu_log',[]);S.set('nm_lec_log',[]);toast('Logs cleared','info')}">🗑 Clear All Logs</button></div>`;
+}
+function changeSysPW(){const p1=document.getElementById('sp1')?.value,p2=document.getElementById('sp2')?.value;
+  if(!p1){toast('Enter password','error');return}if(p1!==p2){toast('No match','error');return}
+  S.set('nm_sysadmin_pw',p1);toast('Password changed ✅','success');}
+function bulkPW(){const pw=document.getElementById('bp')?.value;if(!pw){toast('Enter password','error');return}
+  const pws=getPasswords();Object.values(getCourses()).forEach(v=>{pws[v.code]=pw});S.set('nm_passwords',pws);toast('All updated ✅','success');}
+
+// ═══════════════════════════════════════════════════════════
+// VOS 102 SYSTEM
+// ═══════════════════════════════════════════════════════════
+function vosRegisterScreen(){
+  hideAll();
+  const dept=document.getElementById('reg-dept');
+  dept.innerHTML='<option value="">Select department</option>'+VOS_DEPTS.map(d=>`<option>${d}</option>`).join('');
+  const lvl=document.getElementById('reg-level');
+  lvl.innerHTML=VOS_LEVELS.map(l=>`<option>${l}</option>`).join('');
+  showEl('vos-register','flex');
+}
+
+function vosLoginScreen(type){
+  hideAll();
+  VAPP.loginType=type;
+  document.getElementById('vos-login-title').textContent=type==='admin'?'🛠️ Admin Login':'🎓 Student Login';
+  document.getElementById('vos-login-label').textContent=type==='admin'?'Admin Username':'Matric Number';
+  document.getElementById('vos-un').value='';
+  document.getElementById('vos-pw').value='';
+  hideEl('vos-err');
+  showEl('vos-login','flex');
+}
+
+function vosRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const matric=document.getElementById('reg-matric').value.trim();
+  const dept=document.getElementById('reg-dept').value;
+  const level=document.getElementById('reg-level').value;
+  const phone=document.getElementById('reg-phone').value.trim();
+  const pw1=document.getElementById('reg-pw').value;
+  const pw2=document.getElementById('reg-pw2').value;
+  const err=document.getElementById('reg-err'),ok=document.getElementById('reg-ok');
+  hideEl('reg-err');hideEl('reg-ok');
+  if(!name||!matric||!dept||!pw1){err.textContent='❌ Fill all required fields.';showEl('reg-err');return;}
+  if(pw1!==pw2){err.textContent='❌ Passwords do not match.';showEl('reg-err');return;}
+  const students=S.get('vos_students',[]);
+  if(students.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){
+    err.textContent='❌ Matric number already registered.';showEl('reg-err');return;
+  }
+  students.push({id:'s_'+Date.now(),name,matric,dept,level,phone,pw:pw1,createdAt:new Date().toISOString()});
+  S.set('vos_students',students);
+  ok.textContent='✅ Registration successful! Redirecting to login…';showEl('reg-ok');
+  setTimeout(()=>vosLoginScreen('student'),1400);
+}
+
+function vosLogin(){
+  const id=document.getElementById('vos-un').value.trim();
+  const pw=document.getElementById('vos-pw').value;
+  if(!id||!pw){showEl('vos-err');return;}
+  if(VAPP.loginType==='admin'){
+    const admins=S.get('vos_admins',[]);
+    const a=admins.find(x=>x.username.toLowerCase()===id.toLowerCase()&&x.pw===pw);
+    if(!a){showEl('vos-err');return;}
+    VAPP.user={...a,type:'admin'};
+    buildVOSAdminShell();
+  } else {
+    const students=S.get('vos_students',[]);
+    const s=students.find(x=>x.matric.toUpperCase()===id.toUpperCase()&&x.pw===pw);
+    if(!s){showEl('vos-err');return;}
+    VAPP.user={...s,type:'student'};
+    buildVOSStudentShell();
+  }
+}
+
+function vosLogout(){VAPP.user=null;backToLanding();}
+
+const VOS_STUDENT_TABS=[
+  {id:'v-dashboard',ico:'🏠',label:'Dashboard'},
+  {id:'v-attendance',ico:'✅',label:'Mark Attendance'},
+  {id:'v-quiz',ico:'📝',label:'CBT Quiz'},
+  {id:'v-results',ico:'📊',label:'My Results'},
+  {id:'v-portfolio',ico:'🖼️',label:'Portfolio'},
+  {id:'v-notices',ico:'📢',label:'Announcements'},
+  {id:'v-profile',ico:'👤',label:'My Profile'},
+];
+const VOS_ADMIN_TABS=[
+  {id:'va-dashboard',ico:'🏠',label:'Dashboard'},
+  {id:'va-attendance',ico:'⏱️',label:'Attendance Control'},
+  {id:'va-students',ico:'👥',label:'Students'},
+  {id:'va-quiz',ico:'📋',label:'Quiz Manager'},
+  {id:'va-results',ico:'📊',label:'Results'},
+  {id:'va-notices',ico:'📢',label:'Announcements'},
+  {id:'va-export',ico:'📤',label:'Export Data'},
+];
+
+function buildVOSStudentShell(){
+  document.getElementById('vos-user-name').textContent=VAPP.user.name;
+  document.getElementById('vos-user-meta').textContent=`${VAPP.user.matric} · ${VAPP.user.dept} · L${VAPP.user.level}`;
+  buildNav('vos-sb-nav',VOS_STUDENT_TABS,'vos');
+  hideAll();
+  showEl('vos-shell','flex');
+  showEl('footer','');
+  vosSetTab('v-dashboard');
+}
+
+function buildVOSAdminShell(){
+  document.getElementById('vos-user-name').textContent=VAPP.user.full_name||VAPP.user.name;
+  document.getElementById('vos-user-meta').textContent=(VAPP.user.role||'admin').toUpperCase();
+  buildNav('vos-sb-nav',VOS_ADMIN_TABS,'vos');
+  hideAll();
+  showEl('vos-shell','flex');
+  showEl('footer','');
+  vosSetTab('va-dashboard');
+}
+
+function vosSetTab(id){
+  VAPP.tab=id;
+  document.querySelectorAll('#vos-sb-nav .ni').forEach(el=>el.classList.remove('active'));
+  document.getElementById('vni-'+id)?.classList.add('active');
+  vosRender(id);
+}
+
+function vosRender(id){
+  const c=document.getElementById('vos-tab-content');
+  const map={
+    'v-dashboard':vDashboard,'v-attendance':vAttendance,'v-quiz':vQuiz,
+    'v-results':vResults,'v-portfolio':vPortfolio,'v-notices':vNotices,'v-profile':vProfile,
+    'va-dashboard':vaDashboard,'va-attendance':vaAttendance,'va-students':vaStudents,
+    'va-quiz':vaQuiz,'va-results':vaResults,'va-notices':vaNotices,'va-export':vaExport,
+  };
+  c.innerHTML=`<div class="tab-panel">${(map[id]||(()=>'<div class="al ai">Coming soon.</div>'))()}</div>`;
+}
+
+// ── VOS STUDENT
+function vDashboard(){
+  const u=VAPP.user;
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===u.matric);
+  const qr=S.get('vos_quiz_results',[]).filter(r=>r.matric===u.matric);
+  const ports=S.get('vos_portfolios',[]).filter(p=>p.matric===u.matric);
+  return ph('🏠 Welcome, '+u.name.split(' ')[0],u.dept+' · Level '+u.level)+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Present').length}</div><div class="ml">Present</div></div>
+    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Late').length}</div><div class="ml">Late</div></div>
+    <div class="metric"><div class="mv">${qr.length}</div><div class="ml">Quizzes Taken</div></div>
+    <div class="metric"><div class="mv">${ports.length}</div><div class="ml">Portfolio Items</div></div>
+  </div>
+  <div class="card"><div class="ct">🎯 My Modules</div>
+    ${VOS_MODULES.map(m=>{
+      const cnt=att.filter(a=>a.module===m.id).length;
+      return `<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${cnt} session(s)</div></div></div>`;
+    }).join('')}
+  </div>`;
+}
+
+function vAttendance(){
+  const settings=S.get('vos_att_settings',{});
+  const att=S.get('vos_attendance',[]);
+  const today=new Date().toDateString();
+  let html=ph('✅ Mark Attendance','Select your module');
+  VOS_MODULES.forEach(m=>{
+    const s=settings[m.id]||{open:false};
+    const already=att.find(a=>a.matric===VAPP.user.matric&&a.module===m.id&&new Date(a.date).toDateString()===today);
+    let body='';
+    if(already){
+      body=`<div class="al as">✅ Already marked today as ${already.status} at ${already.time}</div>`;
+    } else if(!s.open){
+      body=`<div class="al ae">🔴 Attendance is CLOSED</div>`;
+    } else {
+      body=`<div class="al as">🟢 Attendance is OPEN</div>
+        <button class="btn btn-p" onclick="vMarkAtt('${m.id}','Present')">✅ Mark Present</button>
+        <button class="btn btn-s" onclick="vMarkAtt('${m.id}','Late')">🟡 Mark Late</button>`;
+    }
+    html+=`<div class="card"><div class="ct">${m.icon} ${m.name}</div>${body}</div>`;
+  });
+  return html;
+}
+
+function vMarkAtt(moduleId,status){
+  const att=S.get('vos_attendance',[]);
+  att.push({
+    id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,
+    module:moduleId,date:new Date().toISOString(),
+    time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),
+    status,
+  });
+  S.set('vos_attendance',att);
+  toast(`Marked ${status} ✅`,'success');
+  vosRender('v-attendance');
+}
+
+function vQuiz(){
+  const quizzes=S.get('vos_quizzes',[]).filter(q=>q.published);
+  const results=S.get('vos_quiz_results',[]).filter(r=>r.matric===VAPP.user.matric);
+  if(!quizzes.length) return ph('📝 CBT Quiz')+'<div class="al ai">No quizzes available right now.</div>';
+  return ph('📝 CBT Quiz','Available quizzes')+
+    quizzes.map(q=>{
+      const done=results.find(r=>r.quizId===q.id);
+      const m=VOS_MODULES.find(mm=>mm.id===q.module);
+      return `<div class="card"><div class="ct">${m?m.icon:'📝'} ${q.title}</div>
+        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} · ${q.questions.length} questions · ${q.duration} mins</p>
+        ${done?`<div class="al as">✅ Completed — Score: ${done.score}/${done.total} (${done.percent}%)</div>`
+              :`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz →</button>`}
+      </div>`;
+    }).join('');
+}
+
+let vQuizState=null;
+function vStartQuiz(id){
+  const q=S.get('vos_quizzes',[]).find(x=>x.id===id);
+  if(!q)return;
+  vQuizState={quiz:q,current:0,answers:{},timeLeft:q.duration*60};
+  vRenderQ();
+  vQuizState.timer=setInterval(()=>{
+    vQuizState.timeLeft--;
+    const t=document.getElementById('v-timer');
+    if(t){
+      const mn=Math.floor(vQuizState.timeLeft/60),sc=vQuizState.timeLeft%60;
+      t.textContent=`${mn}:${String(sc).padStart(2,'0')}`;
+    }
+    if(vQuizState.timeLeft<=0){clearInterval(vQuizState.timer);vSubmitQuiz();}
+  },1000);
+}
+function vRenderQ(){
+  const {quiz,current,answers,timeLeft}=vQuizState;
+  const q=quiz.questions[current];
+  const mn=Math.floor(timeLeft/60),sc=timeLeft%60;
+  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
+        <span style="font-size:.75rem;color:var(--dim)">Question ${current+1} of ${quiz.questions.length}</span>
+        <span id="v-timer" class="badge ba">${mn}:${String(sc).padStart(2,'0')}</span>
+      </div>
+      <div class="mqt" style="margin-top:.5rem">${current+1}. ${q.text}</div>
+      <div class="mopts">
+        ${q.options.map((opt,i)=>`<div class="mopt ${answers[current]===i?'sel':''}" onclick="vSelectAns(${i})">
+          <b>${String.fromCharCode(65+i)}.</b> ${opt}</div>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:1rem">
+        ${current>0?`<button class="btn btn-s" onclick="vNavQ(-1)">← Previous</button>`:'<span></span>'}
+        ${current<quiz.questions.length-1?
+          `<button class="btn btn-p" onclick="vNavQ(1)">Next →</button>`:
+          `<button class="btn btn-g" onclick="vSubmitQuiz()">Submit ✓</button>`}
+      </div>
+    </div></div>`;
+}
+function vSelectAns(i){vQuizState.answers[vQuizState.current]=i;vRenderQ();}
+function vNavQ(d){vQuizState.current+=d;vRenderQ();}
+function vSubmitQuiz(){
+  if(vQuizState.timer)clearInterval(vQuizState.timer);
+  const {quiz,answers}=vQuizState;
+  let score=0;
+  quiz.questions.forEach((q,i)=>{if(answers[i]===q.correct)score++;});
+  const result={id:'qr_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
+    quizId:quiz.id,quizTitle:quiz.title,module:quiz.module,score,total:quiz.questions.length,
+    percent:Math.round(score/quiz.questions.length*100),date:new Date().toISOString()};
+  const results=S.get('vos_quiz_results',[]);results.push(result);S.set('vos_quiz_results',results);
+  vQuizState=null;
+  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel">
+    <div class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:3rem">${result.percent>=70?'🏆':result.percent>=50?'👍':'📚'}</div>
+      <h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted</h2>
+      <p style="color:var(--dim)">${result.quizTitle}</p>
+      <div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">${score}/${result.total}</div>
+      <div style="font-size:1.2rem">${result.percent}%</div>
+      <button class="btn btn-p" style="margin-top:1.2rem" onclick="vosSetTab('v-quiz')">Back to Quizzes</button>
+    </div></div>`;
+}
+
+function vResults(){
+  const results=S.get('vos_quiz_results',[]).filter(r=>r.matric===VAPP.user.matric);
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===VAPP.user.matric);
+  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percent,0)/results.length):0;
+  return ph('📊 My Results')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${results.length}</div><div class="ml">Quizzes</div></div>
+    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Average</div></div>
+    <div class="metric"><div class="mv">${att.length}</div><div class="ml">Attendance</div></div>
+  </div>
+  <div class="card"><div class="ct">Quiz Results</div>
+    ${results.length?`<div class="tw"><table>
+      <thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
+      <tbody>${results.map(r=>`<tr><td>${r.quizTitle}</td><td>${VOS_MODULES.find(m=>m.id===r.module)?.name||'—'}</td>
+        <td>${r.score}/${r.total}</td><td>${r.percent}%</td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No quiz results yet.</div>'}
+  </div>
+  <div class="card"><div class="ct">Attendance</div>
+    ${att.length?`<div class="tw"><table>
+      <thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody>${att.map(a=>`<tr><td>${VOS_MODULES.find(m=>m.id===a.module)?.name||a.module}</td>
+        <td>${new Date(a.date).toLocaleDateString()}</td><td>${a.time}</td>
+        <td><span class="badge ${a.status==='Present'?'bg':'ba'}">${a.status}</span></td></tr>`).join('')}</tbody>
+    </table></div>`:'<div class="al ai">No attendance records yet.</div>'}
+  </div>`;
+}
+
+function vPortfolio(){
+  const ports=S.get('vos_portfolios',[]).filter(p=>p.matric===VAPP.user.matric);
+  return ph('🖼️ My Portfolio','Upload practical work photos')+`
+  <div class="card"><div class="ct">➕ Upload Practical Work</div>
+    <div class="field"><label>Module</label>
+      <select id="port-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
+    <div class="field"><label>Caption</label><input id="port-caption" placeholder="What did you make?"></div>
+    <div class="field"><label>Photo</label><input type="file" id="port-file" accept="image/*"></div>
+    <button class="btn btn-p" onclick="vUploadPort()">📸 Upload</button>
+  </div>
+  <div class="card"><div class="ct">🖼️ My Items (${ports.length})</div>
+    ${ports.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem">
+      ${ports.map(p=>`<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        ${p.thumb?`<img src="${p.thumb}" style="width:100%;height:120px;object-fit:cover">`:'<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--panel)">🖼️</div>'}
+        <div style="padding:.5rem;font-size:.7rem"><b>${p.caption}</b><br><span style="color:var(--dim)">${VOS_MODULES.find(m=>m.id===p.module)?.icon||''} ${new Date(p.date).toLocaleDateString()}</span></div>
+      </div>`).join('')}
+    </div>`:'<div class="al ai">No items yet.</div>'}
+  </div>`;
+}
+function vUploadPort(){
+  const moduleId=document.getElementById('port-module').value;
+  const caption=document.getElementById('port-caption').value.trim();
+  const file=document.getElementById('port-file').files[0];
+  if(!caption){toast('Add a caption','error');return}
+  const save=thumb=>{
+    const ports=S.get('vos_portfolios',[]);
+    ports.push({id:'p_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
+      module:moduleId,caption,thumb,date:new Date().toISOString()});
+    S.set('vos_portfolios',ports);
+    toast('Uploaded ✅','success');vosRender('v-portfolio');
+  };
+  if(file){
+    if(file.size>5*1024*1024){toast('Max 5MB','error');return}
+    const r=new FileReader();r.onload=e=>save(e.target.result);r.readAsDataURL(file);
+  } else save('');
+}
+
+function vNotices(){
+  const ann=S.get('vos_announcements',[]).slice().reverse();
+  return ph('📢 Announcements')+(ann.length?ann.map(a=>`
+    <div class="card" style="${a.priority==='urgent'?'border-color:rgba(239,68,68,.4)':''}">
+      <div class="ct">${a.priority==='urgent'?'🔴 ':''}${a.title}</div>
+      <p style="font-size:.78rem;color:var(--dim);margin-bottom:.4rem">${new Date(a.createdAt).toLocaleString()} · ${a.author}</p>
+      <p style="font-size:.83rem;line-height:1.6">${a.body}</p>
+    </div>`).join(''):'<div class="al ai">No announcements yet.</div>');
+}
+
+function vProfile(){
+  const u=VAPP.user;
+  const att=S.get('vos_attendance',[]).filter(a=>a.matric===u.matric);
+  return ph('👤 My Profile')+`
+  <div class="card">
+    <div class="istrip">
+      <div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+      <div><div class="in">${u.name}</div><div class="im">${u.dept} · Level ${u.level}</div></div>
+    </div>
+    <div class="fr">
+      <div><div class="ml">Matric</div><div class="crn">${u.matric}</div></div>
+      <div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div>
+      <div><div class="ml">Total Attendance</div><div class="crn">${att.length} sessions</div></div>
+      <div><div class="ml">Member Since</div><div class="crn">${new Date(u.createdAt).toLocaleDateString()}</div></div>
+    </div>
+  </div>`;
+}
+
+// ── VOS ADMIN
+function vaDashboard(){
+  const students=S.get('vos_students',[]);
+  const att=S.get('vos_attendance',[]);
+  const today=new Date().toDateString();
+  return ph('🏠 Admin Dashboard','VOS 102 Overview')+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${students.length}</div><div class="ml">Students</div></div>
+    <div class="metric"><div class="mv">${att.filter(a=>new Date(a.date).toDateString()===today).length}</div><div class="ml">Today</div></div>
+    <div class="metric"><div class="mv">${S.get('vos_quizzes',[]).filter(q=>q.published).length}</div><div class="ml">Active Quizzes</div></div>
+    <div class="metric"><div class="mv">${S.get('vos_announcements',[]).length}</div><div class="ml">Announcements</div></div>
+  </div>
+  <div class="card"><div class="ct">📋 Module Attendance</div>
+    ${VOS_MODULES.map(m=>{
+      const ma=att.filter(a=>a.module===m.id);
+      return `<div class="crow">
+        <div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${ma.length} entries</div></div>
+        <div><span class="badge bg">${ma.filter(a=>a.status==='Present').length} P</span> 
+          <span class="badge ba">${ma.filter(a=>a.status==='Late').length} L</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function vaAttendance(){
+  const settings=S.get('vos_att_settings',{});
+  return ph('⏱️ Attendance Control','Open/close per module')+
+    VOS_MODULES.map(m=>{
+      const s=settings[m.id]||{open:false};
+      return `<div class="card">
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem">
+          <span style="font-size:1.6rem">${m.icon}</span>
+          <div style="flex:1"><div class="crn">${m.name}</div></div>
+          <span class="badge ${s.open?'bg':'br'}">${s.open?'OPEN':'CLOSED'}</span>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <button class="btn btn-g" onclick="vaSetAtt('${m.id}',true)">🟢 Open</button>
+          <button class="btn btn-d" onclick="vaSetAtt('${m.id}',false)">🔴 Close</button>
+          <button class="btn btn-s" onclick="vaViewRoll('${m.id}')">📋 View Roll</button>
+        </div>
+      </div>`;
+    }).join('');
+}
+function vaSetAtt(id,open){
+  const s=S.get('vos_att_settings',{});s[id]={...(s[id]||{}),open};S.set('vos_att_settings',s);
+  toast(`${open?'Opened':'Closed'} ✅`,open?'success':'info');vosRender('va-attendance');
+}
+function vaViewRoll(id){
+  const att=S.get('vos_attendance',[]).filter(a=>a.module===id);
+  const m=VOS_MODULES.find(x=>x.id===id);
+  alert(`${m.name} — ${att.length} entries\n\n`+att.slice(0,20).map(a=>`${a.name} (${a.matric}) · ${a.status} · ${new Date(a.date).toLocaleDateString()}`).join('\n')||'No entries');
+}
+
+function vaStudents(){
+  const students=S.get('vos_students',[]);
+  const att=S.get('vos_attendance',[]);
+  return ph('👥 Students',`${students.length} registered`)+
+  `<div class="card"><div class="tw"><table>
+    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Level</th><th>Phone</th><th>Att.</th></tr></thead>
+    <tbody>${students.length?students.map((s,i)=>`<tr>
+      <td>${i+1}</td><td>${s.name}</td><td>${s.matric}</td><td>${s.dept}</td>
+      <td>${s.level}</td><td>${s.phone||'—'}</td>
+      <td>${att.filter(a=>a.matric===s.matric).length}</td>
+    </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--dim);padding:2rem">No students registered yet</td></tr>'}</tbody>
+  </table></div></div>`;
+}
+
+let vQuizDraft=[];
+function vaQuiz(){
+  const quizzes=S.get('vos_quizzes',[]);
+  vQuizDraft=[];
+  return ph('📋 Quiz Manager')+`
+  <div class="card"><div class="ct">➕ Create Quiz</div>
+    <div class="field"><label>Title</label><input id="qm-title" placeholder="Quiz title"></div>
+    <div class="fr">
+      <div class="field"><label>Module</label>
+        <select id="qm-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
+      <div class="field"><label>Duration (mins)</label><input type="number" id="qm-dur" value="20" min="1"></div>
+    </div>
+    <div id="qm-questions"></div>
+    <button class="btn btn-s sm" onclick="vAddQ()">+ Add Question</button>
+    <div style="display:flex;gap:.5rem;margin-top:.8rem">
+      <button class="btn btn-p" onclick="vSaveQuiz(false)">💾 Save Draft</button>
+      <button class="btn btn-g" onclick="vSaveQuiz(true)">📢 Publish</button>
+    </div>
+  </div>
+  <div class="card"><div class="ct">All Quizzes (${quizzes.length})</div>
+    ${quizzes.length?quizzes.map(q=>`<div class="crow">
+      <div><div class="crn">${q.title}</div>
+        <div class="crc">${VOS_MODULES.find(m=>m.id===q.module)?.name} · ${q.questions.length} Qs · ${q.duration}min</div></div>
+      <div class="cra">
+        <span class="badge ${q.published?'bg':'bv'}">${q.published?'Published':'Draft'}</span>
+        ${!q.published?`<button class="btn btn-g sm" onclick="vPubQuiz('${q.id}')">Publish</button>`:''}
+        <button class="btn btn-d sm" onclick="vDelQuiz('${q.id}')">🗑</button>
+      </div>
+    </div>`).join(''):'<div class="al ai">No quizzes yet.</div>'}
+  </div>`;
+}
+function vAddQ(){
+  const idx=vQuizDraft.length;
+  vQuizDraft.push({text:'',options:['','','',''],correct:0});
+  const div=document.createElement('div');
+  div.id='qm-q-'+idx;
+  div.className='card';
+  div.style.background='var(--panel)';
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
+      <b style="color:var(--cyan);font-size:.8rem">QUESTION ${idx+1}</b>
+      <button class="btn btn-d sm" onclick="vRmQ(${idx})">✕</button>
+    </div>
+    <input placeholder="Question text" style="margin-bottom:.4rem" onchange="vQuizDraft[${idx}].text=this.value">
+    ${['A','B','C','D'].map((l,i)=>`
+      <div style="display:flex;gap:.4rem;margin-bottom:.3rem;align-items:center">
+        <input type="radio" name="c-${idx}" value="${i}" ${i===0?'checked':''} onchange="vQuizDraft[${idx}].correct=${i}">
+        <input placeholder="Option ${l}" onchange="vQuizDraft[${idx}].options[${i}]=this.value" style="flex:1">
+      </div>`).join('')}`;
+  document.getElementById('qm-questions').appendChild(div);
+}
+function vRmQ(i){document.getElementById('qm-q-'+i)?.remove();vQuizDraft.splice(i,1);}
+function vSaveQuiz(publish){
+  const title=document.getElementById('qm-title').value.trim();
+  const module=document.getElementById('qm-module').value;
+  const duration=parseInt(document.getElementById('qm-dur').value)||20;
+  if(!title){toast('Enter title','error');return}
+  if(!vQuizDraft.length){toast('Add at least 1 question','error');return}
+  const quizzes=S.get('vos_quizzes',[]);
+  quizzes.push({id:'q_'+Date.now(),title,module,duration,
+    questions:vQuizDraft.map(q=>({...q})),published:publish,createdAt:new Date().toISOString(),
+    author:VAPP.user.full_name||VAPP.user.name});
+  S.set('vos_quizzes',quizzes);
+  toast(publish?'Published ✅':'Draft saved','success');
+  vosRender('va-quiz');
+}
+function vPubQuiz(id){
+  const qs=S.get('vos_quizzes',[]);const q=qs.find(x=>x.id===id);
+  if(q){q.published=true;S.set('vos_quizzes',qs);toast('Published ✅','success');vosRender('va-quiz');}
+}
+function vDelQuiz(id){
+  if(!confirm('Delete?'))return;
+  S.set('vos_quizzes',S.get('vos_quizzes',[]).filter(q=>q.id!==id));
+  vosRender('va-quiz');
+}
+
+function vaResults(){
+  const results=S.get('vos_quiz_results',[]);
+  return ph('📊 Results',`${results.length} attempts`)+`
+  <div class="card"><div class="tw"><table>
+    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Quiz</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
+    <tbody>${results.length?results.sort((a,b)=>b.percent-a.percent).map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${r.name}</td><td>${r.matric}</td><td>${r.dept||'—'}</td>
+      <td>${r.quizTitle}</td><td>${r.score}/${r.total}</td>
+      <td><b>${r.percent}%</b></td><td>${new Date(r.date).toLocaleDateString()}</td>
+    </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:2rem">No results yet</td></tr>'}</tbody>
+  </table></div></div>`;
+}
+
+function vaNotices(){
+  const ann=S.get('vos_announcements',[]).slice().reverse();
+  return ph('📢 Announcements')+`
+  <div class="card"><div class="ct">✍️ New Announcement</div>
+    <div class="field"><label>Title</label><input id="an-title" placeholder="Title"></div>
+    <div class="field"><label>Body</label><textarea id="an-body" placeholder="Message…"></textarea></div>
+    <div class="field"><label>Priority</label>
+      <select id="an-pri"><option value="normal">Normal</option><option value="urgent">Urgent</option></select></div>
+    <button class="btn btn-p" onclick="vaPostAnn()">📢 Post</button>
+  </div>
+  <div class="card"><div class="ct">Posted (${ann.length})</div>
+    ${ann.length?ann.map(a=>`<div class="crow">
+      <div><div class="crn">${a.priority==='urgent'?'🔴 ':''}${a.title}</div>
+        <div class="crc">${new Date(a.createdAt).toLocaleString()} · ${a.author}</div></div>
+      <button class="btn btn-d sm" onclick="vaDelAnn('${a.id}')">🗑</button>
+    </div>`).join(''):'<div class="al ai">No announcements yet.</div>'}
+  </div>`;
+}
+function vaPostAnn(){
+  const title=document.getElementById('an-title').value.trim();
+  const body=document.getElementById('an-body').value.trim();
+  const priority=document.getElementById('an-pri').value;
+  if(!title||!body){toast('Fill all fields','error');return}
+  const ann=S.get('vos_announcements',[]);
+  ann.push({id:'a_'+Date.now(),title,body,priority,
+    author:VAPP.user.full_name||VAPP.user.name,createdAt:new Date().toISOString()});
+  S.set('vos_announcements',ann);
+  toast('Posted ✅','success');vosRender('va-notices');
+}
+function vaDelAnn(id){
+  S.set('vos_announcements',S.get('vos_announcements',[]).filter(a=>a.id!==id));
+  vosRender('va-notices');
+}
+
+function vaExport(){
+  return ph('📤 Export Data','Download as Excel (.xlsx)')+`
+  <div class="card"><div class="ct">📋 Export Attendance</div>
+    <button class="btn btn-p" onclick="vaExportAtt()">⬇️ Download Attendance</button></div>
+  <div class="card"><div class="ct">📊 Export Quiz Results</div>
+    <button class="btn btn-p" onclick="vaExportRes()">⬇️ Download Results</button></div>
+  <div class="card"><div class="ct">👥 Export Students</div>
+    <button class="btn btn-p" onclick="vaExportStu()">⬇️ Download Students</button></div>`;
+}
+function vaExportAtt(){
+  const rows=S.get('vos_attendance',[]).map(a=>({
+    Matric:a.matric,Name:a.name,Department:a.dept||'',Level:a.level||'',
+    Module:VOS_MODULES.find(m=>m.id===a.module)?.name||a.module,
+    Date:new Date(a.date).toLocaleDateString('en-NG'),Time:a.time,Status:a.status,
+  }));
+  vaXlsx(rows,'VOS102_Attendance');
+}
+function vaExportRes(){
+  const rows=S.get('vos_quiz_results',[]).map(r=>({
+    Matric:r.matric,Name:r.name,Department:r.dept||'',Quiz:r.quizTitle,
+    Module:VOS_MODULES.find(m=>m.id===r.module)?.name||r.module,
+    Score:r.score,Total:r.total,Percent:r.percent+'%',
+    Date:new Date(r.date).toLocaleDateString('en-NG'),
+  }));
+  vaXlsx(rows,'VOS102_Results');
+}
+function vaExportStu(){
+  const att=S.get('vos_attendance',[]);
+  const rows=S.get('vos_students',[]).map(s=>({
+    Name:s.name,Matric:s.matric,Department:s.dept,Level:s.level,
+    Phone:s.phone||'',Attendance:att.filter(a=>a.matric===s.matric).length,
+    Registered:new Date(s.createdAt).toLocaleDateString('en-NG'),
+  }));
+  vaXlsx(rows,'VOS102_Students');
+}
+function vaXlsx(rows,filename){
+  if(!rows.length){toast('No data','error');return}
+  if(typeof XLSX==='undefined'){toast('XLSX not loaded','error');return}
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Data');
+  XLSX.writeFile(wb,filename+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Downloaded ✅','success');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+initVOSDefaults();
+</script>
+</body>
+</html>
