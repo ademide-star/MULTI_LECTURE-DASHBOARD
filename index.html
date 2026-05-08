@@ -2343,22 +2343,27 @@ function vaDelAnn(id){
 function vasSettings(){
   if(!vpIsSuperAdmin(VAPP.user)) return '<div class="al ae">⛔ Super Admin access only.</div>';
   const admins=S.get('vos_admins',[]);
-  const settings=S.get('vos_att_settings',{});
+  const modAdmins=admins.filter(a=>a.role!=='super_admin');
   return ph('⚙️ Settings & Admins','Super Admin Panel')+`
 
-  <!-- Module Passwords -->
-  <div class="card"><div class="ct">🔐 Module Admin Passwords</div>
-    <p style="font-size:.78rem;color:var(--dim);margin-bottom:1rem">Set or change the login password for each module admin.</p>
-    ${admins.filter(a=>a.role!=='super_admin').map((a,i)=>`
-    <div class="crow" style="margin-bottom:.5rem">
-      <div><div class="crn">${a.full_name||a.name} <span class="badge bc" style="font-size:.65rem;margin-left:.4rem">${vpModuleLabel(a)}</span></div>
-        <div class="crc">@${a.username} · ${a.role}</div></div>
+  <!-- Module Admin Passwords -->
+  <div class="card"><div class="ct">🔐 Set Module Admin Passwords</div>
+    <p style="font-size:.78rem;color:var(--dim);margin-bottom:1rem">Set or reset the login password for each module admin. Passwords are never shown — enter a new one to change it.</p>
+    ${modAdmins.length===0?'<div class="al ai">No module admins yet. Create one below.</div>':
+    modAdmins.map(a=>`
+    <div class="crow" style="margin-bottom:.6rem;align-items:center">
+      <div style="flex:1">
+        <div class="crn">${a.full_name||a.name} <span class="badge bc" style="font-size:.63rem;margin-left:.4rem">${vpModuleLabel(a)}</span></div>
+        <div class="crc">@${a.username} · Module Admin</div>
+      </div>
       <div style="display:flex;gap:.4rem;align-items:center">
-        <input type="password" placeholder="New password" id="admpw-${i}" style="width:140px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:.4rem .7rem;color:var(--text);font-size:.78rem;outline:none">
-        <button class="btn btn-s sm" onclick="vaSetAdminPW(${i},'${a.id||a.username}')">Set</button>
+        <input type="password" placeholder="New password" data-admin-id="${a.id||a.username}"
+          class="admpw-input"
+          style="width:140px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:.4rem .7rem;color:var(--text);font-size:.78rem;outline:none"
+          onkeydown="if(event.key==='Enter')vaSetAdminPWById('${a.id||a.username}',this.value)">
+        <button class="btn btn-p sm" onclick="vaSetAdminPWById('${a.id||a.username}',this.previousElementSibling.value)">Set</button>
       </div>
     </div>`).join('')}
-    ${admins.filter(a=>a.role!=='super_admin').length===0?'<div class="al ai">No module admins yet.</div>':''}
   </div>
 
   <!-- Add New Admin -->
@@ -2415,17 +2420,23 @@ function toggleSuperAdminModules(){
   if(wrap) wrap.style.opacity=role==='super_admin'?'0.4':'1';
 }
 
-function vaSetAdminPW(idx,idOrUsername){
-  const pw=document.getElementById('admpw-'+idx)?.value.trim();
-  if(!pw||pw.length<4){toast('Enter a password (min 4 chars)','error');return;}
+function vaSetAdminPWById(idOrUsername,pw){
+  if(!pw||!pw.trim()){toast('Enter a password','error');return;}
+  pw=pw.trim();
+  if(pw.length<4){toast('Password must be at least 4 characters','error');return;}
   const admins=S.get('vos_admins',[]);
   const a=admins.find(x=>(x.id||x.username)===idOrUsername);
   if(!a){toast('Admin not found','error');return;}
   a.pw=pw;a.pw_hash=pw;
   S.set('vos_admins',admins);
-  toast(`Password updated for ${a.full_name||a.username} ✅`,'success');
-  document.getElementById('admpw-'+idx).value='';
+  // Clear the input
+  document.querySelectorAll('.admpw-input').forEach(inp=>{
+    if(inp.dataset.adminId===idOrUsername) inp.value='';
+  });
+  toast('Password updated for '+( a.full_name||a.username)+' ✅','success');
 }
+// Legacy alias
+function vaSetAdminPW(idx,idOrUsername){vaSetAdminPWById(idOrUsername,'');}
 
 function vaCreateAdmin(){
   const name=document.getElementById('na-name')?.value.trim();
@@ -2466,6 +2477,53 @@ function vaDelAdmin(idOrUsername){
   S.set('vos_admins',admins);
   toast('Admin removed','info');
   vosRender('va-settings');
+}
+
+
+function vaMyProfile(){
+  const u=VAPP.user;
+  return ph('👤 My Admin Profile')+`
+  <div class="card">
+    <div class="istrip">
+      <div class="iav">${(u.full_name||u.name||'A').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div><div class="in">${u.full_name||u.name}</div>
+        <div class="im">@${u.username} · ${u.role==='super_admin'?'⭐ Super Admin':'Module Admin'}</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">🔑 Change My Password</div>
+    <p style="font-size:.76rem;color:var(--dim);margin-bottom:.9rem">Your password is private and never shown. Enter your current password to update it.</p>
+    <div class="field"><label>Current Password</label><input type="password" id="amp-old" placeholder="Current password…"></div>
+    <div class="fr">
+      <div class="field"><label>New Password</label><input type="password" id="amp-new" placeholder="New password (min 4)…"></div>
+      <div class="field"><label>Confirm</label><input type="password" id="amp-conf" placeholder="Confirm…"></div>
+    </div>
+    <div class="ae al hidden" id="amp-err"></div>
+    <div class="as al hidden" id="amp-ok">✅ Password changed!</div>
+    <button class="btn btn-p" onclick="vaChangeMyPW()">🔄 Update Password</button>
+  </div>`;
+}
+
+function vaChangeMyPW(){
+  const old=document.getElementById('amp-old')?.value;
+  const np=document.getElementById('amp-new')?.value;
+  const cf=document.getElementById('amp-conf')?.value;
+  const err=document.getElementById('amp-err'),ok=document.getElementById('amp-ok');
+  if(err)err.className='ae al hidden';if(ok)ok.className='as al hidden';
+  const u=VAPP.user;
+  const admins=S.get('vos_admins',[]);
+  const idx=admins.findIndex(a=>(a.id||a.username)===(u.id||u.username));
+  if(idx===-1){if(err){err.textContent='❌ Account not found.';err.className='ae al';}return;}
+  const stored=admins[idx].pw||admins[idx].pw_hash||admins[idx].password||'';
+  if(old!==stored){if(err){err.textContent='❌ Current password incorrect.';err.className='ae al';}return;}
+  if(!np||np.length<4){if(err){err.textContent='❌ New password must be 4+ characters.';err.className='ae al';}return;}
+  if(np!==cf){if(err){err.textContent='❌ Passwords do not match.';err.className='ae al';}return;}
+  admins[idx]={...admins[idx],pw:np,pw_hash:np,password:np};
+  S.set('vos_admins',admins);
+  VAPP.user={...VAPP.user,pw:np,pw_hash:np};
+  if(ok)ok.className='as al';
+  ['amp-old','amp-new','amp-conf'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  toast('Password changed ✅','success');
 }
 
 function vaExport(){
@@ -2527,6 +2585,7 @@ const VOS_ADMIN_TABS_PATCH=[
   {id:'va-notices',ico:'📢',label:'Announcements'},
   {id:'va-export',ico:'📤',label:'Export Data'},
   {id:'va-settings',ico:'⚙️',label:'Settings & Admins'},
+  {id:'va-my-profile',ico:'🔑',label:'My Password'},
 ];
 
 function vpEsc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
@@ -2742,7 +2801,7 @@ function vosRender(id){
     'v-results':vResults,'v-portfolio':vPortfolio,'v-notices':vNotices,'v-profile':vProfile,
     'va-dashboard':vaDashboard,'va-attendance':vaAttendance,'va-students':vaStudents,
     'va-quiz':vaQuiz,'va-results':vaResults,'va-portfolio':vaPortfolioAdmin,
-    'va-notices':vaNotices,'va-export':vaExport,'va-settings':vasSettings,
+    'va-notices':vaNotices,'va-export':vaExport,'va-settings':vasSettings,'va-my-profile':vaMyProfile,
   };
   const fn=map[id];
   if(!fn){c.innerHTML='<div class="tab-panel"><div class="al ae">Tab not found: '+id+'</div></div>';return;}
@@ -2855,8 +2914,64 @@ function vNotices(){
 function vProfile(){
   const u=vpNormalizeStudent(VAPP.user);
   const att=(S.get('vos_attendance',[])||[]).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
-  return ph('👤 My Profile')+`<div class="card"><div class="istrip"><div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div><div class="in">${u.name}</div><div class="im">${u.dept} · Level ${u.level}</div></div></div><div class="fr"><div><div class="ml">Matric</div><div class="crn">${u.matric}</div></div><div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div><div><div class="ml">Module</div><div class="crn">${vpModuleIcon(u.module)} ${vpModuleName(u.module)}</div></div><div><div class="ml">Total Attendance</div><div class="crn">${att.length} sessions</div></div></div></div>`;
+  return ph('👤 My Profile')+`
+  <div class="card">
+    <div class="istrip">
+      <div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+      <div style="flex:1">
+        <div class="in">${u.name}</div>
+        <div class="im">${u.dept} · Level ${u.level}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin-top:.8rem">
+      <div><div class="ml">Matric Number</div><div class="crn">${u.matric}</div></div>
+      <div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div>
+      <div><div class="ml">Practical Module</div><div class="crn">${vpModuleIcon(u.module)} ${vpModuleName(u.module)}</div></div>
+      <div><div class="ml">Total Attendance</div><div class="crn">${att.length} session${att.length!==1?'s':''}</div></div>
+      <div><div class="ml">Department</div><div class="crn">${u.dept}</div></div>
+      <div><div class="ml">Level</div><div class="crn">${u.level}</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">🔒 Change Password</div>
+    <p style="font-size:.76rem;color:var(--dim);margin-bottom:.9rem">Your password is never displayed. Enter your current password to set a new one.</p>
+    <div class="field"><label>Current Password</label><input type="password" id="cp-old" placeholder="Current password…" autocomplete="current-password"></div>
+    <div class="fr">
+      <div class="field"><label>New Password</label><input type="password" id="cp-new" placeholder="New password (min 4 chars)…" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm New Password</label><input type="password" id="cp-confirm" placeholder="Confirm new password…" autocomplete="new-password"></div>
+    </div>
+    <div class="ae al hidden" id="cp-err"></div>
+    <div class="as al hidden" id="cp-ok">✅ Password changed successfully!</div>
+    <button class="btn btn-p" onclick="vChangePassword()">🔑 Change Password</button>
+  </div>`;
 }
+
+function vChangePassword(){
+  const oldPw=document.getElementById('cp-old')?.value;
+  const newPw=document.getElementById('cp-new')?.value;
+  const conf=document.getElementById('cp-confirm')?.value;
+  const err=document.getElementById('cp-err');
+  const ok=document.getElementById('cp-ok');
+  if(err) err.className='ae al hidden';
+  if(ok) ok.className='as al hidden';
+  const u=VAPP.user;
+  const students=S.get('vos_students',[]);
+  const idx=students.findIndex(s=>s.matric===u.matric);
+  if(idx===-1){if(err){err.textContent='❌ Account not found.';err.className='ae al';}return;}
+  const stu=students[idx];
+  const storedPw=stu.pw||stu.password||stu.pw_hash||'';
+  if(oldPw!==storedPw){if(err){err.textContent='❌ Current password is incorrect.';err.className='ae al';}return;}
+  if(!newPw||newPw.length<4){if(err){err.textContent='❌ New password must be at least 4 characters.';err.className='ae al';}return;}
+  if(newPw!==conf){if(err){err.textContent='❌ New passwords do not match.';err.className='ae al';}return;}
+  students[idx]={...stu,pw:newPw,password:newPw,pw_hash:newPw};
+  S.set('vos_students',students);
+  VAPP.user={...VAPP.user,pw:newPw,password:newPw};
+  if(ok) ok.className='as al';
+  ['cp-old','cp-new','cp-confirm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  toast('Password changed ✅','success');
+}
+
+
 function vaDashboard(){
   const students=vpStudentsByAccess(VAPP.user);
   const att=vpAttendanceByAccess(VAPP.user);
@@ -2964,3 +3079,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
+
