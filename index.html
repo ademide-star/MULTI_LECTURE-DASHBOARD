@@ -352,7 +352,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 // FIREBASE INIT
 // ═══════════════════════════════════════════════════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs }
+import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const _fbApp = initializeApp({
@@ -365,34 +365,45 @@ const _fbApp = initializeApp({
 });
 const _db = getFirestore(_fbApp);
 
-// ── Key sanitiser (Firestore doc IDs cannot contain / . [ ] # $)
+// ── Key sanitiser: Firestore doc IDs cannot contain / . [ ] # $
 function _fkey(k){ return String(k).replace(/[\/\.#\$\[\]]/g,'__').substring(0,1490); }
 
 // ── Write one key to Firestore (fire-and-forget)
 function _fbSet(k, v){
   setDoc(doc(_db,'portal_data',_fkey(k)),{value:JSON.stringify(v),ts:Date.now()})
-    .catch(e=>console.warn('[FB set]',k,e));
+    .catch(e=>console.warn('[Firebase] Write failed for key:',k,e.message));
 }
 
 // ── Delete one key from Firestore
 function _fbDel(k){
   deleteDoc(doc(_db,'portal_data',_fkey(k)))
-    .catch(e=>console.warn('[FB del]',k,e));
+    .catch(e=>console.warn('[Firebase] Delete failed for key:',k,e.message));
 }
 
 // ── Pull ALL portal data from Firestore into localStorage on boot
 async function _fbPullAll(){
   try{
     const snap = await getDocs(collection(_db,'portal_data'));
+    let count=0;
     snap.forEach(d=>{
       try{
         const raw = d.data().value;
-        if(raw !== undefined) localStorage.setItem(d.id, raw);
-      }catch{}
+        if(raw !== undefined){ localStorage.setItem(d.id, raw); count++; }
+      }catch(e){ console.warn('[Firebase] Failed to restore key:',d.id,e.message); }
     });
-    console.log('[Firebase] Pulled',snap.size,'keys from Firestore ✅');
+    console.log('[Firebase] Pulled',count,'keys from Firestore ✅');
+    return true;
   }catch(e){
-    console.warn('[Firebase] Pull failed — running on local cache:',e);
+    // Most likely cause: Firestore security rules are still in locked mode
+    // Go to Firebase Console → Firestore → Rules and set:
+    //   match /portal_data/{doc} { allow read, write: if true; }
+    console.error('[Firebase] Pull failed. Check Firestore security rules!',e.message);
+    const warn=document.createElement('div');
+    warn.style.cssText='position:fixed;top:0;left:0;width:100%;background:#ef4444;color:#fff;font-family:monospace;font-size:.75rem;padding:.4rem 1rem;z-index:9999;text-align:center;cursor:pointer;';
+    warn.innerHTML='⚠️ Firebase connection failed — running on local data only. Click to dismiss.';
+    warn.onclick=()=>warn.remove();
+    document.body.prepend(warn);
+    return false;
   }
 }
 
@@ -400,17 +411,22 @@ async function _fbPullAll(){
 window._fkey    = _fkey;
 window._fbSet   = _fbSet;
 window._fbDel   = _fbDel;
-window._fbPullAll = _fbPullAll;
 
-// ── Boot sequence: pull from Firestore, then dispatch ready event
+// ── Show loading indicator
 const loadMsg = document.createElement('div');
 loadMsg.id = 'fb-load-msg';
 loadMsg.style.cssText='position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.8rem;padding:.5rem 1rem;z-index:9999;text-align:center;';
 loadMsg.textContent = '⟳ Connecting to NeuroMatrix cloud…';
-document.body ? document.body.prepend(loadMsg) : document.addEventListener('DOMContentLoaded',()=>document.body.prepend(loadMsg));
+document.body.prepend(loadMsg);
+
+// ── Pull data, then signal app to boot
 await _fbPullAll();
 loadMsg.remove();
-window.dispatchEvent(new Event('firebase-ready'));
+
+// Signal the main script that Firebase is ready
+// Use a flag on window in case the event fires before the listener is set up
+window._fbReady = true;
+window.dispatchEvent(new CustomEvent('firebase-ready'));
 </script>
 
 <script>
@@ -3349,6 +3365,8 @@ function vaExportStu(){const att=vpAttendanceByAccess(VAPP.user);const rows=vpSt
 // ═══════════════════════════════════════════════════════════
 // ── Boot after Firebase has pulled all data from Firestore
 function _bootApp(){
+  if(window._fbDidBoot) return;
+  window._fbDidBoot = true;
 
   // ── 1. Explicit initial display states ──────────────────
   const hide = ['shell','vos-shell','vos-register','vos-login','footer','gate'];
@@ -3376,19 +3394,22 @@ function _bootApp(){
   APP.student = stu;
 }
 
-// Wait for Firebase module to signal ready; fall back to DOMContentLoaded
-// in case module fires before this script runs
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    window.addEventListener('firebase-ready', _bootApp, {once:true});
-    // Safety fallback: if firebase-ready fires before we listened, boot anyway after 4s
-    setTimeout(()=>{ if(!window._fbDidBoot){ window._fbDidBoot=true; _bootApp(); } }, 4000);
-  });
-} else {
-  window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
-  setTimeout(()=>{ if(!window._fbDidBoot){ window._fbDidBoot=true; _bootApp(); } }, 4000);
+// ── Boot strategy: use flag OR event, whichever comes first
+// The module sets window._fbReady = true before dispatching the event.
+// If module ran before this script finished parsing, _fbReady is already true.
+function _tryBoot(){
+  if(window._fbReady){ _bootApp(); return; }
+  // Not ready yet — listen for the event
+  window.addEventListener('firebase-ready', _bootApp, {once:true});
+  // Hard fallback: if Firebase never responds within 6s, boot anyway on local cache
+  setTimeout(()=>{ if(!window._fbDidBoot){ console.warn('[NeuroMatrix] Firebase timeout — booting on local cache'); _bootApp(); } }, 6000);
 }
-window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _tryBoot, {once:true});
+} else {
+  _tryBoot();
+}
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
