@@ -352,7 +352,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 // FIREBASE INIT
 // ═══════════════════════════════════════════════════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs }
+import { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const _fbApp = initializeApp({
@@ -411,6 +411,24 @@ async function _fbPullAll(){
     return false;
   }
 }
+
+// ── Live refresh: re-pull shared data keys from Firestore on demand
+// Called when admin opens dashboard to get latest student registrations
+const _LIVE_KEYS = ['vos_students','vos_attendance','vos_quiz_results','vos_quizzes',
+  'vos_assignments','vos_assignment_submissions','vos_portfolios','vos_announcements',
+  'vos_att_settings','vos_admins','vos_forums'];
+
+window._fbRefresh = async function(){
+  try{
+    const snap = await getDocs(collection(_db,'portal_data'));
+    snap.forEach(d=>{
+      if(_fbSkip(d.id)) return;
+      if(!_LIVE_KEYS.includes(d.id)) return; // only refresh shared keys
+      try{ const raw=d.data().value; if(raw!==undefined) localStorage.setItem(d.id,raw); }catch{}
+    });
+    return true;
+  }catch(e){ console.warn('[Firebase] Refresh failed:',e.message); return false; }
+};
 
 // ── Expose to window so the main (non-module) script can use them
 window._fkey    = _fkey;
@@ -2903,6 +2921,9 @@ function buildVOSAdminShell(){
   vpRenderBrandSlots();
   vosSetTab('va-dashboard');
 }
+// Tabs that need fresh data from Firestore before rendering
+const _REFRESH_TABS = new Set(['va-dashboard','va-students','va-results','va-attendance','va-portfolio','va-assignments','v-quiz','v-assignments','v-results','v-portfolio']);
+
 function vosRender(id){
   const c=document.getElementById('vos-tab-content');
   const map={
@@ -2914,6 +2935,17 @@ function vosRender(id){
   };
   const fn=map[id];
   if(!fn){c.innerHTML='<div class="tab-panel"><div class="al ae">Tab not found: '+id+'</div></div>';return;}
+
+  // For data-heavy tabs, pull fresh from Firestore then re-render
+  if(_REFRESH_TABS.has(id) && window._fbRefresh){
+    c.innerHTML='<div class="tab-panel"><div class="al ai" style="padding:2rem">⟳ Loading latest data…</div></div>';
+    window._fbRefresh().then(()=>{
+      try{c.innerHTML=`<div class="tab-panel">${fn()}</div>`;}
+      catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error: '+e.message+'</div></div>';console.error(e);}
+    });
+    return;
+  }
+
   try{c.innerHTML=`<div class="tab-panel">${fn()}</div>`;}
   catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error loading tab: '+e.message+'</div></div>';console.error(e);}
 }
@@ -3427,4 +3459,3 @@ if(document.readyState === 'loading'){
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
