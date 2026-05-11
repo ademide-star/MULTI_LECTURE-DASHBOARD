@@ -380,6 +380,10 @@ function _fbDel(k){
     .catch(e=>console.warn('[Firebase] Delete failed for key:',k,e.message));
 }
 
+// ── Keys that must never be pulled from Firestore (per-device identity/session)
+const _FB_SKIP_KEYS = ['nm_student','nm_lec_log','nm_stu_log'];
+function _fbSkip(id){ return _FB_SKIP_KEYS.some(k=>id===k||id.startsWith(k)); }
+
 // ── Pull ALL portal data from Firestore into localStorage on boot
 async function _fbPullAll(){
   try{
@@ -387,6 +391,7 @@ async function _fbPullAll(){
     let count=0;
     snap.forEach(d=>{
       try{
+        if(_fbSkip(d.id)) return; // never overwrite per-device keys
         const raw = d.data().value;
         if(raw !== undefined){ localStorage.setItem(d.id, raw); count++; }
       }catch(e){ console.warn('[Firebase] Failed to restore key:',d.id,e.message); }
@@ -423,21 +428,29 @@ document.body.prepend(loadMsg);
 await _fbPullAll();
 loadMsg.remove();
 
+// ── One-time cleanup: remove accidentally-synced local-only keys from Firestore
+_FB_SKIP_KEYS.forEach(k=>{ deleteDoc(doc(_db,'portal_data',k)).catch(()=>{}); });
+
 // Signal the main script that Firebase is ready
-// Use a flag on window in case the event fires before the listener is set up
 window._fbReady = true;
 window.dispatchEvent(new CustomEvent('firebase-ready'));
 </script>
 
 <script>
+// ── Keys that are per-device only — never synced to Firestore
+// nm_student = who is logged in on THIS device (each student's own identity)
+// nm_lec_log / nm_stu_log = per-device activity logs
+const _LOCAL_ONLY_KEYS = ['nm_student','nm_lec_log','nm_stu_log'];
+function _isLocalOnly(k){ return _LOCAL_ONLY_KEYS.some(lk=>String(k)===lk||String(k).startsWith(lk)); }
+
 // ═══════════════════════════════════════════════════════════
 // STORAGE & UTILITIES  (localStorage cache + Firestore sync)
 // ═══════════════════════════════════════════════════════════
 const S={
   get:(k,d)=>{try{const fk=window._fkey?window._fkey(k):k;const v=localStorage.getItem(fk);return v!=null?JSON.parse(v):(d===undefined?{}:d)}catch{return d===undefined?{}:d}},
-  set:(k,v)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.setItem(fk,JSON.stringify(v));if(window._fbSet)window._fbSet(k,v);}catch{}},
+  set:(k,v)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.setItem(fk,JSON.stringify(v));if(window._fbSet&&!_isLocalOnly(k))window._fbSet(k,v);}catch{}},
   push:(k,item)=>{const a=S.get(k,[]);a.push(item);S.set(k,a);},
-  del:(k)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.removeItem(fk);if(window._fbDel)window._fbDel(k);}catch{}},
+  del:(k)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.removeItem(fk);if(window._fbDel&&!_isLocalOnly(k))window._fbDel(k);}catch{}},
 };
 
 function showEl(id,disp){
