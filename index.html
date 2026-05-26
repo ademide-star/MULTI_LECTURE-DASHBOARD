@@ -8,31 +8,32 @@
 <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=VC8Xlaps1J2tloin4ulR8kEfLLtTigr-ObxLLuk_u61yc7UsRbd9H541mhiwVMzhWkMaddcIJljKseu_DWIdfQ" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --ink:#080d18;--surface:#0f1724;--panel:#141e30;--border:#1c2d44;
-  --muted:#2a4060;--dim:#6a8aaa;--text:#ddeeff;--bright:#ffffff;
-  --cyan:#00d4ff;--violet:#7c3aed;--green:#10b981;--amber:#f59e0b;
-  --red:#ef4444;--pink:#ec4899;
+  --ink:#ffffff;--surface:#ffffff;--panel:#f6f8fb;--border:#e3e9f1;
+  --muted:#6b7a90;--dim:#4b5a73;--text:#0f1a2e;--bright:#020814;
+  --cyan:#0b75a5;--violet:#6750a4;--green:#0f7a55;--amber:#b7791f;
+  --red:#c53030;--pink:#b83280;
   --head:'Syne', sans-serif;--mono:'DM Mono', monospace;--serif:'Fraunces', serif;
+  --shadow-sm:0 1px 2px rgba(15,26,46,.04),0 1px 1px rgba(15,26,46,.03);
+  --shadow-md:0 4px 16px rgba(15,26,46,.06),0 2px 4px rgba(15,26,46,.04);
+  --shadow-lg:0 12px 28px rgba(15,26,46,.08),0 6px 12px rgba(15,26,46,.05);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:var(--mono);background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
-body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);
-  background-size:64px 64px}
+body{font-family:var(--mono);background:#ffffff;color:var(--text);min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:transparent}
 #app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
 .shell{display:none;flex-direction:row;min-height:100vh}
 .sb{width:252px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;padding:1.4rem .9rem;gap:0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
+  display:flex;flex-direction:column;padding:1.4rem .9rem;gap:0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;box-shadow:var(--shadow-sm)}
 .sb-logo{font-family:var(--head);font-size:1.05rem;font-weight:800;color:var(--cyan);
   display:flex;align-items:center;gap:.55rem;padding:.4rem .4rem 1.4rem;letter-spacing:-.02em}
 .sb-logo span{font-size:1.35rem}
 .sb-sect{font-size:.62rem;color:var(--muted);letter-spacing:.13em;text-transform:uppercase;padding:.8rem .4rem .35rem}
 .sb-nav{display:flex;flex-direction:column;gap:.18rem;flex:1}
 .ni{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:9px;
-  cursor:pointer;font-size:.8rem;color:var(--dim);transition:all .18s;border:1px solid transparent}
-.ni:hover{background:var(--panel);color:var(--text)}
-.ni.active{background:rgba(0,212,255,.1);color:var(--cyan);border-color:rgba(0,212,255,.22)}
+  cursor:pointer;font-size:.8rem;color:var(--dim);transition:all .18s;border:1px solid transparent;position:relative}
+.ni:hover{background:var(--panel);color:var(--text);transform:translateX(2px)}
+.ni.active{background:rgba(11,117,165,.09);color:var(--cyan);border-color:rgba(11,117,165,.22);font-weight:600}
 .ni .ico{font-size:.95rem;flex-shrink:0;width:1.1rem;text-align:center}
 .sb-sel{background:var(--panel);border:1px solid var(--border);border-radius:9px;
   color:var(--text);font-family:var(--mono);font-size:.8rem;padding:.5rem .85rem;width:100%;cursor:pointer;outline:none;margin-bottom:.45rem}
@@ -53,23 +54,26 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .br{background:rgba(239,68,68,.09);color:var(--red);border:1px solid rgba(239,68,68,.22)}
 .bv{background:rgba(124,58,237,.09);color:#a78bfa;border:1px solid rgba(124,58,237,.22)}
 .bp{background:rgba(236,72,153,.09);color:var(--pink);border:1px solid rgba(236,72,153,.22)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.1rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.1rem;box-shadow:var(--shadow-sm);transition:box-shadow .25s ease,transform .2s ease}
+.card:hover{box-shadow:var(--shadow-md)}
 .ct{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright);margin-bottom:.9rem}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.4rem}
-.metric{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:1rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:1rem;box-shadow:var(--shadow-sm);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.metric:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--cyan)}
 .mv{font-family:var(--head);font-size:1.65rem;font-weight:800;color:var(--cyan)}
 .ml{font-size:.7rem;color:var(--dim);margin-top:.2rem}
 .field{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.9rem}
 label{font-size:.74rem;color:var(--dim);letter-spacing:.04em}
-input,textarea,select{background:var(--panel);border:1px solid var(--border);border-radius:9px;
-  padding:.65rem .95rem;color:var(--text);font-family:var(--mono);font-size:.82rem;width:100%;outline:none;transition:border-color .18s}
-input:focus,textarea:focus,select:focus{border-color:var(--cyan)}
+input,textarea,select{background:#ffffff;border:1px solid var(--border);border-radius:9px;
+  padding:.65rem .95rem;color:var(--text);font-family:var(--mono);font-size:.82rem;width:100%;outline:none;transition:border-color .18s,box-shadow .18s}
+input:focus,textarea:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(11,117,165,.12)}
 textarea{resize:vertical;min-height:80px}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
 .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
   padding:.6rem 1.3rem;border-radius:9px;border:none;cursor:pointer;
-  font-family:var(--mono);font-size:.8rem;font-weight:500;transition:all .18s}
+  font-family:var(--mono);font-size:.8rem;font-weight:500;transition:all .18s;position:relative;overflow:hidden}
+.btn:active{transform:scale(.97)}
 .btn-p{background:var(--cyan);color:var(--ink)}
 .btn-p:hover{background:#00bbd8;transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,212,255,.22)}
 .btn-s{background:var(--panel);color:var(--text);border:1px solid var(--border)}
@@ -132,7 +136,7 @@ tr:hover td{background:var(--panel)}
   padding:.38rem 1.1rem;font-size:.72rem;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;
   animation:fadeUp .5s ease both}
 .hero-title{font-family:var(--head);font-size:clamp(2.6rem,7vw,5.5rem);font-weight:800;line-height:.93;
-  letter-spacing:-.035em;background:linear-gradient(135deg,#fff 0%,var(--cyan) 38%,var(--violet) 75%);
+  letter-spacing:-.035em;background:linear-gradient(135deg,#07111f 0%,var(--cyan) 42%,var(--violet) 82%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:fadeUp .6s .08s ease both}
 .hero-sub{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim);
   max-width:440px;line-height:1.75;animation:fadeUp .6s .18s ease both}
@@ -149,14 +153,14 @@ tr:hover td{background:var(--panel)}
 .pcard .pico{font-size:2rem}
 .pcard .plabel{font-family:var(--head);font-size:.95rem;font-weight:700;color:var(--bright)}
 .pcard .pdesc{font-size:.7rem;color:var(--dim);text-align:center;line-height:1.5}
-#gate{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);
+#gate{display:none;position:fixed;inset:0;z-index:100;background:rgba(255,255,255,.85);
   backdrop-filter:blur(14px);align-items:center;justify-content:center}
 .gbox{background:var(--surface);border:1px solid var(--border);border-radius:18px;
   padding:2.2rem;width:370px;max-width:95vw;display:flex;flex-direction:column;gap:1.1rem;animation:fadeUp .3s ease}
 .gt{font-family:var(--head);font-size:1.2rem;font-weight:800;color:var(--bright)}
 #toast{position:fixed;bottom:1.8rem;right:1.8rem;z-index:999;background:var(--surface);
   border:1px solid var(--border);border-radius:13px;padding:.85rem 1.2rem;font-size:.8rem;
-  box-shadow:0 18px 44px rgba(0,0,0,.5);opacity:0;transform:translateY(10px);
+  box-shadow:0 18px 44px rgba(21,32,51,.14);opacity:0;transform:translateY(10px);
   transition:all .28s;max-width:310px;display:flex;align-items:center;gap:.65rem}
 #toast.show{opacity:1;transform:translateY(0)}
 #toast.ts{border-color:rgba(16,185,129,.4);color:var(--green)}
@@ -164,6 +168,21 @@ tr:hover td{background:var(--panel)}
 #toast.ti{border-color:rgba(0,212,255,.4);color:var(--cyan)}
 footer{border-top:1px solid var(--border);padding:.9rem 2rem;font-size:.7rem;
   color:var(--dim);text-align:center;background:var(--surface)}
+.scope-strip{background:linear-gradient(135deg,rgba(11,117,165,.06),rgba(103,80,164,.04));border:1px solid rgba(11,117,165,.18);border-radius:10px;padding:.55rem .85rem;margin-bottom:.6rem;font-size:.7rem;color:var(--dim)}
+.scope-readout{display:inline-block;background:rgba(11,117,165,.08);border:1px solid rgba(11,117,165,.22);color:var(--cyan);padding:.3rem .75rem;border-radius:6px;font-weight:600;font-size:.78rem}
+.scope-chip{display:inline-flex;align-items:center;gap:.3rem;background:rgba(103,80,164,.08);border:1px solid rgba(103,80,164,.22);color:var(--violet);padding:.25rem .65rem;border-radius:99px;font-size:.7rem;font-weight:600}
+.module-chip{display:inline-flex;align-items:center;gap:.3rem;background:rgba(11,117,165,.08);border:1px solid rgba(11,117,165,.22);color:var(--cyan);padding:.25rem .65rem;border-radius:99px;font-size:.7rem;font-weight:600}
+.verify-pill{display:inline-block;font-size:.66rem;padding:.18rem .55rem;border-radius:99px;font-weight:600;margin-top:.25rem}
+.verify-pill.ok{background:rgba(15,122,85,.1);color:var(--green);border:1px solid rgba(15,122,85,.25)}
+.verify-pill.pending{background:rgba(183,121,31,.1);color:var(--amber);border:1px solid rgba(183,121,31,.25)}
+.recipe-week{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:.45rem;margin-bottom:1rem}
+.rcw{padding:.5rem .35rem;border-radius:9px;border:1px solid var(--border);background:var(--surface);cursor:pointer;text-align:center;transition:all .18s;font-size:.72rem}
+.rcw:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.rcw.on{background:rgba(11,117,165,.09);border-color:var(--cyan);color:var(--cyan);font-weight:700}
+.rcw .stat{display:block;font-size:.6rem;margin-top:.2rem;color:var(--dim)}
+.rcw.on .stat{color:var(--cyan)}
+.rcw.graded{border-color:rgba(15,122,85,.4)}
+.rcw.graded .stat{color:var(--green)}
 .sys-pill{display:flex;gap:.5rem;background:var(--panel);border-radius:12px;padding:.4rem;margin-bottom:1.2rem}
 .sp{padding:.45rem 1.1rem;border-radius:8px;font-size:.78rem;cursor:pointer;color:var(--dim);transition:all .18s}
 .sp.on{background:var(--surface);color:var(--cyan);border:1px solid var(--border)}
@@ -291,14 +310,14 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
   <div style="width:100%;max-width:400px">
     <div style="cursor:pointer;margin-bottom:1.8rem" onclick="backToLanding()"><span style="color:var(--dim);font-size:.8rem">← Back</span></div>
     <div class="pt" style="margin-bottom:.4rem" id="vos-login-title">🎓 Student Login</div>
-    <div class="ps" style="margin-bottom:1.5rem">VOS 102 · Sikiru Adetona COEST</div>
+    <div class="ps" style="margin-bottom:1.5rem">VOS 102 · Sikiru Adetona College of Education Science and Technology Omu-Ijebu</div>
     <div class="card">
       <div class="field"><label id="vos-login-label">Matric Number</label><input id="vos-un" placeholder="Your matric number or admin username"></div>
       <div class="field"><label>Password</label><input type="password" id="vos-pw" onkeydown="if(event.key==='Enter')vosLogin()" placeholder="Your password"></div>
       <div class="ae al hidden" id="vos-err">❌ Invalid credentials.</div>
       <button class="btn btn-p full" onclick="vosLogin()" style="margin-top:.3rem">🔓 Login</button>
     </div>
-    <p style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem">Demo admin: <b>adebimpe</b> / <b>ChangeMe123</b></p>
+    <p style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem"></p>
   </div>
 </div>
 
@@ -341,7 +360,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 </div>
 
 <footer id="footer" class="hidden">
-  Developed by <b>Adebimpe-John Omolola</b> · © 2026 · NeuroMatrix Biosystems · Sikiru Adetona COEST
+  Developed by <b>Adebimpe-John Omolola</b> · © 2026 · NeuroMatrix Biosystems · Sikiru Adetona College of Education Science and Technology, Omu-Ijebu-Ode
 </footer>
 <div id="toast"></div>
 </div>
@@ -416,13 +435,21 @@ window.dispatchEvent(new Event('firebase-ready'));
 // ═══════════════════════════════════════════════════════════
 // STORAGE & UTILITIES  (localStorage cache + Firestore sync)
 // ═══════════════════════════════════════════════════════════
+// Keys that should stay local to this browser only (never synced to Firestore)
+const _LOCAL_ONLY_KEYS=new Set(['nm_student','vos_active_scope']);
+function _isLocalOnly(k){
+  if(typeof k!=='string') return false;
+  if(_LOCAL_ONLY_KEYS.has(k)) return true;
+  // Per-student local cache keys can be added later. Default: sync.
+  return false;
+}
 const S={
   get:(k,d)=>{try{const fk=window._fkey?window._fkey(k):k;const v=localStorage.getItem(fk);return v!=null?JSON.parse(v):(d===undefined?{}:d)}catch{return d===undefined?{}:d}},
   // Sarr: always returns an array — safe for .map/.filter/.find/.reduce
   arr:(k)=>{try{const fk=window._fkey?window._fkey(k):k;const v=localStorage.getItem(fk);const p=v!=null?JSON.parse(v):null;return Array.isArray(p)?p:[];}catch{return[];}},
-  set:(k,v)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.setItem(fk,JSON.stringify(v));if(window._fbSet&&!_isLocalOnly(k))window._fbSet(k,v);}catch{}},
+  set:(k,v)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.setItem(fk,JSON.stringify(v));if(window._fbSet&&!_isLocalOnly(k))window._fbSet(k,v);}catch(e){console.warn('S.set failed for',k,e);}},
   push:(k,item)=>{const a=S.arr(k);a.push(item);S.set(k,a);},
-  del:(k)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.removeItem(fk);if(window._fbDel&&!_isLocalOnly(k))window._fbDel(k);}catch{}},
+  del:(k)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.removeItem(fk);if(window._fbDel&&!_isLocalOnly(k))window._fbDel(k);}catch(e){console.warn('S.del failed for',k,e);}},
 };
 
 function showEl(id,disp){
@@ -499,7 +526,7 @@ function initVOSDefaults(){
       username:(a.username||a.id||'').toLowerCase(),
       role:a.role||seed?.role||'module_admin',
       modules:Array.isArray(a.modules)&&a.modules.length?a.modules:(seed?.modules||[]),
-      pw:a.pw||a.pw_hash||a.password||seed?.pw||'ChangeMe123',
+      pw:a.pw||a.pw_hash||a.password||seed?.pw||'Admin2026',
     };
   });
 
@@ -2386,6 +2413,7 @@ const VOS_STUDENT_TABS=[
   {id:'v-attendance',ico:'✅',label:'Mark Attendance'},
   {id:'v-quiz',ico:'📝',label:'CBT Quiz'},
   {id:'v-assignments',ico:'📂',label:'Assignments'},
+  {id:'v-recipes',ico:'🍳',label:'Weekly Recipe'},
   {id:'v-results',ico:'📊',label:'My Results'},
   {id:'v-portfolio',ico:'🖼️',label:'Portfolio'},
   {id:'v-notices',ico:'📢',label:'Announcements'},
@@ -3163,7 +3191,7 @@ function vaChangeMyPW(){
   toast('Password changed ✅','success');
 }
 
-const VOS_BACKUP_KEYS=['vos_students','vos_attendance','vos_quiz_results','vos_quizzes','vos_portfolios','vos_announcements','vos_att_settings','vos_admins','vos_assignments','vos_assignment_submissions','vos_forums','vos_lms_logo'];
+const VOS_BACKUP_KEYS=['vos_students','vos_attendance','vos_quiz_results','vos_quizzes','vos_portfolios','vos_announcements','vos_att_settings','vos_admins','vos_assignments','vos_assignment_submissions','vos_forums','vos_lms_logo','vos_scopes','vos_active_scope'];
 function vaExport(){
   const isSA=vpIsSuperAdmin(VAPP.user);
   return ph('📤 Export & Backup','Download reports or backup all portal data')+`
@@ -3230,12 +3258,12 @@ const VOS_ADMIN_TABS_PATCH=[
   {id:'va-students',ico:'👥',label:'Students'},
   {id:'va-quiz',ico:'📋',label:'Quiz Manager'},
   {id:'va-assignments',ico:'📂',label:'Assignments'},
+  {id:'va-recipes',ico:'🍳',label:'Weekly Recipes'},
   {id:'va-results',ico:'📊',label:'Results'},
   {id:'va-portfolio',ico:'🖼️',label:'Portfolio Review'},
   {id:'va-notices',ico:'📢',label:'Announcements'},
   {id:'va-export',ico:'📤',label:'Export Data'},
   {id:'va-settings',ico:'⚙️',label:'Settings & Admins'},
-  {id:'va-my-profile',ico:'🔑',label:'My Password'},
 ];
 
 function vpEsc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
@@ -3405,20 +3433,56 @@ function vosRegister(){
 function vosLogin(){
   const id=document.getElementById('vos-un').value.trim();
   const pw=document.getElementById('vos-pw').value;
-  if(!id||!pw){showEl('vos-err');return;}
+  const errEl=document.getElementById('vos-err');
+  if(!id||!pw){
+    if(errEl){errEl.textContent='❌ Please enter both username/matric and password.';}
+    showEl('vos-err');
+    return;
+  }
   initVOSDefaults();
-  vpMigrateData();
+  try{vpMigrateData();}catch(e){console.warn('migrate skipped',e);}
   if(VAPP.loginType==='admin'){
-    const admins=S.arr('vos_admins');
-    const a=admins.find(x=>String(x.username||x.id||'').toLowerCase()===id.toLowerCase() && (x.pw===pw || x.pw_hash===pw || x.password===pw));
-    if(!a){showEl('vos-err');return;}
+    const admins=S.arr('vos_admins')||[];
+    const idLow=id.toLowerCase();
+    const a=admins.find(x=>{
+      const uname=String(x.username||x.id||'').toLowerCase();
+      const stored=String(x.pw||x.pw_hash||x.password||'');
+      return uname===idLow && stored===pw;
+    });
+    if(!a){
+      if(errEl){errEl.textContent='❌ Invalid admin credentials. Check username and password.';}
+      showEl('vos-err');return;
+    }
     VAPP.user={...a,type:'admin'};
+    if(errEl){errEl.className='ae al hidden';}
     buildVOSAdminShell();
   } else {
-    const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
-    const s=students.find(x=>x.matric.toUpperCase()===id.toUpperCase()&&(x.pw===pw || x.password===pw));
-    if(!s){showEl('vos-err');return;}
+    // Search across ALL students regardless of active scope so logout/login works after scope switches
+    const allStudents=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
+    const idUp=id.toUpperCase();
+    const s=allStudents.find(x=>String(x.matric||'').toUpperCase()===idUp && String(x.pw||x.password||'')===pw);
+    if(!s){
+      // Provide a helpful diagnostic
+      const sameMatric=allStudents.find(x=>String(x.matric||'').toUpperCase()===idUp);
+      if(errEl){
+        errEl.textContent=sameMatric?'❌ Wrong password for that matric number.':'❌ No student account found with that matric number. Please register first.';
+      }
+      showEl('vos-err');return;
+    }
+    // Auto-switch active scope to where this student is registered
+    if(s.academicSession && s.cohort){
+      const scope=vpNormalizeScope({session:s.academicSession,cohort:s.cohort});
+      try{
+        const scopes=S.arr('vos_scopes')||[];
+        if(!scopes.find(x=>x.key===scope.key)){
+          scopes.push({session:scope.session,cohort:scope.cohort,key:scope.key});
+          S.set('vos_scopes',scopes);
+        }
+        S.set('vos_active_scope',{session:scope.session,cohort:scope.cohort,key:scope.key});
+      }catch(e){console.warn('scope set fail',e);}
+    }
     VAPP.user={...s,type:'student'};
+    if(errEl){errEl.className='ae al hidden';}
     buildVOSStudentShell();
   }
 }
@@ -3449,8 +3513,10 @@ function vosRender(id){
   const map={
     'v-dashboard':vDashboard,'v-attendance':vAttendance,'v-quiz':vQuiz,'v-assignments':vAssignments,
     'v-results':vResults,'v-portfolio':vPortfolio,'v-notices':vNotices,'v-profile':vProfile,
+    'v-recipes':vRecipes,
     'va-dashboard':vaDashboard,'va-attendance':vaAttendance,'va-students':vaStudents,
     'va-quiz':vaQuiz,'va-assignments':vaAssignments,'va-results':vaResults,'va-portfolio':vaPortfolioAdmin,
+    'va-recipes':vaRecipes,
     'va-notices':vaNotices,'va-export':vaExport,'va-settings':vasSettings,'va-my-profile':vaMyProfile,
   };
   const fn=map[id];
@@ -3914,6 +3980,700 @@ function vaExportAtt(){const rows=vpAttendanceByAccess(VAPP.user).map(a=>({Matri
 function vaExportRes(){const rows=vpResultsByAccess(VAPP.user).map(r=>({Matric:r.matric,Name:r.name,Department:r.dept||'',Quiz:r.quizTitle,Module:vpModuleName(r.module),Score:r.score,Total:r.total,Percent:r.percent+'%',Date:new Date(r.date).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Results');}
 function vaExportStu(){const att=vpAttendanceByAccess(VAPP.user);const rows=vpStudentsByAccess(VAPP.user).map(s=>({Name:s.name,Matric:s.matric,Module:vpModuleName(s.module),Department:s.dept,Level:s.level,Phone:s.phone||'',Attendance:att.filter(a=>a.matric===s.matric).length,Registered:new Date(s.createdAt).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Students');}
 
+// VOS academic session / cohort separation.
+function vpDefaultSession(){
+  const d=new Date();
+  const y=d.getFullYear();
+  return d.getMonth()>=7?`${y}/${y+1}`:`${y-1}/${y}`;
+}
+function vpNormalizeScope(scope={}){
+  const session=String(scope.academicSession||scope.session||vpDefaultSession()).trim()||vpDefaultSession();
+  const cohort=String(scope.cohort||scope.classCohort||'Regular').trim()||'Regular';
+  return {session,cohort,key:`${session} | ${cohort}`};
+}
+function vpScope(){
+  return vpNormalizeScope(S.get('vos_active_scope',{}));
+}
+function vpScopePayload(scope=vpScope()){
+  const s=vpNormalizeScope(scope);
+  return {academicSession:s.session,cohort:s.cohort,scopeKey:s.key};
+}
+function vpEnsureScopes(){
+  const active=vpScope();
+  const stored=(S.arr('vos_scopes')||[]).map(vpNormalizeScope);
+  if(!stored.find(s=>s.key===active.key)) stored.unshift(active);
+  if(!stored.length) stored.push(active);
+  const normalized=stored.map(({session,cohort,key})=>({session,cohort,key}));
+  if(JSON.stringify(S.arr('vos_scopes')||[])!==JSON.stringify(normalized)) S.set('vos_scopes',normalized);
+  const activeStored=S.get('vos_active_scope',{});
+  if(activeStored.key!==active.key||activeStored.session!==active.session||activeStored.cohort!==active.cohort){
+    S.set('vos_active_scope',{session:active.session,cohort:active.cohort,key:active.key});
+  }
+  return stored;
+}
+function vpScopedRecord(item,scope=vpScope()){
+  const payload=vpScopePayload({
+    session:item?.academicSession||item?.session||scope.session,
+    cohort:item?.cohort||item?.classCohort||scope.cohort,
+  });
+  return {...item,...payload};
+}
+function vpSameScope(item,scope=vpScope()){
+  return vpScopedRecord(item,scope).scopeKey===vpNormalizeScope(scope).key;
+}
+function vpScopeFilter(items,scope=vpScope()){
+  return (items||[]).map(item=>vpScopedRecord(item,scope)).filter(item=>item.scopeKey===scope.key);
+}
+function vpScopeLabel(scope=vpScope()){
+  const s=vpNormalizeScope(scope);
+  return `${s.session} - ${s.cohort}`;
+}
+function vpScopeManager(){
+  const scopes=vpEnsureScopes();
+  const active=vpScope();
+  return `<div class="card"><div class="ct">Academic Session & Cohort</div>
+    <div class="al ai">Student records, attendance, quiz results, portfolio uploads and assignment submissions are separated by this active scope. Quizzes, assignments and notices stay reusable across sessions.</div>
+    <div class="fr">
+      <div class="field"><label>Saved Scope</label><select id="vp-scope-preset" onchange="vpPickScope(this.value)">${scopes.map((s,i)=>`<option value="${i}" ${s.key===active.key?'selected':''}>${vpEsc(vpScopeLabel(s))}</option>`).join('')}</select></div>
+      <div class="field"><label>Academic Session</label><input id="vp-scope-session" value="${vpEsc(active.session)}" placeholder="2025/2026"></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Cohort</label><input id="vp-scope-cohort" value="${vpEsc(active.cohort)}" placeholder="Regular, Sandwich, Stream A"></div>
+      <div class="field"><label>Current Active Scope</label><div class="scope-readout">${vpEsc(vpScopeLabel(active))}</div></div>
+    </div>
+    <div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p" onclick="vpApplyScope()">Apply Scope</button><button class="btn btn-s" onclick="vpResetScopeInputs()">Use Current Academic Year</button></div>
+  </div>`;
+}
+function vpPickScope(index){
+  const scopes=vpEnsureScopes();
+  const s=scopes[+index];
+  if(!s) return;
+  const se=document.getElementById('vp-scope-session');
+  const co=document.getElementById('vp-scope-cohort');
+  if(se) se.value=s.session;
+  if(co) co.value=s.cohort;
+}
+function vpResetScopeInputs(){
+  const se=document.getElementById('vp-scope-session');
+  const co=document.getElementById('vp-scope-cohort');
+  if(se) se.value=vpDefaultSession();
+  if(co) co.value='Regular';
+}
+function vpApplyScope(){
+  const session=document.getElementById('vp-scope-session')?.value.trim();
+  const cohort=document.getElementById('vp-scope-cohort')?.value.trim();
+  const scope=vpNormalizeScope({session,cohort});
+  const scopes=vpEnsureScopes();
+  if(!scopes.find(s=>s.key===scope.key)) scopes.unshift(scope);
+  S.set('vos_scopes',scopes.map(({session,cohort,key})=>({session,cohort,key})));
+  S.set('vos_active_scope',{session:scope.session,cohort:scope.cohort,key:scope.key});
+  vpMigrateData();
+  vpUpdateScopeStrip();
+  toast('Academic scope set to '+vpScopeLabel(scope),'success');
+  if(VAPP.tab) vosRender(VAPP.tab);
+}
+function vpSetScopeByKey(key){
+  const s=vpEnsureScopes().find(x=>x.key===key);
+  if(!s) return;
+  S.set('vos_active_scope',{session:s.session,cohort:s.cohort,key:s.key});
+  vpUpdateScopeStrip();
+  if(VAPP.tab) vosRender(VAPP.tab);
+}
+function vpEnsureScopeStrip(){
+  const userStrip=document.getElementById('vos-user-strip');
+  if(!userStrip) return null;
+  let strip=document.getElementById('vos-scope-strip');
+  if(!strip){
+    strip=document.createElement('div');
+    strip.id='vos-scope-strip';
+    strip.style.cssText='background:var(--panel);border-radius:10px;padding:.65rem .8rem;margin-bottom:.8rem;font-size:.72rem;border:1px solid var(--border)';
+    userStrip.insertAdjacentElement('afterend',strip);
+  }
+  return strip;
+}
+function vpUpdateScopeStrip(){
+  const strip=vpEnsureScopeStrip();
+  if(!strip) return;
+  const scope=vpScope();
+  if(!VAPP.user){strip.style.display='none';return;}
+  strip.style.display='';
+  if(VAPP.user.type==='admin'){
+    const scopes=vpEnsureScopes();
+    strip.innerHTML=`<div class="sb-sect" style="padding:0 0 .35rem">Academic Scope</div><select class="sb-sel" style="margin:0" onchange="vpSetScopeByKey(this.value)">${scopes.map(s=>`<option value="${vpEsc(s.key)}" ${s.key===scope.key?'selected':''}>${vpEsc(vpScopeLabel(s))}</option>`).join('')}</select>`;
+  } else {
+    strip.innerHTML=`<div style="color:var(--dim)">Academic Scope</div><div style="font-family:var(--head);font-weight:700;color:var(--bright);margin-top:.15rem">${vpEsc(vpScopeLabel(scope))}</div>`;
+  }
+}
+
+const _vosScopeBaseMigrateData=vpMigrateData;
+vpMigrateData=function(){
+  _vosScopeBaseMigrateData();
+  vpEnsureScopes();
+  ['vos_students','vos_attendance','vos_quiz_results','vos_portfolios','vos_assignment_submissions'].forEach(key=>{
+    const items=(S.arr(key)||[]).map(item=>vpScopedRecord(item));
+    S.set(key,items);
+  });
+};
+
+const _vosScopeBaseInitPatch=initVOSPatch;
+initVOSPatch=function(){
+  _vosScopeBaseInitPatch();
+  if(!document.getElementById('vp-scope-style')){
+    const st=document.createElement('style');
+    st.id='vp-scope-style';
+    st.textContent='.scope-readout{display:flex;align-items:center;min-height:2.55rem;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.65rem .95rem;color:var(--bright);font-weight:700}.scope-pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;background:rgba(11,117,165,.08);border:1px solid rgba(11,117,165,.22);color:var(--cyan);padding:.25rem .7rem;font-size:.68rem}';
+    document.head.appendChild(st);
+  }
+  vpMigrateData();
+  vpUpdateScopeStrip();
+};
+
+vpStudentsByAccess=function(user=VAPP.user){
+  const students=vpScopeFilter((S.arr('vos_students')||[]).map(vpNormalizeStudent));
+  return vpIsSuperAdmin(user)?students:students.filter(s=>vpCanAccessModule(s.module,user));
+};
+vpResultsByAccess=function(user=VAPP.user){
+  return vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>vpCanAccessModule(r.module,user));
+};
+vpAttendanceByAccess=function(user=VAPP.user){
+  return vpScopeFilter(S.arr('vos_attendance')).filter(a=>vpCanAccessModule(a.module,user));
+};
+vpPortsByAccess=function(user=VAPP.user){
+  return vpScopeFilter(S.arr('vos_portfolios')).filter(p=>vpCanAccessModule(p.module,user));
+};
+vpAssignmentSubsByAccess=function(user=VAPP.user){
+  return vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>vpCanAccessModule(s.module,user));
+};
+
+const _vosScopeBaseStudentShell=buildVOSStudentShell;
+buildVOSStudentShell=function(){
+  _vosScopeBaseStudentShell();
+  vpUpdateScopeStrip();
+};
+const _vosScopeBaseAdminShell=buildVOSAdminShell;
+buildVOSAdminShell=function(){
+  _vosScopeBaseAdminShell();
+  vpUpdateScopeStrip();
+};
+
+vosRegister=function(){
+  const name=document.getElementById('reg-name').value.trim();
+  const matric=document.getElementById('reg-matric').value.trim();
+  const dept=document.getElementById('reg-dept').value;
+  const level=document.getElementById('reg-level').value;
+  const module=document.getElementById('reg-module')?.value||'';
+  const phone=document.getElementById('reg-phone').value.trim();
+  const pw1=document.getElementById('reg-pw').value;
+  const pw2=document.getElementById('reg-pw2').value;
+  const err=document.getElementById('reg-err'),ok=document.getElementById('reg-ok');
+  const scope=vpScope();
+  hideEl('reg-err');hideEl('reg-ok');
+  if(!name||!matric||!dept||!level||!module||!pw1){err.textContent='Fill all required fields.';showEl('reg-err');return;}
+  if(pw1!==pw2){err.textContent='Passwords do not match.';showEl('reg-err');return;}
+  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
+  if(students.find(s=>vpSameScope(s,scope)&&s.matric.toUpperCase()===matric.toUpperCase())){
+    err.textContent='Matric number already registered for '+vpScopeLabel(scope)+'.';showEl('reg-err');return;
+  }
+  students.push({id:'s_'+Date.now(),name,matric,dept,level,module,module_name:vpModuleName(module),modules:[module],phone,pw:pw1,createdAt:new Date().toISOString(),...vpScopePayload(scope)});
+  S.set('vos_students',students);
+  ok.textContent='Registration successful for '+vpScopeLabel(scope)+'. Redirecting to login...';showEl('reg-ok');
+  setTimeout(()=>vosLoginScreen('student'),1200);
+};
+vosLogin=function(){
+  const id=document.getElementById('vos-un').value.trim();
+  const pw=document.getElementById('vos-pw').value;
+  if(!id||!pw){showEl('vos-err');return;}
+  initVOSDefaults();
+  vpMigrateData();
+  if(VAPP.loginType==='admin'){
+    const admins=S.arr('vos_admins');
+    const a=admins.find(x=>String(x.username||x.id||'').toLowerCase()===id.toLowerCase() && (x.pw===pw || x.pw_hash===pw || x.password===pw));
+    if(!a){showEl('vos-err');return;}
+    VAPP.user={...a,type:'admin'};
+    buildVOSAdminShell();
+  } else {
+    const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
+    const s=students.find(x=>vpSameScope(x)&&x.matric.toUpperCase()===id.toUpperCase()&&(x.pw===pw || x.password===pw));
+    if(!s){showEl('vos-err');return;}
+    VAPP.user={...s,type:'student'};
+    buildVOSStudentShell();
+  }
+};
+
+vDashboard=function(){
+  const u=vpNormalizeStudent(VAPP.user);
+  const mods=vpVisibleModules(u);
+  const att=vpScopeFilter(S.arr('vos_attendance')).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
+  const qr=vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>r.matric===u.matric&&vpCanAccessModule(r.module,u));
+  const ports=vpScopeFilter(S.arr('vos_portfolios')).filter(p=>p.matric===u.matric&&vpCanAccessModule(p.module,u));
+  const myAssignments=vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>s.matric===u.matric&&vpCanAccessModule(s.module,u));
+  return ph('Welcome, '+u.name.split(' ')[0],`${u.dept} - Level ${u.level} - ${vpScopeLabel()}`)+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${mods.length}</div><div class="ml">My Module</div></div>
+    <div class="metric"><div class="mv">${qr.length}</div><div class="ml">Quizzes Taken</div></div>
+    <div class="metric"><div class="mv">${myAssignments.length}</div><div class="ml">Assignments Sent</div></div>
+  </div>
+  <div class="card"><div class="ct">Assigned Module</div>
+    ${mods.map(m=>`<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${vpEsc(vpScopeLabel())}</div></div><span class="module-chip">Student Access</span></div>`).join('')}
+  </div>
+  <div class="card"><div class="ct">Quick Progress</div>
+    <div class="crow"><div><div class="crn">Attendance Marked</div><div class="crc">${att.length} total record(s)</div></div><span class="badge bg">${att.filter(a=>a.status==='Present').length} present</span></div>
+    <div class="crow"><div><div class="crn">Portfolio Uploads</div><div class="crc">${ports.length} practical item(s) uploaded</div></div><span class="badge ba">Trackable</span></div>
+    <div class="crow"><div><div class="crn">Assignment Area</div><div class="crc">Upload files or type your answers for automatic grading.</div></div><button class="btn btn-p sm" onclick="vosSetTab('v-assignments')">Open</button></div>
+  </div>`;
+};
+vMarkAtt=function(moduleId,status){
+  const att=S.arr('vos_attendance');
+  att.push({id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,module:moduleId,date:new Date().toISOString(),time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),status,...vpScopePayload()});
+  S.set('vos_attendance',att);
+  toast(`Marked ${status}`,'success');
+  vosRender('v-attendance');
+};
+vQuiz=function(){
+  const quizzes=(S.arr('vos_quizzes')||[]).filter(q=>q.published&&vpCanAccessModule(q.module,VAPP.user));
+  const results=vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
+  if(!quizzes.length) return ph('CBT Quiz')+'<div class="al ai">No quizzes available for your module right now.</div>';
+  return ph('CBT Quiz','Reusable quizzes shown for '+vpScopeLabel())+
+    quizzes.map(q=>{
+      const done=results.find(r=>r.quizId===q.id);
+      const m=vpModule(q.module);
+      return `<div class="card"><div class="ct">${m?m.icon:'Quiz'} ${q.title}</div>
+        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} - ${q.questions.length} questions - ${q.duration} mins</p>
+        ${done?`<div class="al as">Completed in ${vpEsc(vpScopeLabel(done))} - Score: ${done.score}/${done.total} (${done.percent}%)</div>`:`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz</button>`}
+      </div>`;
+    }).join('');
+};
+vSubmitQuiz=function(){
+  if(vQuizState.timer)clearInterval(vQuizState.timer);
+  const {quiz,answers}=vQuizState;
+  let score=0;
+  quiz.questions.forEach((q,i)=>{if(answers[i]===q.correct)score++;});
+  const result={id:'qr_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,quizId:quiz.id,quizTitle:quiz.title,module:quiz.module,score,total:quiz.questions.length,percent:Math.round(score/quiz.questions.length*100),date:new Date().toISOString(),...vpScopePayload()};
+  const results=S.arr('vos_quiz_results');results.push(result);S.set('vos_quiz_results',results);
+  vQuizState=null;
+  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:3rem">${result.percent>=70?'Excellent':result.percent>=50?'Good':'Review'}</div><h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted</h2><p style="color:var(--dim)">${result.quizTitle} - ${vpEsc(vpScopeLabel(result))}</p><div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">${score}/${result.total}</div><div style="font-size:1.2rem">${result.percent}%</div><button class="btn btn-p" style="margin-top:1.2rem" onclick="vosSetTab('v-quiz')">Back to Quizzes</button></div></div>`;
+};
+vAssignments=function(){
+  const assignments=vpAssignmentsByAccess(VAPP.user);
+  const subs=vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>s.matric===VAPP.user.matric&&vpCanAccessModule(s.module,VAPP.user));
+  const graded=subs.filter(s=>typeof s.score==='number');
+  const avg=graded.length?Math.round(graded.reduce((sum,s)=>sum+(s.percent||0),0)/graded.length):0;
+  return ph('Assignments','Reusable assignment content - results saved to '+vpScopeLabel())+`
+  <div class="metrics"><div class="metric"><div class="mv">${assignments.length}</div><div class="ml">Available</div></div><div class="metric"><div class="mv">${subs.length}</div><div class="ml">Submitted</div></div><div class="metric"><div class="mv">${graded.length}</div><div class="ml">Graded</div></div><div class="metric"><div class="mv">${avg}%</div><div class="ml">Assignment Avg</div></div></div>
+  ${assignments.length?assignments.map(a=>{
+    const sub=subs.find(s=>s.assignmentId===a.id);
+    const due=a.dueDate?new Date(a.dueDate):null;
+    const isLate=sub?.isLate;
+    return `<div class="card"><div class="crow" style="align-items:flex-start;gap:1rem"><div style="flex:1"><div class="ct">${vpEsc(a.title)}</div><div class="crc">${vpModuleIcon(a.module)} ${vpModuleName(a.module)} - ${due?`Due ${due.toLocaleString('en-NG')}`:'No due date'} - Max ${a.maxScore||100} marks</div></div><div class="cra">${sub?`<span class="badge ${typeof sub.score==='number'?(sub.percent>=70?'bg':sub.percent>=50?'ba':'br'):'bv'}">${typeof sub.score==='number'?`${sub.score}/${sub.maxScore||a.maxScore} - ${sub.percent||0}%`:'Submitted'}</span>`:'<span class="badge bc">Open</span>'}${isLate?'<span class="badge br">Late</span>':''}</div></div><p style="font-size:.87rem;color:var(--bright);line-height:1.8;margin:.75rem 0;background:rgba(11,117,165,.06);padding:.7rem;border-radius:6px;border-left:3px solid var(--cyan)">${vpEsc(a.instructions||'No instructions added yet.').replace(/\n/g,'<br>')}</p><div class="al ai" style="margin-bottom:.7rem;font-size:.77rem">Submitting here records your result under ${vpEsc(vpScopeLabel())}.</div>${sub?`<div class="card" style="background:var(--panel);margin-bottom:.8rem"><div class="ct">Current Submission</div><div style="font-size:.78rem;color:var(--dim);line-height:1.8">Submitted ${new Date(sub.submittedAt).toLocaleString('en-NG')} - ${vpEsc(vpScopeLabel(sub))} - Status: <b>${sub.status||'submitted'}</b>${typeof sub.score==='number'?` - Score: <b>${sub.score}/${sub.maxScore||a.maxScore}</b> (${sub.percent||0}%)`:''}</div>${sub.feedback?`<div class="al as" style="margin-top:.7rem">${vpEsc(sub.feedback)}</div>`:''}${sub.fileData?`<div style="margin-top:.7rem"><a href="${sub.fileData}" download="${sub.fileName||'assignment'}" class="btn btn-s sm">Download ${vpEsc(sub.fileName||'attachment')}</a></div>`:''}</div>`:''}<div class="fr">${a.allowText!==false?`<div class="field"><label>Typed Answer</label><textarea id="asg-text-${a.id}" placeholder="Type your answer here for automatic grading..." style="min-height:140px">${sub?vpEsc(sub.textAnswer||''):''}</textarea></div>`:''}${a.allowFile!==false?`<div class="field"><label>Upload File</label><input type="file" id="asg-file-${a.id}" accept=".pdf,.doc,.docx,.txt,.zip,.jpg,.jpeg,.png" style="color:var(--text);font-size:.8rem"><div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Recommended max size: 1.5 MB.</div></div>`:''}</div><div class="field"><label>Notes to Lecturer</label><input id="asg-note-${a.id}" value="${sub?vpEsc(sub.notes||''):''}" placeholder="Optional note for grading or clarification"></div><div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center"><button class="btn btn-p" onclick="vSubmitAssignment('${a.id}')">${sub?'Resubmit Assignment':'Submit Assignment'}</button><span style="font-size:.74rem;color:var(--dim)">${a.allowText!==false?'typed answer enabled':''} ${a.allowFile!==false?'file upload enabled':''}</span></div></div>`;
+  }).join(''):'<div class="al ai">No assignments have been posted for your module yet.</div>'}`;
+};
+vSubmitAssignment=function(id){
+  const assignment=(S.arr('vos_assignments')||[]).find(a=>a.id===id&&a.published&&vpCanAccessModule(a.module,VAPP.user));
+  if(!assignment){toast('Assignment not available','error');return;}
+  const textEl=document.getElementById('asg-text-'+id);
+  const fileEl=document.getElementById('asg-file-'+id);
+  const noteEl=document.getElementById('asg-note-'+id);
+  const textAnswer=(textEl?.value||'').trim();
+  const notes=(noteEl?.value||'').trim();
+  const file=fileEl?.files?.[0]||null;
+  const scope=vpScope();
+  if(!textAnswer && !file){toast('Type an answer or upload a file first','error');return;}
+  if(file && file.size>1.5*1024*1024){toast('File must be 1.5MB or less','error');return;}
+  const auto=textAnswer?vpAutoGradeAssignment(assignment,textAnswer):null;
+  const persist=(fileData='')=>{
+    const submissions=(S.arr('vos_assignment_submissions')||[]).filter(s=>!(s.assignmentId===id&&s.matric===VAPP.user.matric&&vpSameScope(s,scope)));
+    submissions.push({id:'vas_'+Date.now(),assignmentId:id,module:assignment.module,assignmentTitle:assignment.title,matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,textAnswer,notes,fileData,fileName:file?.name||'',fileSize:file?.size||0,fileType:file?.type||'',autoScore:auto?.score??null,score:auto?.score??null,maxScore:auto?.maxScore??(+assignment.maxScore||100),percent:auto?.percent??null,feedback:auto?auto.feedback:'File uploaded successfully. Awaiting lecturer review.',status:auto?'auto-graded':'submitted',isLate:!!(assignment.dueDate&&Date.now()>new Date(assignment.dueDate).getTime()),submittedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),gradedBy:auto?'Auto-grader':'',gradedAt:auto?new Date().toISOString():'',...vpScopePayload(scope)});
+    S.set('vos_assignment_submissions',submissions);
+    toast(auto?`Assignment submitted - auto score ${auto.score}/${auto.maxScore}`:'Assignment submitted','success');
+    vosRender('v-assignments');
+  };
+  if(file){const reader=new FileReader();reader.onload=e=>persist(e.target.result||'');reader.readAsDataURL(file);} else persist('');
+};
+vResults=function(){
+  const results=vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
+  const att=vpScopeFilter(S.arr('vos_attendance')).filter(a=>a.matric===VAPP.user.matric&&vpCanAccessModule(a.module,VAPP.user));
+  const assigns=vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>s.matric===VAPP.user.matric&&vpCanAccessModule(s.module,VAPP.user));
+  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percent,0)/results.length):0;
+  const graded=assigns.filter(s=>typeof s.score==='number');
+  const aAvg=graded.length?Math.round(graded.reduce((s,r)=>s+(r.percent||0),0)/graded.length):0;
+  return ph('My Results',vpScopeLabel())+`<div class="metrics"><div class="metric"><div class="mv">${results.length}</div><div class="ml">Quizzes</div></div><div class="metric"><div class="mv">${avg}%</div><div class="ml">Quiz Avg</div></div><div class="metric"><div class="mv">${assigns.length}</div><div class="ml">Assignments</div></div><div class="metric"><div class="mv">${aAvg}%</div><div class="ml">Assignment Avg</div></div></div><div class="card"><div class="ct">Quiz Results</div>${results.length?`<div class="tw"><table><thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Date</th></tr></thead><tbody>${results.map(r=>`<tr><td>${r.quizTitle}</td><td>${vpModuleName(r.module)}</td><td>${r.score}/${r.total}</td><td>${r.percent}%</td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join('')}</tbody></table></div>`:'<div class="al ai">No quiz results yet.</div>'}</div><div class="card"><div class="ct">Assignment Results</div>${assigns.length?`<div class="tw"><table><thead><tr><th>Assignment</th><th>Module</th><th>Status</th><th>Score</th><th>Date</th></tr></thead><tbody>${assigns.map(a=>`<tr><td>${vpEsc(a.assignmentTitle||'Assignment')}</td><td>${vpModuleName(a.module)}</td><td><span class="badge ${typeof a.score==='number'?(a.percent>=70?'bg':a.percent>=50?'ba':'br'):'bv'}">${a.status||'submitted'}</span></td><td>${typeof a.score==='number'?`${a.score}/${a.maxScore||100} (${a.percent||0}%)`:'Pending review'}</td><td>${new Date(a.submittedAt).toLocaleDateString()}</td></tr>`).join('')}</tbody></table></div>`:'<div class="al ai">No assignment submissions yet.</div>'}</div><div class="card"><div class="ct">Attendance</div>${att.length?`<div class="tw"><table><thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead><tbody>${att.map(a=>`<tr><td>${vpModuleName(a.module)}</td><td>${new Date(a.date).toLocaleDateString()}</td><td>${a.time}</td><td><span class="badge ${a.status==='Present'?'bg':'ba'}">${a.status}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="al ai">No attendance records yet.</div>'}</div>`;
+};
+vPortfolio=function(){
+  const mods=vpVisibleModules(VAPP.user);
+  const ports=vpScopeFilter(S.arr('vos_portfolios')).filter(p=>p.matric===VAPP.user.matric&&vpCanAccessModule(p.module,VAPP.user));
+  return ph('My Portfolio','Upload practical work for '+vpScopeLabel())+`<div class="card"><div class="ct">Upload Practical Work</div><div class="field"><label>Module</label><select id="port-module">${mods.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div><div class="field"><label>Caption</label><input id="port-caption" placeholder="What did you make?"></div><div class="field"><label>Photo</label><input type="file" id="port-file" accept="image/*"></div><button class="btn btn-p" onclick="vUploadPort()">Upload</button></div><div class="card"><div class="ct">My Items (${ports.length})</div>${ports.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem">${ports.map(p=>`<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">${p.thumb?`<img src="${p.thumb}" style="width:100%;height:120px;object-fit:cover">`:'<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--panel)">Image</div>'}<div style="padding:.5rem;font-size:.7rem"><b>${vpEsc(p.caption)}</b><br><span style="color:var(--dim)">${vpModuleIcon(p.module)} ${new Date(p.date).toLocaleDateString()}</span><br><span class="verify-pill ${p.verified?'ok':'pending'}">${p.verified?'Verified':'Pending review'}</span></div></div>`).join('')}</div>`:'<div class="al ai">No items yet.</div>'}</div>`;
+};
+vUploadPort=function(){
+  const moduleId=document.getElementById('port-module').value;
+  const caption=document.getElementById('port-caption').value.trim();
+  const file=document.getElementById('port-file').files[0];
+  if(!vpCanAccessModule(moduleId,VAPP.user)){toast('You can only upload work for your selected module','error');return;}
+  if(!caption){toast('Add a caption','error');return}
+  const save=thumb=>{
+    const ports=S.arr('vos_portfolios');
+    ports.push({id:'p_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,module:moduleId,caption,thumb,date:new Date().toISOString(),verified:false,verifiedBy:'',verifiedAt:'',...vpScopePayload()});
+    S.set('vos_portfolios',ports);
+    toast('Uploaded','success');vosRender('v-portfolio');
+  };
+  if(file){if(file.size>5*1024*1024){toast('Max 5MB','error');return} const r=new FileReader();r.onload=e=>save(e.target.result);r.readAsDataURL(file);} else save('');
+};
+vProfile=function(){
+  const u=vpNormalizeStudent(VAPP.user);
+  const att=vpScopeFilter(S.arr('vos_attendance')).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
+  return ph('My Profile',vpScopeLabel())+`<div class="card"><div class="istrip"><div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div><div class="in">${u.name}</div><div class="im">${u.dept} - Level ${u.level} - ${vpModuleLabel(u)}</div></div></div><div class="fr"><div><div class="ml">Matric</div><div class="crn">${u.matric}</div></div><div><div class="ml">Phone</div><div class="crn">${u.phone||'--'}</div></div><div><div class="ml">Academic Scope</div><div class="crn">${vpEsc(vpScopeLabel(u))}</div></div><div><div class="ml">Total Attendance</div><div class="crn">${att.length} sessions</div></div><div><div class="ml">Member Since</div><div class="crn">${new Date(u.createdAt).toLocaleDateString()}</div></div></div></div>`;
+};
+vaDashboard=function(){
+  const students=vpStudentsByAccess(VAPP.user);
+  const att=vpAttendanceByAccess(VAPP.user);
+  const quizzes=vpQuizzesByAccess(VAPP.user);
+  const ports=vpPortsByAccess(VAPP.user);
+  const mods=vpVisibleModules(VAPP.user);
+  const today=new Date().toDateString();
+  return ph(vpIsSuperAdmin()?'Super Admin Dashboard':'Module Admin Dashboard',`${vpScopeLabel()} - ${vpIsSuperAdmin()?'Full access across all modules':'Access limited to your assigned module(s)'}`)+vpScopeManager()+`<div class="metrics"><div class="metric"><div class="mv">${students.length}</div><div class="ml">Students</div></div><div class="metric"><div class="mv">${att.filter(a=>new Date(a.date).toDateString()===today).length}</div><div class="ml">Today</div></div><div class="metric"><div class="mv">${quizzes.filter(q=>q.published).length}</div><div class="ml">Active Quizzes</div></div><div class="metric"><div class="mv">${ports.length}</div><div class="ml">Portfolio Uploads</div></div></div><div class="card"><div class="ct">Module Access</div>${mods.map(m=>`<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">Students: ${students.filter(s=>s.module===m.id).length} - Uploads: ${ports.filter(p=>p.module===m.id).length}</div></div><span class="module-chip">${vpIsSuperAdmin()?'Full Control':'Assigned Module'}</span></div>`).join('')}</div>${vpIsSuperAdmin()?`<div class="card"><div class="ct">LMS Logo</div><div class="field"><label>Upload Logo (shows across landing, login, sidebar, footer)</label><input type="file" id="brand-logo-input" accept="image/*"></div><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p" onclick="saveLMSLogo()">Upload Logo</button><button class="btn btn-s" onclick="clearLMSLogo()">Remove Logo</button></div><div class="ps" style="margin-top:.7rem">Logo applies across every session and cohort.</div></div>`:''}`;
+};
+vaViewRoll=function(id){
+  if(!vpCanAccessModule(id,VAPP.user)){toast('Access denied for this module','error');return}
+  const att=vpAttendanceByAccess(VAPP.user).filter(a=>a.module===id);
+  const m=vpModule(id);
+  alert(`${m.name} - ${vpScopeLabel()} - ${att.length} entries\n\n`+(att.slice(0,20).map(a=>`${a.name} (${a.matric}) - ${a.status} - ${new Date(a.date).toLocaleDateString()}`).join('\n')||'No entries'));
+};
+vaStudents=function(){
+  const students=vpStudentsByAccess(VAPP.user);
+  const att=vpAttendanceByAccess(VAPP.user);
+  return ph('Students',`${students.length} visible in ${vpScopeLabel()}`)+`<div class="card"><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Dept</th><th>Level</th><th>Session</th><th>Cohort</th><th>Att.</th></tr></thead><tbody>${students.length?students.map((s,i)=>`<tr><td>${i+1}</td><td>${s.name}</td><td>${s.matric}</td><td>${vpModuleIcon(s.module)} ${vpModuleName(s.module)}</td><td>${s.dept}</td><td>${s.level}</td><td>${vpEsc(s.academicSession||'')}</td><td>${vpEsc(s.cohort||'')}</td><td>${att.filter(a=>a.matric===s.matric).length}</td></tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:2rem">No students registered in this scope yet</td></tr>'}</tbody></table></div></div>`;
+};
+vaAssignments=function(){
+  const mods=vpVisibleModules(VAPP.user);
+  const assignments=vpAssignmentsByAccess(VAPP.user,true).slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
+  const submissions=vpAssignmentSubsByAccess(VAPP.user).slice().sort((a,b)=>new Date(b.submittedAt||0)-new Date(a.submittedAt||0));
+  return ph('Assignment Manager','Content is reusable; submissions shown for '+vpScopeLabel())+`<div class="card"><div class="ct">Create Assignment</div><div class="field"><label>Title</label><input id="va-asg-title" placeholder="e.g. VOS 102 Reflection Exercise"></div><div class="fr"><div class="field"><label>Module</label><select id="va-asg-module">${mods.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div><div class="field"><label>Due Date</label><input type="datetime-local" id="va-asg-due"></div></div><div class="fr"><div class="field"><label>Maximum Score</label><input type="number" id="va-asg-score" value="100" min="1"></div><div class="field"><label>Submission Mode</label><div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.85rem 0"><label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-text" checked> Typed answer</label><label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-file" checked> File upload</label></div></div></div><div class="field"><label>Instructions</label><textarea id="va-asg-inst" placeholder="Assignment brief, expectations and grading directions..." style="min-height:120px"></textarea></div><div class="field"><label>Auto-grade keywords / rubric</label><textarea id="va-asg-rubric" placeholder="Enter keywords or key points separated by commas or new lines..." style="min-height:100px"></textarea><div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Typed answers are scored by checking these keywords and answer completeness.</div></div><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-s" onclick="vaSaveAssignment(false)">Save Draft</button><button class="btn btn-g" onclick="vaSaveAssignment(true)">Publish Assignment</button></div></div><div class="card"><div class="ct">Posted Assignments (${assignments.length})</div>${assignments.length?assignments.map(a=>{const subCount=submissions.filter(s=>s.assignmentId===a.id).length;return `<div class="crow" style="align-items:flex-start;gap:.8rem"><div style="flex:1"><div class="crn">${vpEsc(a.title)}</div><div class="crc">${vpModuleIcon(a.module)} ${vpModuleName(a.module)} - ${a.dueDate?`Due ${new Date(a.dueDate).toLocaleString('en-NG')}`:'No due date'} - Max ${a.maxScore||100}</div><div class="crc">${subCount} submission(s) in ${vpEsc(vpScopeLabel())} - ${a.allowText!==false?'Typed':''}${a.allowText!==false&&a.allowFile!==false?' + ':''}${a.allowFile!==false?'File upload':''}</div></div><div class="cra"><span class="badge ${a.published?'bg':'bv'}">${a.published?'Published':'Draft'}</span><button class="btn btn-s sm" onclick="vaToggleAssignment('${a.id}')">${a.published?'Unpublish':'Publish'}</button><button class="btn btn-d sm" onclick="vaDeleteAssignment('${a.id}')">Delete</button></div></div>`;}).join(''):'<div class="al ai">No assignments created yet.</div>'}</div><div class="card"><div class="ct">Submissions (${submissions.length})</div><div style="display:flex;gap:.55rem;flex-wrap:wrap;margin-bottom:.8rem"><button class="btn btn-v sm" onclick="vaExportAssignmentResults()">Export Assignment Results</button></div>${submissions.length?submissions.map(s=>`<div style="border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.8rem;background:var(--panel)"><div class="crow" style="align-items:flex-start;gap:.8rem"><div style="flex:1"><div class="crn">${vpEsc(s.assignmentTitle||'Assignment')} - ${vpEsc(s.name)}</div><div class="crc">${vpEsc(s.matric)} - ${vpModuleIcon(s.module)} ${vpModuleName(s.module)} - ${vpEsc(vpScopeLabel(s))} - Submitted ${new Date(s.submittedAt).toLocaleString('en-NG')}</div><div class="crc">Status: ${s.status||'submitted'} ${s.isLate?'- Late':''}</div></div><span class="badge ${typeof s.score==='number'?(s.percent>=70?'bg':s.percent>=50?'ba':'br'):'bv'}">${typeof s.score==='number'?`${s.score}/${s.maxScore||100}`:'Pending'}</span></div>${s.textAnswer?`<div class="al ai" style="margin-top:.7rem;white-space:pre-wrap;line-height:1.7">${vpEsc(s.textAnswer).slice(0,1200)}${s.textAnswer.length>1200?'...':''}</div>`:''}${s.fileData?`<div style="margin-top:.7rem"><a href="${s.fileData}" download="${s.fileName||'submission'}" class="btn btn-s sm">Download ${vpEsc(s.fileName||'attachment')}</a> <span style="font-size:.72rem;color:var(--dim)">${vpFormatBytes(s.fileSize)}</span></div>`:''}<div class="fr" style="margin-top:.8rem"><div class="field"><label>Score</label><input type="number" id="grade-score-${s.id}" value="${typeof s.score==='number'?s.score:''}" min="0" max="${s.maxScore||100}"></div><div class="field"><label>Feedback</label><textarea id="grade-feedback-${s.id}" style="min-height:90px">${vpEsc(s.feedback||'')}</textarea></div></div><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p sm" onclick="vaSaveAssignmentGrade('${s.id}')">Save Grade</button>${s.autoScore!=null?`<span class="badge bc">Auto: ${s.autoScore}/${s.maxScore||100}</span>`:''}</div></div>`).join(''):'<div class="al ai">No submissions yet for this scope.</div>'}</div>`;
+};
+vaResults=function(){
+  const results=vpResultsByAccess(VAPP.user);
+  const assigns=vpAssignmentSubsByAccess(VAPP.user);
+  const quizAvg=results.length?Math.round(results.reduce((s,r)=>s+(r.percent||0),0)/results.length):0;
+  const graded=assigns.filter(s=>typeof s.score==='number');
+  const asgAvg=graded.length?Math.round(graded.reduce((s,r)=>s+(r.percent||0),0)/graded.length):0;
+  return ph('Results',`${vpScopeLabel()} - ${results.length} quiz attempt(s) and ${assigns.length} assignment submission(s)`)+`<div class="metrics"><div class="metric"><div class="mv">${results.length}</div><div class="ml">Quiz Attempts</div></div><div class="metric"><div class="mv">${quizAvg}%</div><div class="ml">Quiz Avg</div></div><div class="metric"><div class="mv">${assigns.length}</div><div class="ml">Assignments</div></div><div class="metric"><div class="mv">${asgAvg}%</div><div class="ml">Assignment Avg</div></div></div><div class="card"><div class="ct">Quiz Results</div><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Dept</th><th>Quiz</th><th>Score</th><th>%</th><th>Date</th></tr></thead><tbody>${results.length?results.sort((a,b)=>b.percent-a.percent).map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td>${r.matric}</td><td>${vpModuleIcon(r.module)} ${vpModuleName(r.module)}</td><td>${r.dept||'--'}</td><td>${r.quizTitle}</td><td>${r.score}/${r.total}</td><td><b>${r.percent}%</b></td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:2rem">No quiz results yet</td></tr>'}</tbody></table></div></div><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:.8rem;flex-wrap:wrap;margin-bottom:.9rem"><div class="ct" style="margin-bottom:0">Assignment Results</div><button class="btn btn-v sm" onclick="vaExportAssignmentResults()">Export Assignment Results</button></div><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Assignment</th><th>Status</th><th>Score</th><th>Session</th><th>Cohort</th><th>Date</th></tr></thead><tbody>${assigns.length?assigns.map((s,i)=>`<tr><td>${i+1}</td><td>${vpEsc(s.name)}</td><td>${vpEsc(s.matric)}</td><td>${vpModuleIcon(s.module)} ${vpModuleName(s.module)}</td><td>${vpEsc(s.assignmentTitle||'Assignment')}</td><td>${vpEsc(s.status||'submitted')}</td><td>${typeof s.score==='number'?`${s.score}/${s.maxScore||100} (${s.percent||0}%)`:'Pending review'}</td><td>${vpEsc(s.academicSession||'')}</td><td>${vpEsc(s.cohort||'')}</td><td>${new Date(s.submittedAt).toLocaleDateString()}</td></tr>`).join(''):'<tr><td colspan="10" style="text-align:center;color:var(--dim);padding:2rem">No assignment results yet</td></tr>'}</tbody></table></div></div>`;
+};
+vaExport=function(){
+  const isSA=vpIsSuperAdmin(VAPP.user);
+  return ph('Export & Backup','Download reports or backup all portal data')+vpScopeManager()+`<div class="card" style="border-color:rgba(99,179,237,.35)"><div class="ct">Full Data Backup <span class="badge bv" style="font-size:.65rem;margin-left:.4rem">Includes all sessions</span></div><p style="font-size:.78rem;color:var(--dim);line-height:1.6;margin-bottom:.8rem">Export a complete snapshot of all portal data, including academic session and cohort settings.</p><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p" onclick="vaBackupAll()">Download Full Backup (.json)</button>${isSA?`<label class="btn btn-g" style="cursor:pointer">Restore from Backup <input type="file" accept=".json" style="display:none" onchange="vaRestoreBackup(this)"></label>`:''}</div>${isSA?`<div class="al ai" style="margin-top:.7rem;font-size:.75rem">Restore overwrites current data. Only Super Admin can restore.</div>`:''}</div><div class="card"><div class="ct">Export Attendance (Excel)</div><button class="btn btn-p" onclick="vaExportAtt()">Download Attendance</button></div><div class="card"><div class="ct">Export Quiz Results (Excel)</div><button class="btn btn-p" onclick="vaExportRes()">Download Quiz Results</button></div><div class="card"><div class="ct">Export Assignment Results (Excel)</div><button class="btn btn-p" onclick="vaExportAssignmentResults()">Download Assignment Results</button></div><div class="card"><div class="ct">Export Students (Excel)</div><button class="btn btn-p" onclick="vaExportStu()">Download Students</button></div>`;
+};
+vaExportAtt=function(){const rows=vpAttendanceByAccess(VAPP.user).map(a=>({Session:a.academicSession||'',Cohort:a.cohort||'',Matric:a.matric,Name:a.name,Department:a.dept||'',Level:a.level||'',Module:vpModuleName(a.module),Date:new Date(a.date).toLocaleDateString('en-NG'),Time:a.time,Status:a.status}));vaXlsx(rows,'VOS102_Attendance_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));};
+vaExportRes=function(){const rows=vpResultsByAccess(VAPP.user).map(r=>({Session:r.academicSession||'',Cohort:r.cohort||'',Matric:r.matric,Name:r.name,Department:r.dept||'',Quiz:r.quizTitle,Module:vpModuleName(r.module),Score:r.score,Total:r.total,Percent:r.percent+'%',Date:new Date(r.date).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Quiz_Results_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));};
+vaExportStu=function(){const att=vpAttendanceByAccess(VAPP.user);const rows=vpStudentsByAccess(VAPP.user).map(s=>({Session:s.academicSession||'',Cohort:s.cohort||'',Name:s.name,Matric:s.matric,Module:vpModuleName(s.module),Department:s.dept,Level:s.level,Phone:s.phone||'',Attendance:att.filter(a=>a.matric===s.matric).length,Registered:new Date(s.createdAt).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Students_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));};
+function vaExportAssignmentResults(){
+  const rows=vpAssignmentSubsByAccess(VAPP.user).map(s=>({Session:s.academicSession||'',Cohort:s.cohort||'',Matric:s.matric,Name:s.name,Department:s.dept||'',Level:s.level||'',Module:vpModuleName(s.module),Assignment:s.assignmentTitle||'',Status:s.status||'submitted',Score:typeof s.score==='number'?s.score:'',MaxScore:s.maxScore||'',Percent:typeof s.percent==='number'?s.percent+'%':'',AutoScore:s.autoScore??'',Late:s.isLate?'Yes':'No',Submitted:new Date(s.submittedAt).toLocaleString('en-NG'),GradedBy:s.gradedBy||'',GradedAt:s.gradedAt?new Date(s.gradedAt).toLocaleString('en-NG'):'',FileName:s.fileName||'',Notes:s.notes||'',Feedback:s.feedback||''}));
+  vaXlsx(rows,'VOS102_Assignment_Results_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// VOS 102 — WEEKLY RECIPE MODULE (scoped per session/cohort + graded)
+// ═══════════════════════════════════════════════════════════
+const VOS_WEEKS=Array.from({length:15},(_,i)=>`Week ${i+1}`);
+function vpRecipesByAccess(user){
+  user=user||VAPP.user;
+  return vpScopeFilter(S.arr('vos_recipes')).filter(r=>vpCanAccessModule(r.module,user));
+}
+function vpReadFileAsDataURL(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});}
+
+// ── Student Recipe submission view ──
+function vRecipes(){
+  const u=vpNormalizeStudent(VAPP.user);
+  const mods=vpVisibleModules(u);
+  const myRecipes=vpScopeFilter(S.arr('vos_recipes')).filter(r=>r.matric===u.matric);
+  const week=VAPP.recipeWeek||VOS_WEEKS[0];
+  VAPP.recipeWeek=week;
+  const weekRec=myRecipes.find(r=>r.week===week);
+  const totalSubs=myRecipes.length;
+  const gradedSubs=myRecipes.filter(r=>typeof r.score==='number').length;
+  const avg=gradedSubs?Math.round(myRecipes.filter(r=>typeof r.score==='number').reduce((s,r)=>s+(r.percent||0),0)/gradedSubs):0;
+  return ph('🍳 Weekly Recipe','Upload your practical recipe each week — graded by your lecturer in '+vpScopeLabel())+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${totalSubs}</div><div class="ml">Recipes Submitted</div></div>
+    <div class="metric"><div class="mv">${gradedSubs}</div><div class="ml">Graded</div></div>
+    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Average</div></div>
+    <div class="metric"><div class="mv">${VOS_WEEKS.length-totalSubs}</div><div class="ml">Remaining Weeks</div></div>
+  </div>
+  <div class="card"><div class="ct">Select Week</div>
+    <div class="recipe-week">
+      ${VOS_WEEKS.map(w=>{const r=myRecipes.find(x=>x.week===w);const graded=r&&typeof r.score==='number';return `<div class="rcw ${w===week?'on':''} ${graded?'graded':''}" onclick="vSetRecipeWeek('${w}')">${w}<span class="stat">${r?(graded?`✅ ${r.percent}%`:'⏳ Pending'):'—'}</span></div>`;}).join('')}
+    </div>
+  </div>
+  <div class="card"><div class="ct">${weekRec?'Your Submission for ':'Submit Recipe for '}${vpEsc(week)}</div>
+    ${weekRec?`<div class="al ${typeof weekRec.score==='number'?'as':'ai'}" style="margin-bottom:.8rem">${typeof weekRec.score==='number'?`<b>Graded:</b> ${weekRec.score}/${weekRec.maxScore||100} (${weekRec.percent||0}%) · ${vpEsc(weekRec.feedback||'No feedback')}`:'<b>Submitted</b> — awaiting lecturer review.'}</div>`:''}
+    <div class="fr">
+      <div class="field"><label>Module</label><select id="rec-module">${mods.map(m=>`<option value="${m.id}" ${weekRec&&weekRec.module===m.id?'selected':''}>${m.icon} ${m.name}</option>`).join('')}</select></div>
+      <div class="field"><label>Recipe Title</label><input id="rec-title" value="${weekRec?vpEsc(weekRec.title||''):''}" placeholder="e.g. Pineapple Fruit Juice with Ginger"></div>
+    </div>
+    <div class="field"><label>Ingredients (one per line)</label><textarea id="rec-ingredients" placeholder="e.g.\n2 ripe pineapples, peeled and chopped\n1 inch ginger root\n2 cups water\n1 lemon (juice only)\n3 tbsp honey or to taste" style="min-height:120px">${weekRec?vpEsc(weekRec.ingredients||''):''}</textarea></div>
+    <div class="field"><label>Method / Procedure</label><textarea id="rec-method" placeholder="Step-by-step procedure..." style="min-height:150px">${weekRec?vpEsc(weekRec.method||''):''}</textarea></div>
+    <div class="fr">
+      <div class="field"><label>Yield / Quantity</label><input id="rec-yield" value="${weekRec?vpEsc(weekRec.yield_||''):''}" placeholder="e.g. 1 litre / 4 servings"></div>
+      <div class="field"><label>Total Time</label><input id="rec-time" value="${weekRec?vpEsc(weekRec.time_||''):''}" placeholder="e.g. 30 minutes"></div>
+    </div>
+    <div class="field"><label>Reflection / Lessons Learnt (optional)</label><textarea id="rec-reflection" placeholder="What did you learn this week?" style="min-height:90px">${weekRec?vpEsc(weekRec.reflection||''):''}</textarea></div>
+    <div class="field"><label>Photo of Finished Product (optional)</label><input type="file" id="rec-photo" accept="image/*" style="color:var(--text);font-size:.8rem"><div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Recommended &lt; 1.5 MB.</div></div>
+    ${weekRec&&weekRec.photo?`<div style="margin-bottom:.8rem"><img src="${weekRec.photo}" style="max-width:240px;border-radius:9px;border:1px solid var(--border)"></div>`:''}
+    <button class="btn btn-p" onclick="vSubmitRecipe()">${weekRec?'🔄 Update Recipe':'✅ Submit Recipe'}</button>
+  </div>`;
+}
+function vSetRecipeWeek(w){VAPP.recipeWeek=w;vosRender('v-recipes');}
+async function vSubmitRecipe(){
+  const u=vpNormalizeStudent(VAPP.user);
+  const week=VAPP.recipeWeek||VOS_WEEKS[0];
+  const module=document.getElementById('rec-module')?.value||u.module;
+  const title=document.getElementById('rec-title')?.value.trim()||'';
+  const ingredients=document.getElementById('rec-ingredients')?.value.trim()||'';
+  const method=document.getElementById('rec-method')?.value.trim()||'';
+  const yield_=document.getElementById('rec-yield')?.value.trim()||'';
+  const time_=document.getElementById('rec-time')?.value.trim()||'';
+  const reflection=document.getElementById('rec-reflection')?.value.trim()||'';
+  const photoEl=document.getElementById('rec-photo');
+  if(!title||!ingredients||!method){toast('Title, ingredients and method are required','error');return;}
+  let photo='';
+  if(photoEl && photoEl.files && photoEl.files[0]){
+    try{photo=await vpReadFileAsDataURL(photoEl.files[0]);}catch(e){console.warn('photo read fail',e);}
+  }
+  const all=S.arr('vos_recipes');
+  const scope=vpScope();
+  const existingIdx=all.findIndex(r=>r.matric===u.matric&&r.week===week&&r.academicSession===scope.session&&r.cohort===scope.cohort);
+  const completenessScore=Math.min(100,(title?15:0)+(ingredients.split('\n').filter(l=>l.trim()).length>=3?25:10)+(method.length>=120?30:method.length>=60?20:10)+(yield_?5:0)+(time_?5:0)+(reflection.length>=40?10:reflection?5:0)+(photo?10:0));
+  const baseRec={
+    id:'rec_'+Date.now(),
+    matric:u.matric,name:u.name,dept:u.dept,level:u.level,
+    module,week,title,ingredients,method,yield_,time_,reflection,
+    photo:photo|| (existingIdx>=0?all[existingIdx].photo:''),
+    autoScore:completenessScore,maxScore:100,
+    submittedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+    ...vpScopePayload(scope),
+  };
+  if(existingIdx>=0){
+    const prev=all[existingIdx];
+    all[existingIdx]={...prev,...baseRec,score:prev.score,percent:prev.percent,feedback:prev.feedback,gradedBy:prev.gradedBy,gradedAt:prev.gradedAt,id:prev.id};
+    toast('Recipe updated ✅','success');
+  } else {
+    all.push(baseRec);
+    toast('Recipe submitted ✅','success');
+  }
+  S.set('vos_recipes',all);
+  vosRender('v-recipes');
+}
+
+// ── Admin Recipe grading view ──
+function vaRecipes(){
+  const recipes=vpRecipesByAccess(VAPP.user);
+  const week=VAPP.recipeAdminWeek||'all';
+  const visible=week==='all'?recipes:recipes.filter(r=>r.week===week);
+  const graded=recipes.filter(r=>typeof r.score==='number');
+  const avg=graded.length?Math.round(graded.reduce((s,r)=>s+(r.percent||0),0)/graded.length):0;
+  return ph('🍳 Weekly Recipes','Grade student recipes for '+vpScopeLabel())+`
+  <div class="metrics">
+    <div class="metric"><div class="mv">${recipes.length}</div><div class="ml">Total Submissions</div></div>
+    <div class="metric"><div class="mv">${graded.length}</div><div class="ml">Graded</div></div>
+    <div class="metric"><div class="mv">${recipes.length-graded.length}</div><div class="ml">Pending</div></div>
+    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Class Average</div></div>
+  </div>
+  <div class="card"><div class="ct">Filter by Week</div>
+    <div class="recipe-week">
+      <div class="rcw ${week==='all'?'on':''}" onclick="vaSetRecipeWeek('all')">All<span class="stat">${recipes.length}</span></div>
+      ${VOS_WEEKS.map(w=>{const c=recipes.filter(r=>r.week===w).length;return `<div class="rcw ${week===w?'on':''}" onclick="vaSetRecipeWeek('${w}')">${w}<span class="stat">${c} sub${c===1?'':'s'}</span></div>`;}).join('')}
+    </div>
+    <div style="display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.8rem">
+      <button class="btn btn-v sm" onclick="vaExportRecipes()">📤 Export Recipe Results</button>
+    </div>
+  </div>
+  ${visible.length?visible.map(r=>`
+    <div class="card" style="border-left:3px solid var(--cyan)">
+      <div class="crow" style="align-items:flex-start;gap:.8rem">
+        <div style="flex:1">
+          <div class="crn">🍴 ${vpEsc(r.title||'Untitled Recipe')} · ${vpEsc(r.name)} (${vpEsc(r.matric)})</div>
+          <div class="crc">${vpModuleIcon(r.module)} ${vpModuleName(r.module)} · ${vpEsc(r.week)} · ${vpEsc(r.dept||'')} L${vpEsc(r.level||'')}</div>
+          <div class="crc">Submitted ${new Date(r.submittedAt).toLocaleString('en-NG')}${r.updatedAt&&r.updatedAt!==r.submittedAt?` · Updated ${new Date(r.updatedAt).toLocaleString('en-NG')}`:''}</div>
+        </div>
+        <span class="badge ${typeof r.score==='number'?(r.percent>=70?'bg':r.percent>=50?'ba':'br'):'bv'}">${typeof r.score==='number'?`${r.score}/${r.maxScore||100} (${r.percent||0}%)`:'Pending'}</span>
+      </div>
+      <div class="fr" style="margin-top:.7rem">
+        <div><div class="ml">Yield</div><div style="font-size:.82rem">${vpEsc(r.yield_||'—')}</div></div>
+        <div><div class="ml">Time</div><div style="font-size:.82rem">${vpEsc(r.time_||'—')}</div></div>
+      </div>
+      <div style="margin-top:.7rem"><div class="ml">Ingredients</div><div style="font-size:.8rem;white-space:pre-wrap;background:var(--panel);padding:.6rem .8rem;border-radius:8px;border:1px solid var(--border);margin-top:.25rem">${vpEsc(r.ingredients||'')}</div></div>
+      <div style="margin-top:.7rem"><div class="ml">Method</div><div style="font-size:.8rem;white-space:pre-wrap;background:var(--panel);padding:.6rem .8rem;border-radius:8px;border:1px solid var(--border);margin-top:.25rem;line-height:1.7">${vpEsc(r.method||'')}</div></div>
+      ${r.reflection?`<div style="margin-top:.7rem"><div class="ml">Reflection</div><div style="font-size:.8rem;white-space:pre-wrap;background:var(--panel);padding:.6rem .8rem;border-radius:8px;border:1px solid var(--border);margin-top:.25rem">${vpEsc(r.reflection)}</div></div>`:''}
+      ${r.photo?`<div style="margin-top:.7rem"><img src="${r.photo}" style="max-width:300px;border-radius:9px;border:1px solid var(--border)"></div>`:''}
+      <div class="fr" style="margin-top:.8rem">
+        <div class="field"><label>Score (out of ${r.maxScore||100})</label><input type="number" id="rec-score-${r.id}" value="${typeof r.score==='number'?r.score:''}" min="0" max="${r.maxScore||100}"></div>
+        <div class="field"><label>Feedback</label><textarea id="rec-feedback-${r.id}" style="min-height:80px">${vpEsc(r.feedback||'')}</textarea></div>
+      </div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-p sm" onclick="vaGradeRecipe('${r.id}')">💾 Save Grade</button>
+        <button class="btn btn-d sm" onclick="vaDeleteRecipe('${r.id}')">🗑 Delete</button>
+        ${typeof r.autoScore==='number'?`<span class="badge bc">Auto: ${r.autoScore}/100</span>`:''}
+      </div>
+    </div>`).join(''):'<div class="card"><div class="al ai">No recipes submitted yet for the selected week / scope.</div></div>'}`;
+}
+function vaSetRecipeWeek(w){VAPP.recipeAdminWeek=w;vosRender('va-recipes');}
+function vaGradeRecipe(id){
+  const all=S.arr('vos_recipes');
+  const idx=all.findIndex(r=>r.id===id);
+  if(idx===-1){toast('Recipe not found','error');return;}
+  const sc=parseFloat(document.getElementById('rec-score-'+id)?.value);
+  const fb=document.getElementById('rec-feedback-'+id)?.value.trim()||'';
+  if(isNaN(sc)){toast('Enter a numeric score','error');return;}
+  const max=all[idx].maxScore||100;
+  const score=Math.max(0,Math.min(max,sc));
+  all[idx]={...all[idx],score,percent:Math.round(score/max*100),feedback:fb,gradedBy:VAPP.user.full_name||VAPP.user.name||'Admin',gradedAt:new Date().toISOString()};
+  S.set('vos_recipes',all);
+  toast('Grade saved ✅','success');
+  vosRender('va-recipes');
+}
+function vaDeleteRecipe(id){
+  if(!confirm('Delete this recipe submission permanently?'))return;
+  const all=S.arr('vos_recipes').filter(r=>r.id!==id);
+  S.set('vos_recipes',all);
+  toast('Recipe deleted','info');
+  vosRender('va-recipes');
+}
+function vaExportRecipes(){
+  const rows=vpRecipesByAccess(VAPP.user).map(r=>({
+    Session:r.academicSession||'',Cohort:r.cohort||'',Week:r.week||'',
+    Matric:r.matric,Name:r.name,Department:r.dept||'',Level:r.level||'',
+    Module:vpModuleName(r.module),Title:r.title||'',
+    Ingredients:r.ingredients||'',Method:r.method||'',
+    Yield:r.yield_||'',TotalTime:r.time_||'',Reflection:r.reflection||'',
+    AutoScore:r.autoScore==null?'':r.autoScore,Score:typeof r.score==='number'?r.score:'',MaxScore:r.maxScore||100,
+    Percent:typeof r.percent==='number'?r.percent+'%':'',
+    Feedback:r.feedback||'',GradedBy:r.gradedBy||'',
+    GradedAt:r.gradedAt?new Date(r.gradedAt).toLocaleString('en-NG'):'',
+    Submitted:new Date(r.submittedAt).toLocaleString('en-NG'),
+  }));
+  vaXlsx(rows,'VOS102_Weekly_Recipes_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));
+}
+// Ensure backup includes recipes
+try{if(typeof VOS_BACKUP_KEYS!=='undefined'&&!VOS_BACKUP_KEYS.includes('vos_recipes')) VOS_BACKUP_KEYS.push('vos_recipes');}catch(e){}
+
+// ═══════════════════════════════════════════════════════════
+// NEUROMATRIX LMS — SESSION/COHORT SUPPORT (data is keyed by active scope)
+// ═══════════════════════════════════════════════════════════
+function nmDefaultSession(){const y=new Date().getFullYear();return (new Date().getMonth()>=7?y:y-1)+'/'+(new Date().getMonth()>=7?y+1:y);}
+function nmActiveScope(){
+  let scope=null;
+  try{scope=JSON.parse(localStorage.getItem('nm_active_scope'));}catch(e){scope=null;}
+  if(!scope||!scope.session||!scope.cohort){
+    scope={session:nmDefaultSession(),cohort:'Regular'};
+    localStorage.setItem('nm_active_scope',JSON.stringify(scope));
+  }
+  scope.key=`${scope.session} | ${scope.cohort}`;
+  return scope;
+}
+function nmScopes(){
+  let arr=[];
+  try{arr=JSON.parse(localStorage.getItem('nm_scopes'))||[];}catch(e){arr=[];}
+  if(!Array.isArray(arr)) arr=[];
+  const active=nmActiveScope();
+  if(!arr.find(s=>s.key===active.key)){arr.push({session:active.session,cohort:active.cohort,key:active.key});localStorage.setItem('nm_scopes',JSON.stringify(arr));}
+  return arr;
+}
+function nmScopeLabel(scope){scope=scope||nmActiveScope();return `${scope.session} · ${scope.cohort}`;}
+function nmScopeSuffix(){const s=nmActiveScope();return `__nm_${s.session.replace(/[^A-Za-z0-9]/g,'-')}__${s.cohort.replace(/[^A-Za-z0-9]/g,'-')}`;}
+
+// Wrap selected nm_* localStorage keys with active scope suffix so different academic years stay separated.
+const NM_SCOPED_PREFIXES=['nm_att_','nm_cw_','nm_quiz_','nm_assignment_','nm_seminar_','nm_grades_','nm_subs_','nm_stu_log','nm_lec_log'];
+function nmShouldScopeKey(k){return typeof k==='string' && NM_SCOPED_PREFIXES.some(p=>k.startsWith(p));}
+(function patchSforNeuroScope(){
+  if(window._nmScopePatched) return;
+  window._nmScopePatched=true;
+  const origGet=S.get,origArr=S.arr,origSet=S.set,origDel=S.del,origPush=S.push;
+  const wrap=k=>nmShouldScopeKey(k)?(k+nmScopeSuffix()):k;
+  S.get=(k,d)=>origGet(wrap(k),d);
+  S.arr=(k)=>origArr(wrap(k));
+  S.set=(k,v)=>origSet(wrap(k),v);
+  S.del=(k)=>origDel(wrap(k));
+  S.push=(k,item)=>{const a=S.arr(k);a.push(item);S.set(k,a);};
+})();
+function nmScopeManagerHTML(){
+  const scope=nmActiveScope();
+  const scopes=nmScopes();
+  return `<div class="card" style="border-color:rgba(11,117,165,.35);background:linear-gradient(135deg,rgba(11,117,165,.04),rgba(103,80,164,.03))">
+    <div class="ct">🗓️ Academic Session & Cohort</div>
+    <div class="al ai" style="font-size:.78rem">Attendance, classwork, quiz results, assignment submissions and grade records are stored separately per session/cohort. Course definitions and lecture notes stay shared across sessions.</div>
+    <div class="fr">
+      <div class="field"><label>Saved Scopes</label><select id="nm-scope-preset" onchange="nmPickScope(this.value)">${scopes.map((s,i)=>`<option value="${i}" ${s.key===scope.key?'selected':''}>${s.session} · ${s.cohort}</option>`).join('')}</select></div>
+      <div class="field"><label>Current Active Scope</label><div class="scope-readout">${nmScopeLabel(scope)}</div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Academic Session</label><input id="nm-scope-session" value="${scope.session}" placeholder="e.g. 2025/2026"></div>
+      <div class="field"><label>Cohort</label><input id="nm-scope-cohort" value="${scope.cohort}" placeholder="Regular, Sandwich, Stream A..."></div>
+    </div>
+    <div style="display:flex;gap:.55rem;flex-wrap:wrap">
+      <button class="btn btn-p sm" onclick="nmSetScope()">✅ Use This Scope</button>
+      <button class="btn btn-s sm" onclick="nmNewScope()">➕ New Session</button>
+    </div>
+  </div>`;
+}
+function nmPickScope(i){
+  const s=nmScopes()[i];if(!s)return;
+  localStorage.setItem('nm_active_scope',JSON.stringify({session:s.session,cohort:s.cohort}));
+  toast('Scope set to '+nmScopeLabel(s),'success');
+  if(typeof renderTab==='function'&&APP.tab) renderTab(APP.tab);
+}
+function nmSetScope(){
+  const session=document.getElementById('nm-scope-session')?.value.trim();
+  const cohort=document.getElementById('nm-scope-cohort')?.value.trim();
+  if(!session||!cohort){toast('Enter both session and cohort','error');return;}
+  const scope={session,cohort,key:`${session} | ${cohort}`};
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('nm_scopes'))||[];}catch(e){}
+  if(!Array.isArray(arr)) arr=[];
+  if(!arr.find(x=>x.key===scope.key)) arr.push(scope);
+  localStorage.setItem('nm_scopes',JSON.stringify(arr));
+  localStorage.setItem('nm_active_scope',JSON.stringify({session,cohort}));
+  toast('Scope active: '+nmScopeLabel(scope),'success');
+  if(typeof renderTab==='function'&&APP.tab) renderTab(APP.tab);
+}
+function nmNewScope(){
+  const se=document.getElementById('nm-scope-session');const co=document.getElementById('nm-scope-cohort');
+  if(se) se.value='';if(co) co.value='';if(se) se.focus();
+  toast('Enter new session/cohort then click Use This Scope','info');
+}
+// Render a small read-only scope chip in the Neuro sidebar
+function nmRenderScopeStrip(){
+  const sb=document.getElementById('sb');
+  if(!sb) return;
+  let strip=document.getElementById('nm-sb-scope');
+  if(!strip){
+    strip=document.createElement('div');
+    strip.id='nm-sb-scope';
+    strip.className='scope-strip';
+    const logo=sb.querySelector('.sb-logo');
+    if(logo&&logo.nextSibling) sb.insertBefore(strip,logo.nextSibling); else sb.prepend(strip);
+  }
+  const s=nmActiveScope();
+  const scopes=nmScopes();
+  strip.innerHTML=`<div style="font-size:.6rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:.25rem">Academic Scope</div><select class="sb-sel" style="margin:0" onchange="nmPickScope(this.value)">${scopes.map((sc,i)=>`<option value="${i}" ${sc.key===s.key?'selected':''}>${sc.session} · ${sc.cohort}</option>`).join('')}</select>`;
+}
+// Auto-call after each tab render in Neuro
+(function hookRenderTab(){
+  if(typeof renderTab!=='function') return;
+  if(window._nmRenderHooked) return;
+  window._nmRenderHooked=true;
+  const orig=window.renderTab;
+  window.renderTab=function(tab){
+    const r=orig.apply(this,arguments);
+    try{nmRenderScopeStrip();}catch(e){}
+    return r;
+  };
+})();
+// Also try hooking sysadmin settings to include scope manager
+(function hookSysSettings(){
+  if(typeof rSysSettings!=='function') return;
+  const orig=window.rSysSettings;
+  window.rSysSettings=function(){
+    const html=orig.apply(this,arguments);
+    return html.replace('<div class="card"><div class="ct">System Admin Password</div>', nmScopeManagerHTML()+'<div class="card"><div class="ct">System Admin Password</div>');
+  };
+})();
 // ═══════════════════════════════════════════════════════════
 // INIT — runs after full DOM is ready
 // ═══════════════════════════════════════════════════════════
@@ -3950,7 +4710,7 @@ function _bootApp(){
 // in case module fires before this script runs
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', ()=>{
-    window.addEventListener('firebase-ready', _bootApp, {once:true});
+    window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
     // Safety fallback: if firebase-ready fires before we listened, boot anyway after 4s
     setTimeout(()=>{ if(!window._fbDidBoot){ window._fbDidBoot=true; _bootApp(); } }, 4000);
   });
@@ -3961,6 +4721,7 @@ if(document.readyState === 'loading'){
 window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
