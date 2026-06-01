@@ -2886,46 +2886,29 @@ function vBulkImportQ(){
   toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');
 }
 function vSaveQuiz(publish){
-  const title = document.getElementById('qm-title').value.trim();
-  const module = document.getElementById('qm-module').value;
-  const duration = parseInt(document.getElementById('qm-dur').value) || 20;
-  if(!title){ toast('Enter title','error'); return; }
-  if(!vQuizDraft.length){ toast('Add at least 1 question','error'); return; }
-  
-  const quizzes = S.arr('vos_quizzes');
-  quizzes.push({
-    id: 'q_' + Date.now(),
-    title, module, duration,
-    questions: vQuizDraft.map(q=>({...q})),
-    published: publish,
-    createdAt: new Date().toISOString(),
-    author: (VAPP.user?.full_name || VAPP.user?.name || 'Admin')
-  });
-  S.set('vos_quizzes', quizzes);
+  const title=document.getElementById('qm-title').value.trim();
+  const module=document.getElementById('qm-module').value;
+  const duration=parseInt(document.getElementById('qm-dur').value)||20;
+  if(!title){toast('Enter title','error');return}
+  if(!vQuizDraft.length){toast('Add at least 1 question','error');return}
+  const quizzes=S.arr('vos_quizzes');
+  quizzes.push({id:'q_'+Date.now(),title,module,duration,
+    questions:vQuizDraft.map(q=>({...q})),published:publish,createdAt:new Date().toISOString(),
+    author:VAPP.user.full_name||VAPP.user.name});
+  S.set('vos_quizzes',quizzes);
   toast(publish?'Published ✅':'Draft saved','success');
-  
-  // Force page reload to refresh the list
-  setTimeout(() => location.reload(), 500);
+  vosRender('va-quiz');
 }
 function vPubQuiz(id){
-  try {
-    const qs = S.arr('vos_quizzes');
-    const q = qs.find(x => x.id === id);
-    if(q) {
-      q.published = true;
-      S.set('vos_quizzes', qs);
-      toast('Published ✅', 'success');
-      vosRender('va-quiz');
-    }
-  } catch(e) {
-    toast('Publish error: ' + e.message, 'error');
-  }
-
+  const qs=S.arr('vos_quizzes');const q=qs.find(x=>x.id===id);
+  if(q){q.published=true;S.set('vos_quizzes',qs);toast('Published ✅','success');vosRender('va-quiz');}
+}
 function vDelQuiz(id){
   if(!confirm('Delete?'))return;
   S.set('vos_quizzes',S.arr('vos_quizzes').filter(q=>q.id!==id));
   vosRender('va-quiz');
 }
+
 
 function vaResults(){
   const results=S.arr('vos_quiz_results');
