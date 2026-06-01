@@ -2886,39 +2886,27 @@ function vBulkImportQ(){
   toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');
 }
 function vSaveQuiz(publish){
-  try {
-    const title = document.getElementById('qm-title').value.trim();
-    const module = document.getElementById('qm-module').value;
-    const duration = parseInt(document.getElementById('qm-dur').value) || 20;
-    
-    if(!title) { toast('Enter title', 'error'); return; }
-    if(!vQuizDraft.length) { toast('Add at least 1 question', 'error'); return; }
-    
-    // Safely get author name
-    let author = 'Admin';
-    if(typeof VAPP !== 'undefined' && VAPP.user) {
-      author = VAPP.user.full_name || VAPP.user.name || 'Admin';
-    }
-    
-    const quizzes = S.arr('vos_quizzes');
-    quizzes.push({
-      id: 'q_' + Date.now(),
-      title: title,
-      module: module,
-      duration: duration,
-      questions: vQuizDraft.map(q => ({...q})),
-      published: publish,
-      createdAt: new Date().toISOString(),
-      author: author
-    });
-    
-    S.set('vos_quizzes', quizzes);
-    toast(publish ? 'Published ✅' : 'Draft saved', 'success');
-    vosRender('va-quiz');
-  } catch(e) {
-    console.error('Save error:', e);
-    toast('Error: ' + e.message, 'error');
-  }
+  const title = document.getElementById('qm-title').value.trim();
+  const module = document.getElementById('qm-module').value;
+  const duration = parseInt(document.getElementById('qm-dur').value) || 20;
+  if(!title){ toast('Enter title','error'); return; }
+  if(!vQuizDraft.length){ toast('Add at least 1 question','error'); return; }
+  
+  const quizzes = S.arr('vos_quizzes');
+  quizzes.push({
+    id: 'q_' + Date.now(),
+    title, module, duration,
+    questions: vQuizDraft.map(q=>({...q})),
+    published: publish,
+    createdAt: new Date().toISOString(),
+    author: (VAPP.user?.full_name || VAPP.user?.name || 'Admin')
+  });
+  S.set('vos_quizzes', quizzes);
+  toast(publish?'Published ✅':'Draft saved','success');
+  
+  // Force page reload to refresh the list
+  setTimeout(() => location.reload(), 500);
+}
 
 function vPubQuiz(id){
   try {
