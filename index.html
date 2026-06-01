@@ -2767,6 +2767,9 @@ function vaStudents(){
 }
 
 let vQuizDraft=[];
+
+function isPublished(q){return q.published===true||q.published==='true';}
+
 function vaQuiz(){
   const quizzes=S.arr('vos_quizzes');
   vQuizDraft=[];
@@ -2804,13 +2807,14 @@ function vaQuiz(){
       <div><div class="crn">${q.title}</div>
         <div class="crc">${VOS_MODULES.find(m=>m.id===q.module)?.name} · ${q.questions.length} Qs · ${q.duration}min</div></div>
       <div class="cra">
-        <span class="badge ${q.published?'bg':'bv'}">${q.published?'Published':'Draft'}</span>
-        ${!q.published?`<button class="btn btn-g sm" onclick="vPubQuiz('${q.id}')">Publish</button>`:''}
+        <span class="badge ${isPublished(q)?'bg':'bv'}">${isPublished(q)?'Published':'Draft'}</span>
+        ${!isPublished(q)?`<button class="btn btn-g sm" onclick="vPubQuiz('${q.id}')">Publish</button>`:''}
         <button class="btn btn-d sm" onclick="vDelQuiz('${q.id}')">🗑</button>
       </div>
     </div>`).join(''):'<div class="al ai">No quizzes yet.</div>'}
   </div>`;
 }
+
 function vAddQ(){
   const idx=vQuizDraft.length;
   vQuizDraft.push({text:'',options:['','','',''],correct:0});
@@ -2831,12 +2835,20 @@ function vAddQ(){
       </div>`).join('')}`;
   document.getElementById('qm-questions').appendChild(div);
 }
-function vRmQ(i){document.getElementById('qm-q-'+i)?.remove();vQuizDraft.splice(i,1);}
+
+/* FIX: remove by data-index to avoid stale index references after deletions */
+function vRmQ(i){
+  const el=document.getElementById('qm-q-'+i);
+  if(el) el.remove();
+  if(i>=0&&i<vQuizDraft.length) vQuizDraft.splice(i,1);
+}
+
 function vBulkImportQ(){
   const raw=document.getElementById('qm-bulk')?.value.trim();
   if(!raw){toast('Paste questions first','error');return}
   const blocks=raw.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
   let added=0;
+  const imported=[];
   blocks.forEach(block=>{
     const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);
     if(!lines.length)return;
@@ -2854,15 +2866,14 @@ function vBulkImportQ(){
     const correct=Math.max(0,Math.min(3,ansLetter.charCodeAt(0)-65));
     if(text&&options.filter(Boolean).length>=2){
       while(options.length<4) options.push('');
-      vQuizDraft.push({text,options:options.slice(0,4),correct});
+      imported.push({text,options:options.slice(0,4),correct});
       added++;
     }
   });
   if(!added){toast('No valid questions found','error');return}
+  vQuizDraft=[];
   const box=document.getElementById('qm-questions');
   box.innerHTML='';
-  const imported=[...vQuizDraft];
-  vQuizDraft=[];
   imported.forEach(q=>{
     const idx=vQuizDraft.length;
     vQuizDraft.push({...q});
@@ -2885,6 +2896,7 @@ function vBulkImportQ(){
   });
   toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');
 }
+
 function vSaveQuiz(publish){
   const title=document.getElementById('qm-title').value.trim();
   const module=document.getElementById('qm-module').value;
@@ -2892,17 +2904,32 @@ function vSaveQuiz(publish){
   if(!title){toast('Enter title','error');return}
   if(!vQuizDraft.length){toast('Add at least 1 question','error');return}
   const quizzes=S.arr('vos_quizzes');
-  quizzes.push({id:'q_'+Date.now(),title,module,duration,
-    questions:vQuizDraft.map(q=>({...q})),published:publish,createdAt:new Date().toISOString(),
-    author:VAPP.user.full_name||VAPP.user.name});
+  quizzes.push({
+    id:'q_'+Date.now(),
+    title,
+    module,
+    duration,
+    questions:vQuizDraft.map(q=>({...q})),
+    published:publish===true,   /* FIX: always store as strict boolean */
+    createdAt:new Date().toISOString(),
+    author:VAPP.user.full_name||VAPP.user.name
+  });
   S.set('vos_quizzes',quizzes);
   toast(publish?'Published ✅':'Draft saved','success');
   vosRender('va-quiz');
 }
+
 function vPubQuiz(id){
-  const qs=S.arr('vos_quizzes');const q=qs.find(x=>x.id===id);
-  if(q){q.published=true;S.set('vos_quizzes',qs);toast('Published ✅','success');vosRender('va-quiz');}
+  const qs=S.arr('vos_quizzes');
+  const q=qs.find(x=>x.id===id);
+  if(q){
+    q.published=true;           /* FIX: always store as strict boolean */
+    S.set('vos_quizzes',qs);
+    toast('Published ✅','success');
+    vosRender('va-quiz');
+  }
 }
+
 function vDelQuiz(id){
   if(!confirm('Delete?'))return;
   S.set('vos_quizzes',S.arr('vos_quizzes').filter(q=>q.id!==id));
