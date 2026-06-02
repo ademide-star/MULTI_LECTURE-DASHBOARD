@@ -316,6 +316,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
       <div class="field"><label>Password</label><input type="password" id="vos-pw" onkeydown="if(event.key==='Enter')vosLogin()" placeholder="Your password"></div>
       <div class="ae al hidden" id="vos-err">❌ Invalid credentials.</div>
       <button class="btn btn-p full" onclick="vosLogin()" style="margin-top:.3rem">🔓 Login</button>
+      <button class="btn btn-s full" id="vos-sync-btn" onclick="vosSyncAndRetry()" style="margin-top:.5rem;font-size:.73rem">🔄 Sync &amp; Retry (use if just registered or credentials fail)</button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem"></p>
   </div>
@@ -405,6 +406,9 @@ async function _fbPullAll(){
     snap.forEach(d=>{
       try{
         const raw = d.data().value;
+        // d.id is already the sanitised _fkey(originalKey).
+        // localStorage keys must match what S.get() looks up (also via _fkey),
+        // so storing under d.id is correct — both sides use the sanitised form.
         if(raw !== undefined) localStorage.setItem(d.id, raw);
       }catch{}
     });
@@ -413,6 +417,20 @@ async function _fbPullAll(){
     console.warn('[Firebase] Pull failed — running on local cache:',e);
   }
 }
+
+// ── Re-pull a single key from Firestore (used after register to guarantee
+//    the new student record is available immediately in this browser session)
+async function _fbPullKey(k){
+  try{
+    const fk=_fkey(k);
+    const snap=await getDoc(doc(_db,'portal_data',fk));
+    if(snap.exists()){
+      const raw=snap.data().value;
+      if(raw!==undefined) localStorage.setItem(fk,raw);
+    }
+  }catch(e){console.warn('[FB pullKey]',k,e);}
+}
+window._fbPullKey=_fbPullKey;
 
 // ── Expose to window so the main (non-module) script can use them
 window._fkey    = _fkey;
@@ -436,7 +454,9 @@ window.dispatchEvent(new Event('firebase-ready'));
 // STORAGE & UTILITIES  (localStorage cache + Firestore sync)
 // ═══════════════════════════════════════════════════════════
 // Keys that should stay local to this browser only (never synced to Firestore)
-const _LOCAL_ONLY_KEYS=new Set(['nm_student','vos_active_scope']);
+// nm_student = per-browser session identity (intentionally local)
+// vos_active_scope is intentionally synced so admin sees same scope on any browser
+const _LOCAL_ONLY_KEYS=new Set(['nm_student']);
 function _isLocalOnly(k){
   if(typeof k!=='string') return false;
   if(_LOCAL_ONLY_KEYS.has(k)) return true;
@@ -2354,56 +2374,34 @@ function vosLoginScreen(type){
   VAPP.loginType=type;
   document.getElementById('vos-login-title').textContent=type==='admin'?'🛠️ Admin Login':'🎓 Student Login';
   document.getElementById('vos-login-label').textContent=type==='admin'?'Admin Username':'Matric Number';
-  document.getElementById('vos-un').value='';
+  // Pre-fill matric if student just registered
+  const hint=sessionStorage.getItem('vos_reg_matric')||'';
+  document.getElementById('vos-un').value=type==='student'?hint:'';
   document.getElementById('vos-pw').value='';
   hideEl('vos-err');
   const _vl=document.getElementById('vos-login');
   if(_vl){_vl.classList.remove('hidden');_vl.style.display='flex';}
 }
 
-function vosRegister(){
-  const name=document.getElementById('reg-name').value.trim();
-  const matric=document.getElementById('reg-matric').value.trim();
-  const dept=document.getElementById('reg-dept').value;
-  const level=document.getElementById('reg-level').value;
-  const phone=document.getElementById('reg-phone').value.trim();
-  const pw1=document.getElementById('reg-pw').value;
-  const pw2=document.getElementById('reg-pw2').value;
-  const err=document.getElementById('reg-err'),ok=document.getElementById('reg-ok');
-  hideEl('reg-err');hideEl('reg-ok');
-  if(!name||!matric||!dept||!pw1){err.textContent='❌ Fill all required fields.';showEl('reg-err');return;}
-  if(pw1!==pw2){err.textContent='❌ Passwords do not match.';showEl('reg-err');return;}
-  const students=S.arr('vos_students');
-  if(students.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){
-    err.textContent='❌ Matric number already registered.';showEl('reg-err');return;
-  }
-  students.push({id:'s_'+Date.now(),name,matric,dept,level,phone,pw:pw1,createdAt:new Date().toISOString()});
-  S.set('vos_students',students);
-  ok.textContent='✅ Registration successful! Redirecting to login…';showEl('reg-ok');
-  setTimeout(()=>vosLoginScreen('student'),1400);
-}
+// vosRegister and vosLogin are defined further below (full versions with module/scope support)
 
-function vosLogin(){
-  const id=document.getElementById('vos-un').value.trim();
-  const pw=document.getElementById('vos-pw').value;
-  if(!id||!pw){showEl('vos-err');return;}
-  if(VAPP.loginType==='admin'){
-    initVOSDefaults();
-    const admins=S.arr('vos_admins');
-    const a=admins.find(x=>String(x.username||x.id||'').toLowerCase()===id.toLowerCase() && (x.pw===pw || x.pw_hash===pw || x.password===pw));
-    if(!a){showEl('vos-err');return;}
-    VAPP.user={...a,type:'admin'};
-    buildVOSAdminShell();
-  } else {
-    const students=S.arr('vos_students');
-    const s=students.find(x=>x.matric.toUpperCase()===id.toUpperCase()&&(x.pw===pw || x.password===pw));
-    if(!s){showEl('vos-err');return;}
-    VAPP.user={...s,type:'student'};
-    buildVOSStudentShell();
-  }
-}
+function vosLogout(){VAPP.user=null;try{sessionStorage.removeItem('vos_reg_matric');}catch{}backToLanding();}
 
-function vosLogout(){VAPP.user=null;backToLanding();}
+// Sync latest data from Firestore then re-attempt login (fixes "invalid credentials" on fresh browser)
+async function vosSyncAndRetry(){
+  const btn=document.getElementById('vos-sync-btn');
+  if(btn){btn.textContent='⟳ Syncing…';btn.disabled=true;}
+  try{
+    if(window._fbPullAll) await window._fbPullAll();
+    toast('Data synced ✅ — try logging in now','success');
+  }catch(e){
+    toast('Sync failed — check network','error');
+  }finally{
+    if(btn){btn.textContent='🔄 Sync & Retry';btn.disabled=false;}
+  }
+  // Auto-attempt login after sync
+  vosLogin();
+}
 
 const VOS_STUDENT_TABS=[
   {id:'v-dashboard',ico:'🏠',label:'Dashboard'},
@@ -3452,8 +3450,12 @@ function vosRegister(){
   if(students.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){err.textContent='❌ Matric number already registered.';showEl('reg-err');return;}
   students.push({id:'s_'+Date.now(),name,matric,dept,level,module,module_name:vpModuleName(module),modules:[module],phone,pw:pw1,createdAt:new Date().toISOString()});
   S.set('vos_students',students);
+  // Store matric hint so login screen can pre-fill after redirect
+  try{sessionStorage.setItem('vos_reg_matric',matric);}catch{}
   ok.textContent='✅ Registration successful! Redirecting to login…';showEl('reg-ok');
-  setTimeout(()=>vosLoginScreen('student'),1200);
+  // Delay redirect slightly longer to allow Firestore write to propagate,
+  // then redirect. On login the app will re-read from localStorage (already updated).
+  setTimeout(()=>vosLoginScreen('student'),1800);
 }
 function vosLogin(){
   const id=document.getElementById('vos-un').value.trim();
@@ -3508,6 +3510,7 @@ function vosLogin(){
     }
     VAPP.user={...s,type:'student'};
     if(errEl){errEl.className='ae al hidden';}
+    try{sessionStorage.removeItem('vos_reg_matric');}catch{}
     buildVOSStudentShell();
   }
 }
