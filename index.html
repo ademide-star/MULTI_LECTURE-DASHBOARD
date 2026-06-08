@@ -1730,9 +1730,13 @@ function loadMSTShortAnswers(){
   const subs=S.arr(`nm_mst_subs_${APP.course.code}`);
   const sub=subs.find(s=>s.matric===matric);
   if(!sub){panel.innerHTML='<div class="al aw">No MST submission found.</div>';return;}
-  const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
   const items=sub.answers.filter(a=>a.type==='short_answer'||a.type==='fill_gap');
-  if(!items.length){panel.innerHTML='<div class="al as">✅ No short answer/fill-gap questions in this MST.</div>';return;}
+  if(!items.length){panel.innerHTML='<div class="al as">✅ No short answers to mark in this MST.</div>';return;}
+  
+  // Store count on the panel element so save function reads it dynamically
+  panel.dataset.itemCount=items.length;
+  panel.dataset.matric=matric;
+  
   panel.innerHTML=items.map((item,i)=>{
     const ans=item.ans||'';
     const keywords=(item.keywords||'').split(',').map(k=>k.trim().toLowerCase()).filter(Boolean);
@@ -1747,17 +1751,27 @@ function loadMSTShortAnswers(){
         <label style="font-size:.74rem">Score (0–${item.marks||5}):</label>
         <input type="number" min="0" max="${item.marks||5}" value="${item.awarded??autoScore}"
           id="mst-sa-score-${i}" style="width:65px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:.3rem .5rem;color:var(--text);font-size:.78rem;outline:none">
+        <span style="font-size:.72rem;color:var(--dim)">/ ${item.marks||5} marks</span>
       </div>
-    </div>`;}).join('')+
-    `<button class="btn btn-p" onclick="saveMSTShortScores('${matric}',${items.length})">💾 Save MST Marks</button>`;
+    </div>`;
+  }).join('')+
+  // Use data attribute instead of hardcoded count
+  `<button class="btn btn-p" onclick="saveMSTShortScores()">💾 Save MST Marks</button>`;
 }
 
-function saveMSTShortScores(matric,count){
+function saveMSTShortScores(){
+  const panel=document.getElementById('mst-sa-panel');
+  // Read count and matric dynamically from the panel's data attributes
+  const count=parseInt(panel?.dataset.itemCount||'0');
+  const matric=panel?.dataset.matric||'';
+  if(!matric||!count){toast('Load a student first','error');return;}
+  
   const subs=S.arr(`nm_mst_subs_${APP.course.code}`);
   const idx=subs.findIndex(s=>s.matric===matric);
-  if(idx<0)return;
+  if(idx<0){toast('Submission not found','error');return;}
   const sub=subs[idx];
   const shortItems=sub.answers.filter(a=>a.type==='short_answer'||a.type==='fill_gap');
+  
   let extra=0;
   for(let i=0;i<count;i++){
     const v=parseInt(document.getElementById('mst-sa-score-'+i)?.value||'0');
@@ -1765,15 +1779,25 @@ function saveMSTShortScores(matric,count){
     shortItems[i].awarded=Math.min(max,Math.max(0,v));
     extra+=shortItems[i].awarded;
   }
-  // Recalculate total
+  
+  // Recalculate total score
   let total=0;
-  sub.answers.forEach(a=>{if(a.type==='short_answer'||a.type==='fill_gap')total+=a.awarded||0;else total+=a.earned||0;});
+  sub.answers.forEach(a=>{
+    if(a.type==='short_answer'||a.type==='fill_gap'){
+      total+=a.awarded||0;
+    } else {
+      total+=a.earned||0;
+    }
+  });
   sub.score=total;
   sub.pct=Math.round(total/Math.max(sub.total,1)*100);
   subs[idx]=sub;
   S.set(`nm_mst_subs_${APP.course.code}`,subs);
-  toast(`MST marks updated — ${sub.score}/${sub.total} (${sub.pct}%) ✅`,'success');
-  document.getElementById('mst-sa-panel').innerHTML=`<div class="al as">✅ MST marked: ${sub.score}/${sub.total} = ${sub.pct}%</div>`;
+  toast(`MST marks saved — ${sub.score}/${sub.total} (${sub.pct}%) ✅`,'success');
+  panel.innerHTML=`<div class="al as">✅ Marked: ${sub.score}/${sub.total} = ${sub.pct}%</div>`;
+  // Clear data attributes
+  delete panel.dataset.itemCount;
+  delete panel.dataset.matric;
 }
 
 function saveShortScores(matric,week,count){
