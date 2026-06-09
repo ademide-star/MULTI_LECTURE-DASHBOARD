@@ -1937,8 +1937,16 @@ function mstAddQ(){
   } else {
     qs.push({type,q,keywords:document.getElementById('mst-keywords')?.value.trim()||'',marks});
   }
-  S.set(`nm_mst_questions_${APP.course.code}`,qs);
-  toast('Question added ✅','success');renderTab('mst-ctrl');
+  try {
+  S.set(`nm_mst_questions_${APP.course.code}`, qs);
+  toast('Question added ✅', 'success');
+  renderTab('mst-ctrl');
+} catch (err) {
+  if (err.name === 'QuotaExceededError') {
+    toast('Storage full! Delete some questions or use fewer words.', 'error');
+  } else {
+    toast('Failed to save: ' + err.message, 'error');
+  }
 }
 function mstDelQ(i){
   const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
