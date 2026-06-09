@@ -1944,8 +1944,11 @@ function mstAddQ(){
   if (err.name === 'QuotaExceededError') {
     toast('Storage full! Delete some questions or use fewer words.', 'error');
   } else {
-    toast('Failed to save: ' + err.message, 'error');
+     toast('Failed to save: ' + err.message, 'error');
   }
+}
+}
+  
 function mstDelQ(i){
   const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
   qs.splice(i,1);S.set(`nm_mst_questions_${APP.course.code}`,qs);
