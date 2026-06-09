@@ -3658,7 +3658,7 @@ function vpAutoGradeAssignment(assignment,text){
   }
   score=Math.max(0,Math.min(maxScore,score));
   const percent=Math.round((score/maxScore)*100);
-  const missing=phrases.filter(p=>!answer.includes(p.toLowerCase())).slice(0,5);
+  const missing=phrases.filter(p=>!answer.includes(p.toLowerCase()));
   const feedback=phrases.length
     ? `Auto-grade: matched ${uniqueMatched.length}/${phrases.length} rubric keyword(s).${missing.length?` Missing focus: ${missing.join(', ')}.`:''}`
     : `Auto-grade estimated from answer completeness (${words} words). Add rubric keywords in admin view for more precise scoring.`;
