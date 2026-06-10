@@ -465,12 +465,82 @@ function _isLocalOnly(k){
 }
 const S={
   get:(k,d)=>{try{const fk=window._fkey?window._fkey(k):k;const v=localStorage.getItem(fk);return v!=null?JSON.parse(v):(d===undefined?{}:d)}catch{return d===undefined?{}:d}},
-  // Sarr: always returns an array — safe for .map/.filter/.find/.reduce
   arr:(k)=>{try{const fk=window._fkey?window._fkey(k):k;const v=localStorage.getItem(fk);const p=v!=null?JSON.parse(v):null;return Array.isArray(p)?p:[];}catch{return[];}},
-  set:(k,v)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.setItem(fk,JSON.stringify(v));if(window._fbSet&&!_isLocalOnly(k))window._fbSet(k,v);}catch(e){console.warn('S.set failed for',k,e);}},
+  set:(k,v)=>{
+    try{
+      const fk=window._fkey?window._fkey(k):k;
+      const json=JSON.stringify(v);
+      try{
+        localStorage.setItem(fk,json);
+      }catch(quotaErr){
+        if(quotaErr.name==='QuotaExceededError'){
+          // Try to free space by removing large file-bearing keys from cache
+          console.warn('[Quota] localStorage full. Attempting cleanup...');
+          S._cleanupLargeKeys();
+          try{
+            localStorage.setItem(fk,json);
+            console.log('[Quota] Cleanup succeeded, retry worked');
+          }catch(retryErr){
+            // Still failed - strip base64 from value if present and try again
+            const stripped=S._stripBase64(v);
+            try{
+              localStorage.setItem(fk,JSON.stringify(stripped));
+              console.warn('[Quota] Saved without base64 data — file content stays in Firebase only');
+              if(window.toast)toast('Storage full — large files synced to cloud only','aw');
+            }catch(finalErr){
+              // Give up local cache, but still sync to Firebase
+              console.error('[Quota] Cannot cache locally even after stripping. Firebase sync still works.',finalErr);
+              if(window.toast)toast('Local cache full but cloud save succeeded','aw');
+            }
+          }
+        } else { throw quotaErr; }
+      }
+      if(window._fbSet&&!_isLocalOnly(k))window._fbSet(k,v);
+    }catch(e){console.warn('S.set failed for',k,e);}
+  },
   push:(k,item)=>{const a=S.arr(k);a.push(item);S.set(k,a);},
   del:(k)=>{try{const fk=window._fkey?window._fkey(k):k;localStorage.removeItem(fk);if(window._fbDel&&!_isLocalOnly(k))window._fbDel(k);}catch(e){console.warn('S.del failed for',k,e);}},
+
+  // Strip base64 file data to reduce size (files remain in Firebase)
+  _stripBase64:(v)=>{
+    if(!v) return v;
+    const clone=JSON.parse(JSON.stringify(v));
+    const strip=(obj)=>{
+      if(!obj||typeof obj!=='object') return;
+      for(const key in obj){
+        if(typeof obj[key]==='string' && obj[key].startsWith('data:') && obj[key].length>5000){
+          obj[key]='[stored in cloud]';
+        } else if(typeof obj[key]==='object'){
+          strip(obj[key]);
+        }
+      }
+    };
+    if(Array.isArray(clone)) clone.forEach(strip); else strip(clone);
+    return clone;
+  },
+
+  // Remove the largest cached keys to free space
+  _cleanupLargeKeys:()=>{
+    const sizes=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      const v=localStorage.getItem(k);
+      sizes.push({k,size:v?v.length:0});
+    }
+    sizes.sort((a,b)=>b.size-a.size);
+    // Remove top 5 largest items that look like file-bearing keys
+    let freed=0;
+    for(const item of sizes.slice(0,10)){
+      if(item.size>50000 && (item.k.includes('sub_')||item.k.includes('seminar')||item.k.includes('announcement')||item.k.includes('portfolio'))){
+        localStorage.removeItem(item.k);
+        freed+=item.size;
+        console.log('[Cleanup] Removed',item.k,'(',Math.round(item.size/1024),'KB)');
+        if(freed>1024*1024) break; // Freed 1MB, should be enough
+      }
+    }
+  },
 };
+
 
 function showEl(id,disp){
   const el=document.getElementById(id);if(!el)return;
@@ -1936,19 +2006,10 @@ function mstAddQ(){
   } else {
     qs.push({type,q,keywords:document.getElementById('mst-keywords')?.value.trim()||'',marks});
   }
-  try {
   S.set(`nm_mst_questions_${APP.course.code}`, qs);
   toast('Question added ✅', 'success');
   renderTab('mst-ctrl');
-} catch (err) {
-  if (err.name === 'QuotaExceededError') {
-    toast('Storage full! Delete some questions or use fewer words.', 'error');
-  } else {
-     toast('Failed to save: ' + err.message, 'error');
-  }
-}
-}
-  
+} 
 function mstDelQ(i){
   const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
   qs.splice(i,1);S.set(`nm_mst_questions_${APP.course.code}`,qs);
