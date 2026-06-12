@@ -568,7 +568,6 @@ function initVOSDefaults(){
   S.set('vos_admins',admins);
 }
 
-
 // ═══════════════════════════════════════════════════════════
 // NEURO APP STATE
 // ═══════════════════════════════════════════════════════════
@@ -1846,89 +1845,200 @@ function saveScore(){
   sc.name=n;sc.matric=m;S.set(k,sc);logLec(`Manual score: ${n} (${m}) ${w}`);toast('Scores saved ✅','success');
 }
 
+
 // ═══════════════════════════════════════════════════════════
 // MID-SEMESTER TEST (NM LMS)
 // ═══════════════════════════════════════════════════════════
 
 function rAdmMST(){
-  const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
-  const status=S.get(`nm_mst_status_${APP.course.code}`,{is_open:false,duration_mins:30});
-  const subs=S.arr(`nm_mst_subs_${APP.course.code}`);
-  const selSty=`style="background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.5rem .8rem;color:var(--text);font-size:.8rem;width:100%;outline:none"`;
-  return ph('🧪 Mid-Semester Test',APP.course.name)+`
+  const qs     = S.arr(`nm_mst_questions_${APP.course.code}`);
+  const status = S.get(`nm_mst_status_${APP.course.code}`,{is_open:false,duration_mins:30});
+  const subs   = S.arr(`nm_mst_subs_${APP.course.code}`);
+  const selSty = `style="background:var(--panel);border:1px solid var(--border);border-radius:9px;
+                  padding:.5rem .8rem;color:var(--text);font-size:.8rem;width:100%;outline:none"`;
+
+  return ph('🧪 Mid-Semester Test', APP.course.name) + `
+
+  <!-- ── Test Control ── -->
   <div class="card">
     <div class="ct">⚙️ Test Control</div>
     <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem">
       <span class="badge ${status.is_open?'bg':'br'}">${status.is_open?'🟢 OPEN':'🔴 CLOSED'}</span>
-      <span style="font-size:.78rem;color:var(--dim)">${qs.length} question(s) · ${subs.length} submission(s) · ${status.duration_mins||30} min timer</span>
+      <span style="font-size:.78rem;color:var(--dim)">
+        ${qs.length} question(s) · ${subs.length} submission(s) · ${status.duration_mins||30} min timer
+      </span>
     </div>
-    <div class="field"><label>Duration (minutes)</label>
+    <div class="field">
+      <label>Duration (minutes)</label>
       <input type="number" id="mst-dur" value="${status.duration_mins||30}" min="5" max="180" ${selSty}>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-      <button class="btn btn-p" onclick="mstOpen()">🟢 Open Test</button>
-      <button class="btn btn-d" onclick="mstClose()">🔴 Close Test</button>
+      <button class="btn btn-p"  onclick="mstOpen()">🟢 Open Test</button>
+      <button class="btn btn-d"  onclick="mstClose()">🔴 Close Test</button>
       <button class="btn btn-v sm" onclick="nmExportMSTResults()">📥 Export Results CSV</button>
     </div>
   </div>
+
+  <!-- ── Bulk Import ── -->
   <div class="card">
-  <div class="card"><div class="ct">📥 Bulk Import Questions</div>
+    <div class="ct">📥 Bulk Import Questions</div>
     <div class="al ai" style="font-size:.75rem;line-height:1.85">
-      <b>MCQ:</b> <code>MCQ: Question?</code> then A.–E. options then <code>Correct: A</code><br>
-      <b>GAP:</b> <code>GAP: The _____ is key.</code> then <code>Correct: answer|alternative</code><br>
+      <b>MCQ:</b> <code>MCQ: Question?</code> then <code>A. Option</code> … then <code>Correct: A</code><br>
+      <b>GAP:</b> <code>GAP: The _____ is key.</code> then <code>Correct: answer|alt</code><br>
       <b>SHORT:</b> <code>SHORT: Explain X.</code> then <code>Model: key points</code> then <code>Marks: 5</code>
     </div>
-    <textarea id="bulk-q" placeholder="Paste multiple questions here…" style="min-height:140px"></textarea>
-    <button class="btn btn-p" style="margin-top:.7rem" onclick="bulkImportQs()">📥 Import All Questions</button>
+    <textarea id="bulk-q" placeholder="Paste multiple questions here…"
+              style="min-height:140px"></textarea>
+    <button class="btn btn-p" style="margin-top:.7rem"
+            onclick="mstBulkImportQs()">📥 Import All Questions</button>
   </div>
+
+  <!-- ── Add Single Question ── -->
+  <div class="card">
     <div class="ct">➕ Add Question</div>
-    <div class="field"><label>Question Type</label>
+    <div class="field">
+      <label>Question Type</label>
       <select id="mst-qtype" ${selSty} onchange="mstQTypeChange()">
         <option value="mcq">Multiple Choice (MCQ)</option>
         <option value="short_answer">Short Answer</option>
         <option value="fill_gap">Fill in the Gap</option>
       </select>
     </div>
-    <div class="field"><label>Question Text *</label>
-      <textarea id="mst-qtext" placeholder="Type your question…" style="min-height:70px;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.6rem .9rem;color:var(--text);font-size:.82rem;width:100%;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+    <div class="field">
+      <label>Question Text *</label>
+      <textarea id="mst-qtext" placeholder="Type your question…"
+        style="min-height:70px;background:var(--panel);border:1px solid var(--border);
+               border-radius:9px;padding:.6rem .9rem;color:var(--text);font-size:.82rem;
+               width:100%;outline:none;resize:vertical;box-sizing:border-box"></textarea>
     </div>
     <div id="mst-mcq-opts">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <div class="field"><label>Option A *</label><input id="mst-oa" placeholder="Option A"></div>
         <div class="field"><label>Option B *</label><input id="mst-ob" placeholder="Option B"></div>
-        <div class="field"><label>Option C</label><input id="mst-oc" placeholder="Option C"></div>
-        <div class="field"><label>Option D</label><input id="mst-od" placeholder="Option D"></div>
+        <div class="field"><label>Option C</label>  <input id="mst-oc" placeholder="Option C"></div>
+        <div class="field"><label>Option D</label>  <input id="mst-od" placeholder="Option D"></div>
       </div>
-      <div class="field"><label>Correct Answer</label>
+      <div class="field">
+        <label>Correct Answer</label>
         <select id="mst-correct" ${selSty}>
-          <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+          <option value="A">A</option><option value="B">B</option>
+          <option value="C">C</option><option value="D">D</option>
         </select>
       </div>
     </div>
     <div id="mst-sa-opts" style="display:none">
-      <div class="field"><label>Keywords for auto-marking (comma-separated)</label>
+      <div class="field">
+        <label>Keywords for auto-marking (comma-separated)</label>
         <input id="mst-keywords" placeholder="e.g. mitosis, cell division, nucleus">
       </div>
     </div>
-    <div class="field"><label>Marks</label>
+    <div class="field">
+      <label>Marks</label>
       <input type="number" id="mst-marks" value="2" min="1" max="20" ${selSty}>
     </div>
     <button class="btn btn-p" onclick="mstAddQ()">➕ Add Question</button>
   </div>
+
+  <!-- ── Question List ── -->
   <div class="card">
-    <div class="ct">📋 Questions (${qs.length} · Total ${qs.reduce((s,q)=>s+(q.marks||1),0)} marks)</div>
-    ${!qs.length?'<div class="al ai">No questions yet.</div>':
-    qs.map((q,i)=>mstRenderAdmQ(q,i)).join('')}
+    <div class="ct">
+      📋 Questions (${qs.length} · Total ${qs.reduce((s,q)=>s+(q.marks||1),0)} marks)
+    </div>
+    ${ !qs.length
+        ? '<div class="al ai">No questions yet.</div>'
+        : qs.map((q,i) => mstRenderAdmQ(q,i)).join('') }
   </div>
+
+  <!-- ── Submissions ── -->
   <div class="card">
     <div class="ct">📊 Submissions (${subs.length})</div>
-    ${!subs.length?'<div class="al ai">No submissions yet.</div>':`<div class="tw"><table>
-      <thead><tr><th>Name</th><th>Matric</th><th>Score</th><th>%</th><th>Submitted</th></tr></thead>
-      <tbody>${subs.map(s=>`<tr><td>${s.name}</td><td>${s.matric}</td><td>${s.score}/${s.total}</td><td>${s.pct}%</td><td>${new Date(s.ts).toLocaleString('en-NG')}</td></tr>`).join('')}</tbody>
-    </table></div>`}
+    ${ !subs.length
+        ? '<div class="al ai">No submissions yet.</div>'
+        : `<div class="tw"><table>
+            <thead><tr>
+              <th>Name</th><th>Matric</th><th>Score</th><th>%</th><th>Submitted</th>
+            </tr></thead>
+            <tbody>
+              ${subs.map(s=>`<tr>
+                <td>${s.name}</td><td>${s.matric}</td>
+                <td>${s.score}/${s.total}</td><td>${s.pct}%</td>
+                <td>${new Date(s.ts).toLocaleString('en-NG')}</td>
+              </tr>`).join('')}
+            </tbody>
+           </table></div>` }
   </div>`;
 }
+function mstBulkImportQs(){
+  const raw = document.getElementById('bulk-q')?.value.trim();
+  if(!raw){ toast('Paste questions first','error'); return; }
 
+  // split on a new block start so multi-line options stay together
+  const blocks = raw.split(/\n(?=MCQ:|GAP:|SHORT:)/i);
+  const qs = S.arr(`nm_mst_questions_${APP.course.code}`);
+  let added = 0;
+
+  blocks.forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if(!lines.length) return;
+    const head = lines[0];
+
+    if(/^MCQ:/i.test(head)){
+      const qtext = head.slice(4).trim();
+      const opts  = {};
+      let correct = '';
+      let marks   = 2;
+
+      lines.slice(1).forEach(l => {
+        const m = l.match(/^([A-E])[.)]\s*(.+)/i);
+        if(m)                         opts[m[1].toUpperCase()] = m[2].trim();
+        else if(/^correct:/i.test(l)) correct = l.split(':')[1].trim().toUpperCase();
+        else if(/^marks:/i.test(l))   marks   = parseInt(l.split(':')[1]) || 2;
+      });
+
+      if(qtext && Object.keys(opts).length >= 2 && correct){
+        qs.push({ type:'mcq', q:qtext, options:opts, answer:correct, marks });
+        added++;
+      }
+    }
+    else if(/^GAP:/i.test(head)){
+      const qtext = head.slice(4).trim();
+      let keywords = '';
+      let marks    = 2;
+
+      lines.slice(1).forEach(l => {
+        if(/^correct:/i.test(l))  keywords = l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l)) marks  = parseInt(l.split(':')[1]) || 2;
+      });
+
+      if(qtext){
+        qs.push({ type:'fill_gap', q:qtext, keywords, marks });
+        added++;
+      }
+    }
+    else if(/^SHORT:/i.test(head)){
+      const qtext = head.slice(6).trim();
+      let keywords = '';
+      let marks    = 2;
+
+      lines.slice(1).forEach(l => {
+        // accept either MODEL: or KEYWORDS: as the keyword source
+        if(/^model:/i.test(l))      keywords = l.split(':').slice(1).join(':').trim();
+        else if(/^keywords:/i.test(l)) keywords = l.split(':').slice(1).join(':').trim();
+        else if(/^marks:/i.test(l)) marks    = parseInt(l.split(':')[1]) || 2;
+      });
+
+      if(qtext){
+        qs.push({ type:'short_answer', q:qtext, keywords, marks });
+        added++;
+      }
+    }
+  });
+
+  if(!added){ toast('No valid questions found — check format','error'); return; }
+  S.set(`nm_mst_questions_${APP.course.code}`, qs);
+  toast(`Imported ${added} question${added>1?'s':''} ✅`, 'success');
+  renderTab('mst-ctrl');
+}
 function mstQTypeChange(){
   const t=document.getElementById('mst-qtype')?.value;
   document.getElementById('mst-mcq-opts').style.display=t==='mcq'?'':'none';
@@ -1958,10 +2068,18 @@ function mstAddQ(){
   } else {
     qs.push({type,q,keywords:document.getElementById('mst-keywords')?.value.trim()||'',marks});
   }
+  try {
   S.set(`nm_mst_questions_${APP.course.code}`, qs);
   toast('Question added ✅', 'success');
   renderTab('mst-ctrl');
-} 
+} catch (err) {
+  if (err.name === 'QuotaExceededError') {
+    toast('Storage full! Delete some questions or use fewer words.', 'error');
+  } else {
+    toast('Failed to save: ' + err.message, 'error');
+  }
+}
+}
 function mstDelQ(i){
   const qs=S.arr(`nm_mst_questions_${APP.course.code}`);
   qs.splice(i,1);S.set(`nm_mst_questions_${APP.course.code}`,qs);
@@ -4202,21 +4320,31 @@ initVOSPatch=function(){
   vpUpdateScopeStrip();
 };
 
-vpStudentsByAccess=function(user=VAPP.user){
-  const students=vpScopeFilter((S.arr('vos_students')||[]).map(vpNormalizeStudent));
-  return vpIsSuperAdmin(user)?students:students.filter(s=>vpCanAccessModule(s.module,user));
+// ── REPLACE the five vpXxxByAccess overrides ─────────────────────────────
+// Admins see all records within their module access regardless of scope.
+// Students still see only their own scope (handled inside each student tab).
+vpStudentsByAccess = function(user){
+  user = user || VAPP.user;
+  const students = (S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
+  return vpIsSuperAdmin(user)
+    ? students
+    : students.filter(s => vpCanAccessModule(s.module, user));
 };
-vpResultsByAccess=function(user=VAPP.user){
-  return vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>vpCanAccessModule(r.module,user));
+vpResultsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_quiz_results')||[]).filter(r => vpCanAccessModule(r.module, user));
 };
-vpAttendanceByAccess=function(user=VAPP.user){
-  return vpScopeFilter(S.arr('vos_attendance')).filter(a=>vpCanAccessModule(a.module,user));
+vpAttendanceByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_attendance')||[]).filter(a => vpCanAccessModule(a.module, user));
 };
-vpPortsByAccess=function(user=VAPP.user){
-  return vpScopeFilter(S.arr('vos_portfolios')).filter(p=>vpCanAccessModule(p.module,user));
+vpPortsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_portfolios')||[]).filter(p => vpCanAccessModule(p.module, user));
 };
-vpAssignmentSubsByAccess=function(user=VAPP.user){
-  return vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>vpCanAccessModule(s.module,user));
+vpAssignmentSubsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_assignment_submissions')||[]).filter(s => vpCanAccessModule(s.module, user));
 };
 
 const _vosScopeBaseStudentShell=buildVOSStudentShell;
@@ -4253,23 +4381,56 @@ vosRegister=function(){
   ok.textContent='Registration successful for '+vpScopeLabel(scope)+'. Redirecting to login...';showEl('reg-ok');
   setTimeout(()=>vosLoginScreen('student'),1200);
 };
-vosLogin=function(){
-  const id=document.getElementById('vos-un').value.trim();
-  const pw=document.getElementById('vos-pw').value;
-  if(!id||!pw){showEl('vos-err');return;}
+// ── REPLACE the vosLogin = function(){...}; override at the bottom ────────
+vosLogin = function(){
+  const id = document.getElementById('vos-un').value.trim();
+  const pw = document.getElementById('vos-pw').value;
+  const errEl = document.getElementById('vos-err');
+  if(!id || !pw){ showEl('vos-err'); return; }
   initVOSDefaults();
-  vpMigrateData();
-  if(VAPP.loginType==='admin'){
-    const admins=S.arr('vos_admins');
-    const a=admins.find(x=>String(x.username||x.id||'').toLowerCase()===id.toLowerCase() && (x.pw===pw || x.pw_hash===pw || x.password===pw));
-    if(!a){showEl('vos-err');return;}
-    VAPP.user={...a,type:'admin'};
+  try{ vpMigrateData(); }catch(e){ console.warn('migrate skipped',e); }
+
+  if(VAPP.loginType === 'admin'){
+    const admins = S.arr('vos_admins') || [];
+    const a = admins.find(x =>
+      String(x.username||x.id||'').toLowerCase() === id.toLowerCase() &&
+      (x.pw===pw || x.pw_hash===pw || x.password===pw)
+    );
+    if(!a){ showEl('vos-err'); return; }
+    VAPP.user = {...a, type:'admin'};
     buildVOSAdminShell();
   } else {
-    const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
-    const s=students.find(x=>vpSameScope(x)&&x.matric.toUpperCase()===id.toUpperCase()&&(x.pw===pw || x.password===pw));
-    if(!s){showEl('vos-err');return;}
-    VAPP.user={...s,type:'student'};
+    // Search ALL students — no scope guard — so a student can always log in
+    // even when the active scope on this browser differs from their registration scope.
+    const allStudents = (S.arr('vos_students')||[]).map(vpNormalizeStudent);
+    const s = allStudents.find(x =>
+      x.matric.toUpperCase() === id.toUpperCase() &&
+      (x.pw===pw || x.password===pw || x.pw_hash===pw)
+    );
+    if(!s){
+      if(errEl){
+        const sameMatric = allStudents.find(x => x.matric.toUpperCase()===id.toUpperCase());
+        errEl.textContent = sameMatric
+          ? '❌ Wrong password for that matric number.'
+          : '❌ No account found with that matric number. Please register first.';
+      }
+      showEl('vos-err'); return;
+    }
+    // Auto-restore the scope the student belongs to so their data is visible
+    if(s.academicSession && s.cohort){
+      const sc = vpNormalizeScope({session:s.academicSession, cohort:s.cohort});
+      try{
+        const scopes = S.arr('vos_scopes')||[];
+        if(!scopes.find(x=>x.key===sc.key)){
+          scopes.push({session:sc.session, cohort:sc.cohort, key:sc.key});
+          S.set('vos_scopes', scopes);
+        }
+        S.set('vos_active_scope', {session:sc.session, cohort:sc.cohort, key:sc.key});
+      }catch(e){ console.warn('scope restore fail',e); }
+    }
+    VAPP.user = {...s, type:'student'};
+    if(errEl) errEl.className = 'ae al hidden';
+    try{ sessionStorage.removeItem('vos_reg_matric'); }catch(e){}
     buildVOSStudentShell();
   }
 };
@@ -4633,23 +4794,37 @@ try{if(typeof VOS_BACKUP_KEYS!=='undefined'&&!VOS_BACKUP_KEYS.includes('vos_reci
 // ═══════════════════════════════════════════════════════════
 function nmDefaultSession(){const y=new Date().getFullYear();return (new Date().getMonth()>=7?y:y-1)+'/'+(new Date().getMonth()>=7?y+1:y);}
 function nmActiveScope(){
-  let scope=null;
-  try{scope=JSON.parse(localStorage.getItem('nm_active_scope'));}catch(e){scope=null;}
-  if(!scope||!scope.session||!scope.cohort){
-    scope={session:nmDefaultSession(),cohort:'Regular'};
-    localStorage.setItem('nm_active_scope',JSON.stringify(scope));
+  const fk = window._fkey ? window._fkey('nm_active_scope') : 'nm_active_scope';
+  let scope = null;
+  try { scope = JSON.parse(localStorage.getItem(fk)); } catch(e){ scope = null; }
+  if(!scope || !scope.session || !scope.cohort){
+    scope = {session: nmDefaultSession(), cohort: 'Regular'};
+    try { localStorage.setItem(fk, JSON.stringify(scope)); } catch(e){}
+    if(window._fbSet) window._fbSet('nm_active_scope', scope); // sync to Firestore
   }
-  scope.key=`${scope.session} | ${scope.cohort}`;
+  scope.key = `${scope.session} | ${scope.cohort}`;
   return scope;
 }
-function nmScopes(){
-  let arr=[];
-  try{arr=JSON.parse(localStorage.getItem('nm_scopes'))||[];}catch(e){arr=[];}
-  if(!Array.isArray(arr)) arr=[];
-  const active=nmActiveScope();
-  if(!arr.find(s=>s.key===active.key)){arr.push({session:active.session,cohort:active.cohort,key:active.key});localStorage.setItem('nm_scopes',JSON.stringify(arr));}
-  return arr;
+function nmSetScope(){
+  const session = (document.getElementById('nm-scope-session')?.value||'').trim();
+  const cohort  = (document.getElementById('nm-scope-cohort')?.value||'').trim();
+  if(!session || !cohort){ toast('Enter both session and cohort','error'); return; }
+  const scope = {session, cohort, key:`${session} | ${cohort}`};
+  let arr = []; try{ arr = JSON.parse(localStorage.getItem('nm_scopes'))||[]; }catch(e){}
+  if(!Array.isArray(arr)) arr = [];
+  if(!arr.find(x=>x.key===scope.key)) arr.push(scope);
+  localStorage.setItem('nm_scopes', JSON.stringify(arr));
+  const fk = window._fkey ? window._fkey('nm_active_scope') : 'nm_active_scope';
+  try { localStorage.setItem(fk, JSON.stringify({session, cohort})); } catch(e){}
+  // push both values to Firestore so every device picks them up
+  if(window._fbSet){
+    window._fbSet('nm_active_scope', {session, cohort});
+    window._fbSet('nm_scopes', arr);
+  }
+  toast('Scope active: '+nmScopeLabel(scope),'success');
+  if(typeof renderTab==='function' && APP.tab) renderTab(APP.tab);
 }
+
 function nmScopeLabel(scope){scope=scope||nmActiveScope();return `${scope.session} · ${scope.cohort}`;}
 function nmScopeSuffix(){const s=nmActiveScope();return `__nm_${s.session.replace(/[^A-Za-z0-9]/g,'-')}__${s.cohort.replace(/[^A-Za-z0-9]/g,'-')}`;}
 
