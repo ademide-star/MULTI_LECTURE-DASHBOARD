@@ -1872,6 +1872,15 @@ function rAdmMST(){
     </div>
   </div>
   <div class="card">
+  <div class="card"><div class="ct">📥 Bulk Import Questions</div>
+    <div class="al ai" style="font-size:.75rem;line-height:1.85">
+      <b>MCQ:</b> <code>MCQ: Question?</code> then A.–E. options then <code>Correct: A</code><br>
+      <b>GAP:</b> <code>GAP: The _____ is key.</code> then <code>Correct: answer|alternative</code><br>
+      <b>SHORT:</b> <code>SHORT: Explain X.</code> then <code>Model: key points</code> then <code>Marks: 5</code>
+    </div>
+    <textarea id="bulk-q" placeholder="Paste multiple questions here…" style="min-height:140px"></textarea>
+    <button class="btn btn-p" style="margin-top:.7rem" onclick="bulkImportQs()">📥 Import All Questions</button>
+  </div>
     <div class="ct">➕ Add Question</div>
     <div class="field"><label>Question Type</label>
       <select id="mst-qtype" ${selSty} onchange="mstQTypeChange()">
