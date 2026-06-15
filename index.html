@@ -4969,6 +4969,861 @@ if(document.readyState === 'loading'){
 }
 window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
 </script>
+/* =====================================================================
+   VOS + NeuroMatrix LMS — Bug Fixes
+   Paste this entire block just before </body> in your HTML file.
+   ===================================================================== */
+<script>
+(function applyVOSFixes() {
+  'use strict';
+
+  /* ── Wait until core functions are ready ────────────────────────── */
+  function whenReady(fn) {
+    if (typeof vosRender === 'function') { fn(); }
+    else { window.addEventListener('firebase-ready', fn, { once: true }); }
+  }
+
+  whenReady(function () {
+
+    /* =================================================================
+       FIX 1 ─ STUDENT QUIZ VIEW
+       Issue: quizzes filtered too strictly; students can't see questions.
+       Fix: broaden published check, skip module filter for question render.
+    ================================================================= */
+    window.vQuiz = function () {
+      /* Quizzes are reusable across scopes — no scope filter here */
+      const allQuizzes = S.arr('vos_quizzes') || [];
+      const published = allQuizzes.filter(function (q) {
+        return (q.published === true || q.published === 'true' || q.published === 1);
+      });
+
+      /* Filter to student's assigned module only */
+      const myModules = vpGetModuleIds(VAPP.user);
+      const quizzes = published.filter(function (q) {
+        return !myModules.length || myModules.includes(q.module);
+      });
+
+      /* Results: search ALL results for this student, no scope limit */
+      const allResults = S.arr('vos_quiz_results') || [];
+      const myResults = allResults.filter(function (r) {
+        return r.matric === VAPP.user.matric;
+      });
+
+      if (!quizzes.length) {
+        return ph('📝 CBT Quiz', 'No quizzes published for your module yet') +
+          '<div class="al ai">Your lecturer has not published any quizzes yet. Check back later.</div>';
+      }
+
+      return ph('📝 CBT Quiz', 'Your module: ' + vpModuleLabel(VAPP.user)) +
+        quizzes.map(function (q) {
+          const done = myResults.find(function (r) { return r.quizId === q.id; });
+          const m = vpModule(q.module);
+          const qCount = Array.isArray(q.questions) ? q.questions.length : 0;
+          return '<div class="card"><div class="ct">' +
+            (m ? m.icon : '📝') + ' ' + vpEsc(q.title) + '</div>' +
+            '<p style="font-size:.78rem;color:var(--dim)">' +
+            (m ? m.name : '') + ' · ' + qCount + ' question' + (qCount !== 1 ? 's' : '') +
+            ' · ' + q.duration + ' mins</p>' +
+            (done
+              ? '<div class="al as">✅ Completed — Score: ' + done.score + '/' + done.total +
+                ' (' + done.percent + '%)</div>'
+              : '<button class="btn btn-p" onclick="vStartQuiz(\'' + q.id + '\')">▶ Start Quiz</button>') +
+            '</div>';
+        }).join('');
+    };
+
+
+    /* =================================================================
+       FIX 2 ─ QUIZ QUESTION RENDERING
+       Issue: vRenderQ crashes if questions array is malformed.
+       Fix: guard against missing fields, handle both array-options
+            (VOS student quizzes) and object-options (NM style).
+    ================================================================= */
+    window.vRenderQ = function () {
+      if (!vQuizState) return;
+      var quiz = vQuizState.quiz;
+      var current = vQuizState.current;
+      var answers = vQuizState.answers;
+      var timeLeft = vQuizState.timeLeft;
+
+      if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
+        document.getElementById('vos-tab-content').innerHTML =
+          '<div class="tab-panel"><div class="al ae">❌ This quiz has no questions yet. Please inform your lecturer.</div></div>';
+        return;
+      }
+
+      var q = quiz.questions[current];
+      if (!q) {
+        document.getElementById('vos-tab-content').innerHTML =
+          '<div class="tab-panel"><div class="al ae">❌ Question ' + (current + 1) + ' could not be loaded.</div></div>';
+        return;
+      }
+
+      var mn = Math.floor(timeLeft / 60);
+      var sc = timeLeft % 60;
+      var timerStr = String(mn).padStart(2, '0') + ':' + String(sc).padStart(2, '0');
+
+      /* Build options — support both array and object formats */
+      var optionsHtml = '';
+      if (Array.isArray(q.options)) {
+        /* VOS format: options is an array of strings */
+        optionsHtml = q.options.map(function (opt, i) {
+          var sel = answers[current] === i ? 'sel' : '';
+          return '<div class="mopt ' + sel + '" onclick="vSelectAns(' + i + ')">' +
+            '<b>' + String.fromCharCode(65 + i) + '.</b> ' + vpEsc(opt) + '</div>';
+        }).join('');
+      } else if (q.options && typeof q.options === 'object') {
+        /* Object format: {A: '...', B: '...' } */
+        var keys = Object.keys(q.options);
+        optionsHtml = keys.map(function (k, i) {
+          var sel = (answers[current] === i || answers[current] === k) ? 'sel' : '';
+          return '<div class="mopt ' + sel + '" onclick="vSelectAnsKey(' + i + ',\'' + k + '\')">' +
+            '<b>' + k + '.</b> ' + vpEsc(q.options[k]) + '</div>';
+        }).join('');
+      } else {
+        optionsHtml = '<div class="al aw">No options found for this question.</div>';
+      }
+
+      var total = quiz.questions.length;
+      document.getElementById('vos-tab-content').innerHTML =
+        '<div class="tab-panel">' +
+        '<div class="istrip" style="margin-bottom:.8rem">' +
+          '<div style="flex:1;font-size:.8rem;color:var(--dim)">Question ' + (current + 1) + ' of ' + total + '</div>' +
+          '<span id="v-timer" class="badge ba" style="font-size:1rem;font-weight:700">' + timerStr + '</span>' +
+        '</div>' +
+        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
+          '<div class="mqt" style="font-size:.95rem;font-weight:600;color:#1a2744;margin-bottom:.8rem">' +
+            (current + 1) + '. ' + vpEsc(q.text || q.q || q.question || '') +
+          '</div>' +
+          '<div class="mopts">' + optionsHtml + '</div>' +
+        '</div>' +
+        '<div class="pbw" style="margin:.6rem 0 1rem"><div class="pbf" style="width:' +
+          Math.round(((current + 1) / total) * 100) + '%"></div></div>' +
+        '<div style="display:flex;justify-content:space-between;gap:.6rem">' +
+          (current > 0 ? '<button class="btn btn-s" onclick="vNavQ(-1)">← Previous</button>' : '<span></span>') +
+          (current < total - 1
+            ? '<button class="btn btn-p" onclick="vNavQ(1)">Next →</button>'
+            : '<button class="btn btn-g" onclick="vSubmitQuiz()">✅ Submit Test</button>') +
+        '</div></div>';
+    };
+
+    /* Support object-key option selection */
+    window.vSelectAnsKey = function (i, k) {
+      vQuizState.answers[vQuizState.current] = i;
+      window.vRenderQ();
+    };
+    window.vSelectAns = function (i) {
+      vQuizState.answers[vQuizState.current] = i;
+      window.vRenderQ();
+    };
+    window.vNavQ = function (d) {
+      vQuizState.current += d;
+      window.vRenderQ();
+    };
+
+
+    /* =================================================================
+       FIX 3 ─ QUIZ START — MORE ROBUST
+    ================================================================= */
+    window.vStartQuiz = function (id) {
+      var allQuizzes = S.arr('vos_quizzes') || [];
+      var q = allQuizzes.find(function (x) { return x.id === id; });
+      if (!q) { toast('Quiz not found. Try syncing.', 'error'); return; }
+      if (!Array.isArray(q.questions) || q.questions.length === 0) {
+        toast('This quiz has no questions yet.', 'error'); return;
+      }
+      vQuizState = { quiz: q, current: 0, answers: {}, timeLeft: (q.duration || 20) * 60 };
+      window.vRenderQ();
+      vQuizState.timer = setInterval(function () {
+        vQuizState.timeLeft--;
+        var t = document.getElementById('v-timer');
+        if (t) {
+          var mn = Math.floor(vQuizState.timeLeft / 60);
+          var sc = vQuizState.timeLeft % 60;
+          t.textContent = String(mn).padStart(2, '0') + ':' + String(sc).padStart(2, '0');
+          if (vQuizState.timeLeft <= 120) t.style.color = 'var(--red)';
+        }
+        if (vQuizState.timeLeft <= 0) { clearInterval(vQuizState.timer); vSubmitQuiz(); }
+      }, 1000);
+    };
+
+
+    /* =================================================================
+       FIX 4 ─ QUIZ SUBMISSION — save immediately, no scope blocking
+    ================================================================= */
+    window.vSubmitQuiz = function () {
+      if (vQuizState && vQuizState.timer) clearInterval(vQuizState.timer);
+      var quiz = vQuizState.quiz;
+      var answers = vQuizState.answers;
+      var questions = quiz.questions || [];
+
+      var score = 0;
+      questions.forEach(function (q, i) {
+        /* Support numeric correct index OR letter key */
+        var ans = answers[i];
+        var correct = q.correct;
+        if (typeof correct === 'number' && ans === correct) score++;
+        else if (typeof correct === 'string') {
+          /* letter key — convert stored index back to letter */
+          var letter = String.fromCharCode(65 + ans);
+          if (letter === correct.toUpperCase()) score++;
+        }
+      });
+
+      var total = questions.length || 1;
+      var percent = Math.round((score / total) * 100);
+      var scope = vpScope();
+
+      var result = {
+        id: 'qr_' + Date.now(),
+        matric: VAPP.user.matric,
+        name: VAPP.user.name,
+        dept: VAPP.user.dept,
+        level: VAPP.user.level,
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        module: quiz.module,
+        score: score,
+        total: total,
+        percent: percent,
+        date: new Date().toISOString(),
+        academicSession: scope.session,
+        cohort: scope.cohort,
+        scopeKey: scope.key
+      };
+
+      var results = S.arr('vos_quiz_results') || [];
+      results.push(result);
+      S.set('vos_quiz_results', results);
+
+      vQuizState = null;
+
+      var emoji = percent >= 70 ? '🏆' : percent >= 50 ? '👍' : '📚';
+      document.getElementById('vos-tab-content').innerHTML =
+        '<div class="tab-panel"><div class="card" style="text-align:center;padding:2rem">' +
+        '<div style="font-size:3rem">' + emoji + '</div>' +
+        '<h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted!</h2>' +
+        '<p style="color:var(--dim)">' + vpEsc(quiz.title) + '</p>' +
+        '<div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">' +
+          score + '/' + total + '</div>' +
+        '<div style="font-size:1.2rem">' + percent + '%</div>' +
+        '<div style="display:flex;gap:.8rem;justify-content:center;margin-top:1.2rem">' +
+          '<button class="btn btn-p" onclick="vosSetTab(\'v-results\')">📊 View Results</button>' +
+          '<button class="btn btn-s" onclick="vosSetTab(\'v-quiz\')">Back to Quizzes</button>' +
+        '</div></div></div>';
+
+      toast('Submitted! ' + score + '/' + total + ' (' + percent + '%) ✅', 'success');
+    };
+
+
+    /* =================================================================
+       FIX 5 ─ STUDENT RESULTS VIEW
+       Issue: vpScopeFilter blocks results if scope doesn't match exactly.
+       Fix: show all results for this student, any scope, scoped display label.
+    ================================================================= */
+    window.vResults = function () {
+      var allResults = S.arr('vos_quiz_results') || [];
+      var myResults = allResults.filter(function (r) {
+        return r.matric === VAPP.user.matric;
+      });
+
+      var allAtt = S.arr('vos_attendance') || [];
+      var myAtt = allAtt.filter(function (a) {
+        return a.matric === VAPP.user.matric;
+      });
+
+      var allSubs = S.arr('vos_assignment_submissions') || [];
+      var mySubs = allSubs.filter(function (s) {
+        return s.matric === VAPP.user.matric;
+      });
+
+      var allRecipes = S.arr('vos_recipes') || [];
+      var myRecipes = allRecipes.filter(function (r) {
+        return r.matric === VAPP.user.matric;
+      });
+
+      var avg = myResults.length
+        ? Math.round(myResults.reduce(function (s, r) { return s + r.percent; }, 0) / myResults.length)
+        : 0;
+      var graded = mySubs.filter(function (s) { return typeof s.score === 'number'; });
+      var aAvg = graded.length
+        ? Math.round(graded.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / graded.length)
+        : 0;
+
+      return ph('📊 My Results', 'All your submissions across sessions') +
+        '<div class="metrics">' +
+          '<div class="metric"><div class="mv">' + myResults.length + '</div><div class="ml">Quizzes Taken</div></div>' +
+          '<div class="metric"><div class="mv">' + avg + '%</div><div class="ml">Quiz Average</div></div>' +
+          '<div class="metric"><div class="mv">' + mySubs.length + '</div><div class="ml">Assignments</div></div>' +
+          '<div class="metric"><div class="mv">' + myAtt.length + '</div><div class="ml">Attendance Records</div></div>' +
+        '</div>' +
+
+        '<div class="card"><div class="ct">📝 Quiz Results (' + myResults.length + ')</div>' +
+        (myResults.length
+          ? '<div class="tw"><table><thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Session</th><th>Date</th></tr></thead><tbody>' +
+            myResults.slice().reverse().map(function (r) {
+              return '<tr><td>' + vpEsc(r.quizTitle) + '</td><td>' +
+                vpModuleName(r.module) + '</td><td>' + r.score + '/' + r.total + '</td>' +
+                '<td><b>' + r.percent + '%</b></td>' +
+                '<td>' + vpEsc(r.academicSession || '') + '</td>' +
+                '<td>' + new Date(r.date).toLocaleDateString() + '</td></tr>';
+            }).join('') +
+            '</tbody></table></div>'
+          : '<div class="al ai">No quiz results yet. Complete a quiz to see your score here.</div>') +
+        '</div>' +
+
+        '<div class="card"><div class="ct">📂 Assignment Results (' + mySubs.length + ')</div>' +
+        (mySubs.length
+          ? '<div class="tw"><table><thead><tr><th>Assignment</th><th>Status</th><th>Score</th><th>Feedback</th><th>Date</th></tr></thead><tbody>' +
+            mySubs.slice().reverse().map(function (s) {
+              var scoreStr = typeof s.score === 'number'
+                ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)'
+                : 'Awaiting review';
+              var cls = typeof s.score === 'number'
+                ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
+              return '<tr><td>' + vpEsc(s.assignmentTitle || 'Assignment') + '</td>' +
+                '<td><span class="badge ' + cls + '">' + (s.status || 'submitted') + '</span></td>' +
+                '<td>' + scoreStr + '</td>' +
+                '<td style="max-width:200px;font-size:.75rem">' + vpEsc((s.feedback || '').slice(0, 80)) + '</td>' +
+                '<td>' + new Date(s.submittedAt).toLocaleDateString() + '</td></tr>';
+            }).join('') +
+            '</tbody></table></div>'
+          : '<div class="al ai">No assignments submitted yet.</div>') +
+        '</div>' +
+
+        '<div class="card"><div class="ct">🍳 Weekly Recipes (' + myRecipes.length + ')</div>' +
+        (myRecipes.length
+          ? '<div class="tw"><table><thead><tr><th>Week</th><th>Title</th><th>Score</th><th>Feedback</th></tr></thead><tbody>' +
+            myRecipes.map(function (r) {
+              var scoreStr = typeof r.score === 'number'
+                ? r.score + '/' + (r.maxScore || 100) + ' (' + (r.percent || 0) + '%)'
+                : '⏳ Pending';
+              return '<tr><td>' + vpEsc(r.week) + '</td><td>' + vpEsc(r.title) + '</td>' +
+                '<td>' + scoreStr + '</td>' +
+                '<td style="font-size:.75rem">' + vpEsc((r.feedback || '').slice(0, 80)) + '</td></tr>';
+            }).join('') +
+            '</tbody></table></div>'
+          : '<div class="al ai">No recipes submitted yet.</div>') +
+        '</div>' +
+
+        '<div class="card"><div class="ct">✅ Attendance (' + myAtt.length + ' records)</div>' +
+        (myAtt.length
+          ? '<div class="tw"><table><thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead><tbody>' +
+            myAtt.slice().reverse().slice(0, 30).map(function (a) {
+              return '<tr><td>' + vpModuleName(a.module) + '</td>' +
+                '<td>' + new Date(a.date).toLocaleDateString() + '</td>' +
+                '<td>' + a.time + '</td>' +
+                '<td><span class="badge ' + (a.status === 'Present' ? 'bg' : 'ba') + '">' + a.status + '</span></td></tr>';
+            }).join('') +
+            '</tbody></table></div>'
+          : '<div class="al ai">No attendance records yet.</div>') +
+        '</div>';
+    };
+
+
+    /* =================================================================
+       FIX 6 ─ ADMIN RESULTS — see ALL submissions immediately
+    ================================================================= */
+    window.vaResults = function () {
+      /* Admin sees ALL results for modules they have access to */
+      var allQResults = S.arr('vos_quiz_results') || [];
+      var allASubs = S.arr('vos_assignment_submissions') || [];
+
+      var qResults = allQResults.filter(function (r) {
+        return vpCanAccessModule(r.module, VAPP.user);
+      });
+      var aSubs = allASubs.filter(function (s) {
+        return vpCanAccessModule(s.module, VAPP.user);
+      });
+
+      var quizAvg = qResults.length
+        ? Math.round(qResults.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / qResults.length) : 0;
+      var graded = aSubs.filter(function (s) { return typeof s.score === 'number'; });
+      var asgAvg = graded.length
+        ? Math.round(graded.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / graded.length) : 0;
+
+      return ph('📊 Results', qResults.length + ' quiz attempt(s) · ' + aSubs.length + ' assignment submission(s)') +
+        '<div class="metrics">' +
+          '<div class="metric"><div class="mv">' + qResults.length + '</div><div class="ml">Quiz Attempts</div></div>' +
+          '<div class="metric"><div class="mv">' + quizAvg + '%</div><div class="ml">Quiz Avg</div></div>' +
+          '<div class="metric"><div class="mv">' + aSubs.length + '</div><div class="ml">Assignments</div></div>' +
+          '<div class="metric"><div class="mv">' + asgAvg + '%</div><div class="ml">Assignment Avg</div></div>' +
+        '</div>' +
+
+        '<div class="card"><div class="ct">Quiz Results (' + qResults.length + ')</div>' +
+        (qResults.length
+          ? '<div class="tw"><table><thead><tr>' +
+              '<th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Quiz</th><th>Score</th><th>%</th><th>Session</th><th>Date</th>' +
+            '</tr></thead><tbody>' +
+            qResults.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); })
+              .map(function (r, i) {
+                return '<tr><td>' + (i + 1) + '</td><td>' + vpEsc(r.name) + '</td><td>' + vpEsc(r.matric) +
+                  '</td><td>' + vpModuleName(r.module) + '</td><td>' + vpEsc(r.quizTitle) +
+                  '</td><td>' + r.score + '/' + r.total + '</td><td><b>' + r.percent + '%</b></td>' +
+                  '<td>' + vpEsc(r.academicSession || '') + '</td>' +
+                  '<td>' + new Date(r.date).toLocaleDateString() + '</td></tr>';
+              }).join('') +
+            '</tbody></table></div>'
+          : '<div class="al ai">No quiz results yet.</div>') +
+        '</div>' +
+
+        '<div class="card">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">' +
+            '<div class="ct" style="margin:0">Assignment Results (' + aSubs.length + ')</div>' +
+            '<button class="btn btn-v sm" onclick="vaExportAssignmentResults()">📥 Export</button>' +
+          '</div>' +
+          (aSubs.length
+            ? '<div class="tw"><table><thead><tr>' +
+                '<th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Assignment</th><th>Status</th><th>Score</th><th>Session</th><th>Date</th>' +
+              '</tr></thead><tbody>' +
+              aSubs.slice().sort(function (a, b) { return new Date(b.submittedAt) - new Date(a.submittedAt); })
+                .map(function (s, i) {
+                  var scoreStr = typeof s.score === 'number'
+                    ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)' : 'Pending';
+                  var cls = typeof s.score === 'number'
+                    ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
+                  return '<tr><td>' + (i + 1) + '</td><td>' + vpEsc(s.name) + '</td><td>' + vpEsc(s.matric) +
+                    '</td><td>' + vpModuleName(s.module) + '</td><td>' + vpEsc(s.assignmentTitle || '') +
+                    '</td><td><span class="badge ' + cls + '">' + (s.status || 'submitted') + '</span></td>' +
+                    '<td>' + scoreStr + '</td>' +
+                    '<td>' + vpEsc(s.academicSession || '') + '</td>' +
+                    '<td>' + new Date(s.submittedAt).toLocaleDateString() + '</td></tr>';
+                }).join('') +
+              '</tbody></table></div>'
+            : '<div class="al ai">No assignment results yet.</div>') +
+        '</div>';
+    };
+
+
+    /* =================================================================
+       FIX 7 ─ ADMIN ASSIGNMENT VIEW — see ALL submissions immediately
+    ================================================================= */
+    var _origVaAssignments = window.vaAssignments;
+    window.vaAssignments = function () {
+      /* Fetch fresh data directly — bypass scope filter for admin */
+      var mods = vpVisibleModules(VAPP.user);
+      var allAssignments = S.arr('vos_assignments') || [];
+      var assignments = allAssignments
+        .filter(function (a) { return vpCanAccessModule(a.module, VAPP.user); })
+        .sort(function (a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+
+      var allSubs = S.arr('vos_assignment_submissions') || [];
+      var submissions = allSubs
+        .filter(function (s) { return vpCanAccessModule(s.module, VAPP.user); })
+        .sort(function (a, b) { return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0); });
+
+      var createCard = '<div class="card"><div class="ct">➕ Create Assignment</div>' +
+        '<div class="field"><label>Title</label><input id="va-asg-title" placeholder="e.g. VOS 102 Reflection Exercise"></div>' +
+        '<div class="fr"><div class="field"><label>Module</label><select id="va-asg-module">' +
+          mods.map(function (m) { return '<option value="' + m.id + '">' + m.icon + ' ' + m.name + '</option>'; }).join('') +
+        '</select></div><div class="field"><label>Due Date</label><input type="datetime-local" id="va-asg-due"></div></div>' +
+        '<div class="fr"><div class="field"><label>Maximum Score</label><input type="number" id="va-asg-score" value="100" min="1"></div>' +
+        '<div class="field"><label>Submission Mode</label><div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.85rem 0">' +
+          '<label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-text" checked> Typed answer</label>' +
+          '<label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-file" checked> File upload</label>' +
+        '</div></div></div>' +
+        '<div class="field"><label>Instructions</label><textarea id="va-asg-inst" placeholder="Assignment brief..." style="min-height:120px"></textarea></div>' +
+        '<div class="field"><label>Auto-grade keywords / rubric</label>' +
+          '<textarea id="va-asg-rubric" placeholder="Enter keywords separated by commas or new lines..." style="min-height:100px"></textarea>' +
+          '<div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Typed answers will be scored against these keywords automatically.</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
+          '<button class="btn btn-s" onclick="vaSaveAssignment(false)">💾 Save Draft</button>' +
+          '<button class="btn btn-g" onclick="vaSaveAssignment(true)">📢 Publish Assignment</button>' +
+        '</div></div>';
+
+      var postedCard = '<div class="card"><div class="ct">Posted Assignments (' + assignments.length + ')</div>' +
+        (assignments.length
+          ? assignments.map(function (a) {
+              var subCount = submissions.filter(function (s) { return s.assignmentId === a.id; }).length;
+              return '<div class="crow" style="align-items:flex-start;gap:.8rem">' +
+                '<div style="flex:1"><div class="crn">' + vpEsc(a.title) + '</div>' +
+                '<div class="crc">' + vpModuleIcon(a.module) + ' ' + vpModuleName(a.module) +
+                  (a.dueDate ? ' · Due ' + new Date(a.dueDate).toLocaleString('en-NG') : '') +
+                  ' · Max ' + (a.maxScore || 100) + ' marks</div>' +
+                '<div class="crc">' + subCount + ' submission(s)</div></div>' +
+                '<div class="cra"><span class="badge ' + (a.published ? 'bg' : 'bv') + '">' +
+                  (a.published ? 'Published' : 'Draft') + '</span>' +
+                '<button class="btn btn-s sm" onclick="vaToggleAssignment(\'' + a.id + '\')">' +
+                  (a.published ? 'Unpublish' : 'Publish') + '</button>' +
+                '<button class="btn btn-d sm" onclick="vaDeleteAssignment(\'' + a.id + '\')">🗑</button>' +
+                '</div></div>';
+            }).join('')
+          : '<div class="al ai">No assignments created yet.</div>') +
+        '</div>';
+
+      var subCard = '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">' +
+          '<div class="ct" style="margin:0">All Submissions (' + submissions.length + ')</div>' +
+          '<button class="btn btn-v sm" onclick="vaExportAssignmentResults()">📥 Export</button>' +
+        '</div>' +
+        (submissions.length
+          ? submissions.map(function (s) {
+              var scoreStr = typeof s.score === 'number'
+                ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)' : 'Pending';
+              var cls = typeof s.score === 'number'
+                ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
+              return '<div style="border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.8rem;background:var(--panel)">' +
+                '<div class="crow" style="align-items:flex-start;gap:.8rem">' +
+                  '<div style="flex:1">' +
+                    '<div class="crn">' + vpEsc(s.assignmentTitle || 'Assignment') + ' — ' + vpEsc(s.name) + '</div>' +
+                    '<div class="crc">' + vpEsc(s.matric) + ' · ' + vpModuleName(s.module) +
+                      ' · Submitted ' + new Date(s.submittedAt).toLocaleString('en-NG') + '</div>' +
+                    '<div class="crc">Status: ' + (s.status || 'submitted') +
+                      (s.isLate ? ' · <span style="color:var(--red)">Late</span>' : '') +
+                      (s.academicSession ? ' · ' + vpEsc(s.academicSession) : '') + '</div>' +
+                  '</div>' +
+                  '<span class="badge ' + cls + '">' + scoreStr + '</span>' +
+                '</div>' +
+                (s.textAnswer
+                  ? '<div class="al ai" style="margin-top:.7rem;white-space:pre-wrap;font-size:.8rem">' +
+                    vpEsc(s.textAnswer.slice(0, 1200)) + (s.textAnswer.length > 1200 ? '…' : '') + '</div>'
+                  : '') +
+                (s.fileData
+                  ? '<div style="margin-top:.7rem"><a href="' + s.fileData + '" download="' +
+                    (s.fileName || 'submission') + '" class="btn btn-s sm">📎 Download ' + vpEsc(s.fileName || 'attachment') + '</a></div>'
+                  : '') +
+                '<div class="fr" style="margin-top:.8rem">' +
+                  '<div class="field"><label>Score (0–' + (s.maxScore || 100) + ')</label>' +
+                    '<input type="number" id="grade-score-' + s.id + '" value="' +
+                    (typeof s.score === 'number' ? s.score : '') + '" min="0" max="' + (s.maxScore || 100) + '">' +
+                  '</div>' +
+                  '<div class="field"><label>Feedback</label>' +
+                    '<textarea id="grade-feedback-' + s.id + '" style="min-height:80px">' +
+                    vpEsc(s.feedback || '') + '</textarea>' +
+                  '</div>' +
+                '</div>' +
+                '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
+                  '<button class="btn btn-p sm" onclick="vaSaveAssignmentGrade(\'' + s.id + '\')">💾 Save Grade</button>' +
+                  (s.autoScore != null ? '<span class="badge bc">Auto: ' + s.autoScore + '/' + (s.maxScore || 100) + '</span>' : '') +
+                '</div></div>';
+            }).join('')
+          : '<div class="al ai">No submissions yet. Students will appear here as soon as they submit.</div>') +
+        '</div>';
+
+      return ph('📂 Assignment Manager', 'All modules you have access to') +
+        createCard + postedCard + subCard;
+    };
+
+
+    /* =================================================================
+       FIX 8 ─ ADMIN DASHBOARD — show live submission count
+    ================================================================= */
+    var _origVaDashboard = window.vaDashboard;
+    window.vaDashboard = function () {
+      var students = vpStudentsByAccess(VAPP.user) || [];
+      var att = S.arr('vos_attendance') || [];
+      var attMine = att.filter(function (a) { return vpCanAccessModule(a.module, VAPP.user); });
+      var quizzes = (S.arr('vos_quizzes') || []).filter(function (q) {
+        return q.published && vpCanAccessModule(q.module, VAPP.user);
+      });
+      var allSubs = S.arr('vos_assignment_submissions') || [];
+      var mySubs = allSubs.filter(function (s) { return vpCanAccessModule(s.module, VAPP.user); });
+      var allQRes = S.arr('vos_quiz_results') || [];
+      var myQRes = allQRes.filter(function (r) { return vpCanAccessModule(r.module, VAPP.user); });
+      var mods = vpVisibleModules(VAPP.user);
+      var today = new Date().toDateString();
+
+      return ph(vpIsSuperAdmin() ? '🏠 Super Admin Dashboard' : '🏠 Module Admin Dashboard',
+        'Showing live data for your access scope') +
+        (typeof vpScopeManager === 'function' ? vpScopeManager() : '') +
+        '<div class="metrics">' +
+          '<div class="metric"><div class="mv">' + students.length + '</div><div class="ml">Students</div></div>' +
+          '<div class="metric"><div class="mv">' +
+            attMine.filter(function (a) { return new Date(a.date).toDateString() === today; }).length +
+          '</div><div class="ml">Attendance Today</div></div>' +
+          '<div class="metric"><div class="mv">' + quizzes.length + '</div><div class="ml">Active Quizzes</div></div>' +
+          '<div class="metric"><div class="mv">' + mySubs.length + '</div><div class="ml">Submissions</div></div>' +
+          '<div class="metric"><div class="mv">' + myQRes.length + '</div><div class="ml">Quiz Results</div></div>' +
+        '</div>' +
+        '<div class="card"><div class="ct">🧭 Module Overview</div>' +
+          mods.map(function (m) {
+            var stuCount = students.filter(function (s) { return s.module === m.id; }).length;
+            var subCount = mySubs.filter(function (s) { return s.module === m.id; }).length;
+            var qCount = myQRes.filter(function (r) { return r.module === m.id; }).length;
+            return '<div class="crow"><div>' +
+              '<div class="crn">' + m.icon + ' ' + m.name + '</div>' +
+              '<div class="crc">Students: ' + stuCount + ' · Submissions: ' + subCount + ' · Quiz results: ' + qCount + '</div>' +
+            '</div><span class="module-chip">' + (vpIsSuperAdmin() ? 'Full Control' : 'Assigned') + '</span></div>';
+          }).join('') +
+        '</div>' +
+        (vpIsSuperAdmin()
+          ? '<div class="card"><div class="ct">🪪 LMS Logo</div>' +
+              '<div class="field"><label>Upload Logo (shows across landing, login, sidebar, footer)</label>' +
+                '<input type="file" id="brand-logo-input" accept="image/*"></div>' +
+              '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
+                '<button class="btn btn-p" onclick="saveLMSLogo()">Upload Logo</button>' +
+                '<button class="btn btn-s" onclick="clearLMSLogo()">Remove Logo</button>' +
+              '</div></div>'
+          : '');
+    };
+
+
+    /* =================================================================
+       FIX 9 ─ NEUROMATRIX: MST SUBMIT — ensure save + immediate visibility
+    ================================================================= */
+    var _origNMMSTSubmit = window.mstSubmit;
+    window.mstSubmit = function (qCount) {
+      clearInterval(_mstTimerInterval);
+      var qs = S.arr('nm_mst_questions_' + APP.course.code);
+      var answers = [];
+      var autoScore = 0;
+      var autoTotal = 0;
+      var hasPendingManual = false;
+
+      for (var i = 0; i < qCount; i++) {
+        var q = qs[i];
+        if (!q) continue;
+        var marks = q.marks || 1;
+        if (q.type === 'mcq') {
+          var sel = document.querySelector('input[name="mst-q-' + i + '"]:checked');
+          var ans = sel ? sel.value : '';
+          var earned = (ans === q.answer) ? marks : 0;
+          autoScore += earned;
+          autoTotal += marks;
+          answers.push({ type: 'mcq', q: q.q, ans: ans, correct: ans === q.answer, earned: earned, marks: marks });
+        } else {
+          var el = document.getElementById('mst-ans-' + i);
+          var textAns = (el ? el.value : '').trim();
+          var keywords = (q.keywords || '').split(',').map(function (k) { return k.trim().toLowerCase(); }).filter(Boolean);
+          var matched = keywords.filter(function (kw) { return textAns.toLowerCase().includes(kw); });
+          var textEarned = keywords.length > 0 ? Math.round((matched.length / keywords.length) * marks) : 0;
+          if (keywords.length > 0) { autoScore += textEarned; autoTotal += marks; }
+          else { hasPendingManual = true; autoTotal += marks; }
+          answers.push({ type: q.type, q: q.q, ans: textAns, keywords: q.keywords, earned: textEarned, marks: marks, awarded: keywords.length > 0 ? textEarned : null });
+        }
+      }
+
+      var total = qs.reduce(function (s, q) { return s + (q.marks || 1); }, 0);
+      var pct = total > 0 ? Math.round(autoScore / total * 100) : 0;
+      var sub = {
+        name: APP.student.name, matric: APP.student.matric, course: APP.course.code,
+        answers: answers, score: autoScore, total: total, pct: pct,
+        pendingManual: hasPendingManual, ts: new Date().toISOString()
+      };
+
+      var subs = S.arr('nm_mst_subs_' + APP.course.code);
+      var idx = subs.findIndex(function (s) { return s.matric === APP.student.matric; });
+      if (idx >= 0) subs[idx] = sub; else subs.push(sub);
+      S.set('nm_mst_subs_' + APP.course.code, subs);
+
+      toast('Submitted! ' + autoScore + '/' + total + ' (' + pct + '%)' +
+        (hasPendingManual ? ' — short answers pending review' : '') + ' ✅', 'success');
+      renderTab('mst');
+    };
+
+
+    /* =================================================================
+       FIX 10 ─ NEUROMATRIX PROGRESS — show MST and CW results immediately
+    ================================================================= */
+    var _origRProgress = window.rProgress;
+    window.rProgress = function () {
+      /* Force-read fresh data */
+      var matric = APP.student.matric;
+      var code = APP.course.code;
+      if (!matric || !code) return _origRProgress();
+
+      var attCnt = 0;
+      WEEKS.forEach(function (w) { if (S.get('nm_att_' + code + '_' + w + '_' + matric, null)) attCnt++; });
+      var attPct = Math.round(attCnt / 15 * 100);
+
+      var cwDone = 0, cwScore = 0, cwTotal = 0;
+      WEEKS.forEach(function (w) {
+        var sub = S.get('nm_cw_' + code + '_' + w + '_' + matric, null);
+        if (sub) {
+          cwDone++;
+          cwScore += sub.total_score || sub.auto_score || 0;
+          cwTotal += sub.auto_total || 0;
+        }
+      });
+      var cwPct = cwTotal > 0 ? Math.round(cwScore / cwTotal * 100) : null;
+
+      var mstSubs = S.arr('nm_mst_subs_' + code);
+      var mstSub = mstSubs.find(function (s) { return s.matric === matric; });
+
+      var semSub = S.get('nm_seminar_' + code + '_' + matric, null);
+      var semScore = S.get('nm_sem_score_' + code + '_' + matric, null);
+
+      var stored = S.get('nm_scores_' + code + '_' + matric, {});
+      var override = stored.override_grade !== undefined ? stored.override_grade : null;
+      var finalGrade = override !== null ? override : cwPct;
+      var gl = finalGrade === null ? '—'
+        : finalGrade >= 70 ? 'A' : finalGrade >= 60 ? 'B' : finalGrade >= 50 ? 'C'
+        : finalGrade >= 45 ? 'D' : finalGrade >= 40 ? 'E' : 'F';
+      var gradeColor = gl === 'F' ? 'var(--red)' : gl === 'A' ? 'var(--green)' : 'var(--amber)';
+
+      function bar(pct, color) {
+        return '<div style="background:var(--border);border-radius:99px;height:8px;overflow:hidden;margin:.4rem 0">' +
+          '<div style="width:' + Math.max(0, Math.min(100, pct || 0)) + '%;background:' + color +
+          ';height:100%;border-radius:99px;transition:width .6s"></div></div>';
+      }
+
+      return (typeof istrip === 'function' ? istrip() : '') +
+        ph('📊 My Progress', APP.course.name) +
+        '<div class="metrics">' +
+          '<div class="metric"><div class="mv">' + attCnt + '/15</div><div class="ml">Attendance</div></div>' +
+          '<div class="metric"><div class="mv">' + (cwPct !== null ? cwPct + '%' : '—') + '</div><div class="ml">Classwork</div></div>' +
+          '<div class="metric"><div class="mv">' + (mstSub ? mstSub.pct + '%' : '—') + '</div><div class="ml">MST Score</div></div>' +
+          '<div class="metric"><div class="mv" style="color:' + gradeColor + '">' + gl + '</div><div class="ml">Grade</div></div>' +
+        '</div>' +
+
+        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
+          '<div class="ct" style="color:#1a2744">🕒 Attendance</div>' +
+          '<div style="font-size:.82rem;color:#555">' + attCnt + ' of 15 weeks · ' + attPct + '%</div>' +
+          bar(attPct, '#00d4ff') +
+          '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.6rem">' +
+            WEEKS.map(function (w) {
+              var done = S.get('nm_att_' + code + '_' + w + '_' + matric, null);
+              return '<span style="font-size:.7rem;padding:.25rem .5rem;border-radius:6px;background:' +
+                (done ? '#10b981' : '#e5e7eb') + ';color:' + (done ? '#fff' : '#888') + '">' +
+                w.replace('Week ', 'W') + '</span>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+
+        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
+          '<div class="ct" style="color:#1a2744">🧩 Classwork</div>' +
+          '<div style="font-size:.82rem;color:#555">' + cwDone + ' weeks submitted' +
+            (cwTotal > 0 ? ' · ' + cwScore + '/' + cwTotal + ' (' + cwPct + '%)' : '') + '</div>' +
+          (cwTotal > 0 ? bar(cwPct, '#7c3aed') : '') +
+        '</div>' +
+
+        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
+          '<div class="ct" style="color:#1a2744">🧪 Mid-Semester Test</div>' +
+          (mstSub
+            ? '<div style="font-size:.82rem;color:#555">Score: ' + mstSub.score + '/' + mstSub.total +
+              ' · ' + mstSub.pct + '%</div>' +
+              bar(mstSub.pct, '#f59e0b') +
+              (mstSub.pendingManual
+                ? '<div style="font-size:.75rem;color:#f59e0b;margin-top:.4rem">⏳ Short answers pending review</div>' : '') +
+              '<div style="font-size:.72rem;color:#888;margin-top:.3rem">Submitted: ' +
+                new Date(mstSub.ts).toLocaleString('en-NG') + '</div>'
+            : '<div style="font-size:.82rem;color:#888">Not submitted yet.</div>') +
+        '</div>' +
+
+        '<div class="card" style="background:#1a1a2e;border:2px solid var(--cyan)">' +
+          '<div class="ct">🏅 Overall Grade</div>' +
+          '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">' +
+            '<div style="font-size:3rem;font-weight:800;font-family:var(--head);color:' + gradeColor + '">' + gl + '</div>' +
+            '<div style="font-size:.82rem;color:var(--dim);line-height:1.9">' +
+              (cwPct !== null ? 'Classwork avg: ' + cwPct + '%<br>' : '') +
+              (override !== null ? 'Lecturer override: ' + override + '%<br>' : '') +
+              (mstSub ? 'MST: ' + mstSub.pct + '%<br>' : '') +
+              (semScore !== null ? 'Seminar: ' + semScore + '/100' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    };
+
+
+    /* =================================================================
+       FIX 11 ─ ADMIN: CBT QUESTION SAVE (NeuroMatrix)
+       Ensure questions save correctly and show immediately
+    ================================================================= */
+    var _origMstAddQ = window.mstAddQ;
+    window.mstAddQ = function () {
+      var type = document.getElementById('mst-qtype') ? document.getElementById('mst-qtype').value : 'mcq';
+      var qtext = document.getElementById('mst-qtext') ? document.getElementById('mst-qtext').value.trim() : '';
+      var marks = parseInt(document.getElementById('mst-marks') ? document.getElementById('mst-marks').value : '2') || 2;
+      if (!qtext) { toast('Enter question text', 'error'); return; }
+
+      var qs = S.arr('nm_mst_questions_' + APP.course.code) || [];
+
+      if (type === 'mcq') {
+        var oa = document.getElementById('mst-oa') ? document.getElementById('mst-oa').value.trim() : '';
+        var ob = document.getElementById('mst-ob') ? document.getElementById('mst-ob').value.trim() : '';
+        var oc = document.getElementById('mst-oc') ? document.getElementById('mst-oc').value.trim() : '';
+        var od = document.getElementById('mst-od') ? document.getElementById('mst-od').value.trim() : '';
+        if (!oa || !ob) { toast('Enter at least options A and B', 'error'); return; }
+        var opts = { A: oa, B: ob };
+        if (oc) opts.C = oc;
+        if (od) opts.D = od;
+        qs.push({ type: 'mcq', q: qtext, options: opts, answer: document.getElementById('mst-correct') ? document.getElementById('mst-correct').value : 'A', marks: marks });
+      } else {
+        qs.push({ type: type, q: qtext, keywords: document.getElementById('mst-keywords') ? document.getElementById('mst-keywords').value.trim() : '', marks: marks });
+      }
+
+      S.set('nm_mst_questions_' + APP.course.code, qs);
+      toast('Question added ✅ (' + qs.length + ' total)', 'success');
+      renderTab('mst-ctrl');
+    };
+
+
+    /* =================================================================
+       FIX 12 ─ SYNC BUTTON: force-pull then re-render current tab
+    ================================================================= */
+    window.nmForceSync = function () {
+      toast('Syncing…', 'info');
+      if (window._fbPullAll) {
+        window._fbPullAll().then(function () {
+          toast('Synced ✅', 'success');
+          if (APP.tab) renderTab(APP.tab);
+        }).catch(function () { toast('Sync error — using cached data', 'error'); });
+      } else {
+        toast('Sync not available offline', 'error');
+      }
+    };
+
+    window.vosForceSync = function () {
+      toast('Syncing…', 'info');
+      if (window._fbPullAll) {
+        window._fbPullAll().then(function () {
+          toast('Synced ✅', 'success');
+          if (VAPP.tab) vosRender(VAPP.tab);
+        }).catch(function () { toast('Sync error — using cached data', 'error'); });
+      } else {
+        toast('Sync not available offline', 'error');
+      }
+    };
+
+
+    /* =================================================================
+       FIX 13 ─ ADMIN QUIZ PUBLISH: ensure boolean true is stored
+    ================================================================= */
+    var _origVPubQuiz = window.vPubQuiz;
+    window.vPubQuiz = function (id) {
+      var qs = S.arr('vos_quizzes') || [];
+      var q = qs.find(function (x) { return x.id === id; });
+      if (!q) { toast('Quiz not found', 'error'); return; }
+      if (!vpCanAccessModule(q.module, VAPP.user)) { toast('Access denied for this quiz', 'error'); return; }
+      q.published = true;
+      S.set('vos_quizzes', qs);
+      toast('Quiz published ✅ — students can now see it', 'success');
+      vosRender('va-quiz');
+    };
+
+    /* Ensure vSaveQuiz stores published as strict boolean */
+    var _origVSaveQuiz = window.vSaveQuiz;
+    window.vSaveQuiz = function (publish) {
+      var title = document.getElementById('qm-title') ? document.getElementById('qm-title').value.trim() : '';
+      var module = document.getElementById('qm-module') ? document.getElementById('qm-module').value : '';
+      var duration = parseInt(document.getElementById('qm-dur') ? document.getElementById('qm-dur').value : '20') || 20;
+      if (!title) { toast('Enter quiz title', 'error'); return; }
+      if (!vQuizDraft || !vQuizDraft.length) { toast('Add at least 1 question first', 'error'); return; }
+      if (!vpCanAccessModule(module, VAPP.user)) { toast('You cannot create a quiz for this module', 'error'); return; }
+
+      var quizzes = S.arr('vos_quizzes') || [];
+      quizzes.push({
+        id: 'q_' + Date.now(),
+        title: title,
+        module: module,
+        duration: duration,
+        questions: vQuizDraft.map(function (q) { return Object.assign({}, q); }),
+        published: publish === true,
+        createdAt: new Date().toISOString(),
+        author: VAPP.user.full_name || VAPP.user.name || 'Admin'
+      });
+      S.set('vos_quizzes', quizzes);
+      toast(publish === true ? '✅ Quiz published — students can take it now' : '💾 Draft saved', 'success');
+      vosRender('va-quiz');
+    };
+
+
+    console.log('[VOS Fixes] All 13 patches applied ✅');
+  });
+
+})();
+</script>  
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
