@@ -817,6 +817,79 @@ function saveIdent(){
 function logLec(action){S.push('nm_lec_log',{course:APP.course?.code||'sys',action,ts:new Date().toISOString()})}
 function logStu(action,extra={}){S.push('nm_stu_log',{name:APP.student.name,matric:APP.student.matric,course:APP.course?.code||'',action,...extra,ts:new Date().toISOString()})}
 
+function nmAttendanceMigrateLegacy(){
+  if(window._nmAttLegacyMigrated || window._nmAttLegacyMigrating) return;
+  window._nmAttLegacyMigrating=true;
+  try{
+    let sessions=S.arr('nm_attendance_sessions');
+    let records=S.arr('nm_attendance_records');
+    let changed=false;
+    const courses=(typeof getCourses==='function'?getCourses():(Array.isArray(COURSES)?COURSES:[]))||[];
+    courses.forEach(course=>{
+      WEEKS.forEach(week=>{
+        const legacyStatus=S.get(`nm_att_status_${course.code}_${week}`,null);
+        if(legacyStatus && !sessions.find(s=>s.course===course.code&&s.week===week)){
+          sessions.push({course:course.code,week,is_open:!!legacyStatus.is_open,ts:legacyStatus.ts||null});
+          changed=true;
+        }
+        const legacyList=S.arr(`nm_att_list_${course.code}_${week}`);
+        legacyList.forEach(rec=>{
+          if(!records.find(r=>r.course===course.code&&r.week===week&&r.matric===rec.matric)){
+            records.push({course:course.code,week,name:rec.name,matric:rec.matric,ts:rec.ts||new Date().toISOString()});
+            changed=true;
+          }
+          S.del(`nm_att_${course.code}_${week}_${rec.matric}`);
+        });
+        if(legacyStatus) S.del(`nm_att_status_${course.code}_${week}`);
+        if(legacyList.length) S.del(`nm_att_list_${course.code}_${week}`);
+      });
+    });
+    if(changed){
+      S.set('nm_attendance_sessions',sessions);
+      S.set('nm_attendance_records',records);
+    }
+  }finally{
+    window._nmAttLegacyMigrated=true;
+    window._nmAttLegacyMigrating=false;
+  }
+}
+function nmAttendanceSessions(){nmAttendanceMigrateLegacy();return S.arr('nm_attendance_sessions');}
+function nmAttendanceRecords(){nmAttendanceMigrateLegacy();return S.arr('nm_attendance_records');}
+function nmGetAttendanceSession(course=APP.course.code,week=APP.week){
+  return nmAttendanceSessions().find(s=>s.course===course&&s.week===week)||{course,week,is_open:false,ts:null};
+}
+function nmSetAttendanceSession(course,week,patch={}){
+  const sessions=nmAttendanceSessions();
+  const idx=sessions.findIndex(s=>s.course===course&&s.week===week);
+  const next={...(idx>=0?sessions[idx]:{course,week,is_open:false,ts:null}),course,week,...patch};
+  if(idx>=0) sessions[idx]=next; else sessions.push(next);
+  S.set('nm_attendance_sessions',sessions);
+  return next;
+}
+function nmGetAttendanceRecord(course=APP.course.code,week=APP.week,matric=APP.student.matric){
+  return nmAttendanceRecords().find(r=>r.course===course&&r.week===week&&r.matric===matric)||null;
+}
+function nmUpsertAttendanceRecord(record){
+  const records=nmAttendanceRecords();
+  const idx=records.findIndex(r=>r.course===record.course&&r.week===record.week&&r.matric===record.matric);
+  if(idx>=0) records[idx]={...records[idx],...record}; else records.push(record);
+  S.set('nm_attendance_records',records);
+  return idx>=0?records[idx]:record;
+}
+function nmAttendanceWeekRecords(course=APP.course.code,week=APP.week){
+  return nmAttendanceRecords().filter(r=>r.course===course&&r.week===week).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+}
+function nmAttendanceStudents(course=APP.course.code){
+  const seen=new Set();
+  return nmAttendanceRecords().filter(r=>r.course===course).reduce((acc,r)=>{
+    if(seen.has(r.matric)) return acc;
+    seen.add(r.matric);
+    acc.push({name:r.name,matric:r.matric});
+    return acc;
+  },[]);
+}
+function nmHasAttendance(course,week,matric){return !!nmGetAttendanceRecord(course,week,matric);}
+
 // ═══════════════════════════════════════════════════════════
 // NEURO STUDENT TABS
 // ═══════════════════════════════════════════════════════════
@@ -834,8 +907,8 @@ function rAbout(){
 
 function rAttendance(){
   return requireIdent(()=>{
-    const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
-    const marked=S.get(`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`,null);
+    const status=nmGetAttendanceSession(APP.course.code,APP.week);
+    const marked=nmGetAttendanceRecord(APP.course.code,APP.week,APP.student.matric);
     let body='';
     if(marked){
       body=`<div class="al as">✅ Attendance marked for ${APP.week} at ${new Date(marked.ts).toLocaleString()}</div>`;
@@ -850,10 +923,12 @@ function rAttendance(){
 }
 
 function markAtt(){
-  const k=`nm_att_${APP.course.code}_${APP.week}_${APP.student.matric}`;
-  const rec={name:APP.student.name,matric:APP.student.matric,ts:new Date().toISOString()};
-  S.set(k,rec);
-  S.push(`nm_att_list_${APP.course.code}_${APP.week}`,rec);
+  const status=nmGetAttendanceSession(APP.course.code,APP.week);
+  if(!status.is_open){toast('Attendance is closed for this week','error');return;}
+  const existing=nmGetAttendanceRecord(APP.course.code,APP.week,APP.student.matric);
+  if(existing){toast('Attendance already marked ✅','info');renderTab('attendance');return;}
+  const rec={course:APP.course.code,week:APP.week,name:APP.student.name,matric:APP.student.matric,ts:new Date().toISOString()};
+  nmUpsertAttendanceRecord(rec);
   logStu('Attendance marked',{week:APP.week});
   toast('Attendance marked ✅','success');renderTab('attendance');
 }
@@ -1087,12 +1162,10 @@ function rProgress(){
     const matric=APP.student.matric;
     const code=APP.course.code;
 
-    // Attendance
     let attCnt=0;
-    WEEKS.forEach(w=>{ if(S.get(`nm_att_${code}_${w}_${matric}`,null)) attCnt++; });
+    WEEKS.forEach(w=>{ if(nmHasAttendance(code,w,matric)) attCnt++; });
     const attPct=Math.round(attCnt/15*100);
 
-    // Classwork
     let cwDone=0,cwScore=0,cwTotal=0;
     WEEKS.forEach(w=>{
       const sub=S.get(`nm_cw_${code}_${w}_${matric}`,null);
@@ -1100,24 +1173,19 @@ function rProgress(){
     });
     const cwPct=cwTotal>0?Math.round(cwScore/cwTotal*100):null;
 
-    // MST
     const mstSubs=S.arr(`nm_mst_subs_${code}`);
     const mstSub=mstSubs.find(s=>s.matric===matric);
 
-    // Assignments
     let assCount=0;
     WEEKS.forEach(w=>{ if(S.get(`nm_sub_${code}_${w}_${matric}_assignment`,null)) assCount++; });
 
-    // Drawings/Practical
     let drawCount=0;
     WEEKS.forEach(w=>{ if(S.get(`nm_sub_${code}_${w}_${matric}_drawing`,null)) drawCount++; });
 
-    // Seminar
     const semSub=S.get(`nm_seminar_${code}_${matric}`,null);
     const semScore=S.get(`nm_sem_score_${code}_${matric}`,null);
     const semFb=S.get(`nm_sem_fb_${code}_${matric}`,null);
 
-    // Manual scores
     const stored=S.get(`nm_scores_${code}_${matric}`,{});
     const override=stored.override_grade??null;
     const finalGrade=override!==null?override:cwPct;
@@ -1127,8 +1195,6 @@ function rProgress(){
       <div style="width:${Math.max(0,Math.min(100,pct||0))}%;background:${color};height:100%;border-radius:99px;transition:width .6s"></div></div>`;
 
     return istrip()+ph('📊 My Progress',APP.course.name)+`
-
-    <!-- SUMMARY METRICS -->
     <div class="metrics">
       <div class="metric"><div class="mv">${attCnt}/15</div><div class="ml">Attendance</div></div>
       <div class="metric"><div class="mv">${cwPct!==null?cwPct+'%':'—'}</div><div class="ml">Classwork</div></div>
@@ -1136,18 +1202,16 @@ function rProgress(){
       <div class="metric"><div class="mv" style="color:${gradeLetter==='F'?'var(--red)':gradeLetter==='A'?'var(--green)':'var(--amber)'}">${gradeLetter}</div><div class="ml">CW Grade</div></div>
     </div>
 
-    <!-- ATTENDANCE -->
     <div class="card" style="background:#f8faff;color:#1a1a2e;border:1px solid rgba(99,179,237,.3)">
       <div class="ct" style="color:#1a2744">🕒 Attendance</div>
       <div style="font-size:.82rem;color:#555;margin-bottom:.3rem">${attCnt} of 15 weeks present · ${attPct}%</div>
       ${bar(attPct,'#00d4ff')}
       <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.6rem">
-        ${WEEKS.map(w=>{const done=S.get(`nm_att_${code}_${w}_${matric}`,null);
+        ${WEEKS.map(w=>{const done=nmHasAttendance(code,w,matric);
           return `<span style="font-size:.7rem;padding:.25rem .5rem;border-radius:6px;background:${done?'#10b981':'#e5e7eb'};color:${done?'#fff':'#888'}">${w.replace('Week ','W')}</span>`;}).join('')}
       </div>
     </div>
 
-    <!-- CLASSWORK -->
     <div class="card" style="background:#f8faff;color:#1a1a2e;border:1px solid rgba(99,179,237,.3)">
       <div class="ct" style="color:#1a2744">🧩 Classwork</div>
       <div style="font-size:.82rem;color:#555;margin-bottom:.3rem">${cwDone} weeks submitted · Score: ${cwTotal>0?cwScore+'/'+cwTotal+' ('+cwPct+'%)':'No submissions yet'}</div>
@@ -1159,7 +1223,6 @@ function rProgress(){
       </div>`:''}
     </div>
 
-    <!-- MID-SEMESTER TEST -->
     <div class="card" style="background:#f8faff;color:#1a1a2e;border:1px solid rgba(99,179,237,.3)">
       <div class="ct" style="color:#1a2744">🧪 Mid-Semester Test</div>
       ${mstSub?`
@@ -1170,7 +1233,6 @@ function rProgress(){
       :'<div style="font-size:.82rem;color:#888">Not submitted yet.</div>'}
     </div>
 
-    <!-- ASSIGNMENTS SUBMITTED -->
     <div class="card" style="background:#f8faff;color:#1a1a2e;border:1px solid rgba(99,179,237,.3)">
       <div class="ct" style="color:#1a2744">📝 Assignments & Practical</div>
       <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.82rem;color:#555">
@@ -1190,7 +1252,6 @@ function rProgress(){
       </div>`:''}
     </div>
 
-    <!-- SEMINAR -->
     <div class="card" style="background:#f8faff;color:#1a1a2e;border:1px solid rgba(99,179,237,.3)">
       <div class="ct" style="color:#1a2744">🎤 Seminar</div>
       ${semSub?`
@@ -1200,7 +1261,6 @@ function rProgress(){
       `:'<div style="font-size:.82rem;color:#888">Seminar not submitted yet.</div>'}
     </div>
 
-    <!-- OVERALL GRADE -->
     <div class="card" style="background:#1a1a2e;border:2px solid var(--cyan)">
       <div class="ct">🏅 Overall CW Grade</div>
       <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
@@ -1268,9 +1328,9 @@ function saveLec(){
 }
 
 function rAdmAttCtrl(){
-  const status=S.get(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:false});
+  const status=nmGetAttendanceSession(APP.course.code,APP.week);
   return ph('🕒 Attendance Control',APP.course.name)+
-  `<div class="wstrip">${WEEKS.map(w=>{const st=S.get(`nm_att_status_${APP.course.code}_${w}`,{is_open:false});
+  `<div class="wstrip">${WEEKS.map(w=>{const st=nmGetAttendanceSession(APP.course.code,w);
     return`<div class="wc ${w===APP.week?'on':''}" onclick="setAW('${w}')">${w} ${st.is_open?'🟢':''}</div>`}).join('')}</div>
   <div class="card"><div class="ct">Status — ${APP.week}</div>
     <span class="badge ${status.is_open?'bg':'br'}" style="margin-bottom:1rem;display:inline-flex">${status.is_open?'🟢 OPEN':'🔴 CLOSED'}</span>
@@ -1282,12 +1342,12 @@ function rAdmAttCtrl(){
 }
 function setAW(w){APP.week=w;renderTab('att-ctrl')}
 function setAttStatus(open){
-  S.set(`nm_att_status_${APP.course.code}_${APP.week}`,{is_open:open,ts:new Date().toISOString()});
+  nmSetAttendanceSession(APP.course.code,APP.week,{is_open:open,ts:new Date().toISOString()});
   logLec(`Attendance ${open?'opened':'closed'} for ${APP.week}`);
   toast(`Attendance ${open?'opened 🟢':'closed 🔴'}`,open?'success':'info');renderTab('att-ctrl');
 }
 function attListPreview(week){
-  const list=S.arr(`nm_att_list_${APP.course.code}_${week}`);
+  const list=nmAttendanceWeekRecords(APP.course.code,week);
   if(!list.length)return`<div class="al ai">No attendance yet for ${week}.</div>`;
   return`<div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Time</th></tr></thead>
     <tbody>${list.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.matric}</td><td>${new Date(a.ts).toLocaleTimeString()}</td></tr>`).join('')}</tbody>
@@ -1296,8 +1356,10 @@ function attListPreview(week){
 
 function rAdmAttRec(){
   const totals={};
-  WEEKS.forEach(w=>{S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{
-    if(!totals[a.matric])totals[a.matric]={name:a.name,matric:a.matric,count:0};totals[a.matric].count++;});});
+  nmAttendanceRecords().filter(a=>a.course===APP.course.code).forEach(a=>{
+    if(!totals[a.matric])totals[a.matric]={name:a.name,matric:a.matric,count:0};
+    totals[a.matric].count++;
+  });
   return ph('📊 Attendance Records',APP.course.name)+
   `<div style="display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
     <button class="btn btn-v sm" onclick="nmExportAttendance()">📥 Export All Attendance CSV</button>
@@ -1311,7 +1373,6 @@ function rAdmAttRec(){
     </table></div>`:'<div class="al ai">No data yet.</div>'}</div>`;
 }
 function setARW(w){APP.week=w;renderTab('att-rec')}
-
 // ── NM CSV download utility
 function nmDownloadCsv(rows, filename){
   const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
@@ -1324,16 +1385,15 @@ function nmDownloadCsv(rows, filename){
 
 function nmExportAttendance(){
   const rows=[['Name','Matric','Week','Time']];
-  WEEKS.forEach(w=>{S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{
-    rows.push([a.name,a.matric,w,new Date(a.ts).toLocaleString('en-NG')]);
-  });});
+  nmAttendanceRecords().filter(a=>a.course===APP.course.code).forEach(a=>{
+    rows.push([a.name,a.matric,a.week,new Date(a.ts).toLocaleString('en-NG')]);
+  });
   nmDownloadCsv(rows,`NM_Attendance_${APP.course.code}`);
 }
 function nmExportResults(){
   const rows=[['Name','Matric','Week','CW Score (%)','Pending Short Answers']];
   WEEKS.forEach(w=>{
-    const list=S.arr(`nm_att_list_${APP.course.code}_${w}`);
-    list.forEach(a=>{
+    nmAttendanceWeekRecords(APP.course.code,w).forEach(a=>{
       const sub=S.get(`nm_cw_${APP.course.code}_${w}_${a.matric}`,null);
       if(sub)rows.push([a.name,a.matric,w,sub.pct??'—',sub.pending_short?.length||0]);
     });
@@ -1347,9 +1407,7 @@ function nmExportMSTResults(){
   nmDownloadCsv(rows,`NM_MST_${APP.course.code}`);
 }
 function nmExportSeminars(){
-  const students=[];
-  const seen=new Set();
-  WEEKS.forEach(w=>{S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{if(!seen.has(a.matric)){seen.add(a.matric);students.push(a);}});});
+  const students=nmAttendanceStudents(APP.course.code);
   const rows=[['Name','Matric','Topic','Filename','Submitted','Feedback']];
   students.forEach(a=>{
     const sem=S.get(`nm_seminar_${APP.course.code}_${a.matric}`,null);
@@ -1529,7 +1587,7 @@ function bulkImportQs(){
 }
 
 function rAdmCWSubs(){
-  const list=S.arr(`nm_att_list_${APP.course.code}_${APP.week}`);
+  const list=nmAttendanceWeekRecords(APP.course.code,APP.week);
   const subs=list.map(a=>{const s=S.get(`nm_cw_${APP.course.code}_${APP.week}_${a.matric}`,null);return s?{...s}:null}).filter(Boolean);
   return ph('📝 Classwork Submissions',APP.course.name)+
   `<div class="wstrip">${WEEKS.map(w=>`<div class="wc ${w===APP.week?'on':''}" onclick="setCWSW('${w}')">${w}</div>`).join('')}</div>
@@ -1542,11 +1600,7 @@ function rAdmCWSubs(){
 function setCWSW(w){APP.week=w;renderTab('cw-subs')}
 
 function rAdmGrading(){
-  const allMatrics={};
-  WEEKS.forEach(w=>{
-    S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{if(!allMatrics[a.matric])allMatrics[a.matric]={name:a.name,matric:a.matric};});
-  });
-  const students=Object.values(allMatrics);
+  const students=nmAttendanceStudents(APP.course.code);
 
   function autoGradeRow(matric){
     let cwTotal=0,cwEarned=0,cwCount=0;
@@ -1669,10 +1723,9 @@ function rAdmGrading(){
 }
 
 function nmExportGradingCsv(){
-  const allMatrics={};
-  WEEKS.forEach(w=>{S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{if(!allMatrics[a.matric])allMatrics[a.matric]={name:a.name,matric:a.matric};});});
+  const students=nmAttendanceStudents(APP.course.code);
   const rows=[['Name','Matric','CW Weeks Done','CW Auto%','MST%','Seminar/100','Override%','Final Grade']];
-  Object.values(allMatrics).forEach(s=>{
+  students.forEach(s=>{
     let cwTotal=0,cwEarned=0,cwCount=0;
     WEEKS.forEach(w=>{const sub=S.get(`nm_cw_${APP.course.code}_${w}_${s.matric}`,null);if(sub&&sub.auto_total){cwEarned+=sub.auto_score||0;cwTotal+=sub.auto_total;cwCount++;}});
     const cwPct=cwTotal>0?Math.round(cwEarned/cwTotal*100):null;
@@ -2234,7 +2287,7 @@ function rAdmStuSubs(){
 }
 function setSSW(w){APP.week=w;renderTab('stu-subs')}
 function subList(type){
-  const list=S.arr(`nm_att_list_${APP.course.code}_${APP.week}`);
+  const list=nmAttendanceWeekRecords(APP.course.code,APP.week);
   const subs=list.map(a=>{const s=S.get(`nm_sub_${APP.course.code}_${APP.week}_${a.matric}_${type}`,null);return s?{...s,name:a.name,matric:a.matric}:null}).filter(Boolean);
   if(!subs.length)return`<div class="al ai">No ${type} submissions for ${APP.week}.</div>`;
   return`<div class="tw"><table><thead><tr><th>Name</th><th>Matric</th><th>File</th><th>Size</th><th>Submitted</th><th>Download</th></tr></thead>
@@ -2246,7 +2299,7 @@ function subList(type){
   <button class="btn btn-v sm" style="margin-top:.6rem" onclick="nmCsvSubs('${type}')">📥 Export ${type} list CSV</button>`;
 }
 function nmCsvSubs(type){
-  const list=S.arr(`nm_att_list_${APP.course.code}_${APP.week}`);
+  const list=nmAttendanceWeekRecords(APP.course.code,APP.week);
   const rows=[['Name','Matric','Filename','Size(KB)','Submitted']];
   list.forEach(a=>{const s=S.get(`nm_sub_${APP.course.code}_${APP.week}_${a.matric}_${type}`,null);
     if(s)rows.push([s.name||a.name,a.matric,s.filename,s.size?Math.round(s.size/1024):'—',new Date(s.ts).toLocaleString('en-NG')]);
@@ -2334,9 +2387,7 @@ function tglAnn(i){const anns=S.arr('nm_announcements_'+APP.course.code);anns[i]
 function delAnn(i){if(!confirm('Delete this announcement?'))return;const anns=S.arr('nm_announcements_'+APP.course.code);anns.splice(i,1);S.set('nm_announcements_'+APP.course.code,anns);renderTab('ann-admin');}
 
 function rAdmSeminar(){
-  // Collect all unique students who have attended any week
-  const seen=new Set();const students=[];
-  WEEKS.forEach(w=>{S.arr(`nm_att_list_${APP.course.code}_${w}`).forEach(a=>{if(!seen.has(a.matric)){seen.add(a.matric);students.push(a);}});});
+  const students=nmAttendanceStudents(APP.course.code);
   const sems=students.map(a=>{const s=S.get(`nm_seminar_${APP.course.code}_${a.matric}`,null);return{...a,sem:s};});
   const submitted=sems.filter(s=>s.sem);
   return ph('🎤 Seminar Submissions',APP.course.name)+`
@@ -2589,25 +2640,7 @@ const VOS_ADMIN_TABS=[
   {id:'va-settings',ico:'⚙️',label:'Settings & Admins'},
 ];
 
-function buildVOSStudentShell(){
-  document.getElementById('vos-user-name').textContent=VAPP.user.name;
-  document.getElementById('vos-user-meta').textContent=`${VAPP.user.matric} · ${VAPP.user.dept} · L${VAPP.user.level}`;
-  buildNav('vos-sb-nav',VOS_STUDENT_TABS,'vos');
-  hideAll();
-  const _vs=document.getElementById('vos-shell');if(_vs){_vs.classList.remove('hidden');_vs.style.display='flex';}
-  const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
-  vosSetTab('v-dashboard');
-}
 
-function buildVOSAdminShell(){
-  document.getElementById('vos-user-name').textContent=VAPP.user.full_name||VAPP.user.name;
-  document.getElementById('vos-user-meta').textContent=(VAPP.user.role||'admin').toUpperCase();
-  buildNav('vos-sb-nav',VOS_ADMIN_TABS,'vos');
-  hideAll();
-  const _vs=document.getElementById('vos-shell');if(_vs){_vs.classList.remove('hidden');_vs.style.display='flex';}
-  const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
-  vosSetTab('va-dashboard');
-}
 
 function vosSetTab(id){
   VAPP.tab=id;
@@ -2619,25 +2652,6 @@ function vosSetTab(id){
 // vosRender consolidated below
 
 // ── VOS STUDENT
-function vDashboard(){
-  const u=VAPP.user;
-  const att=S.arr('vos_attendance').filter(a=>a.matric===u.matric);
-  const qr=S.arr('vos_quiz_results').filter(r=>r.matric===u.matric);
-  const ports=S.arr('vos_portfolios').filter(p=>p.matric===u.matric);
-  return ph('🏠 Welcome, '+u.name.split(' ')[0],u.dept+' · Level '+u.level)+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Present').length}</div><div class="ml">Present</div></div>
-    <div class="metric"><div class="mv">${att.filter(a=>a.status==='Late').length}</div><div class="ml">Late</div></div>
-    <div class="metric"><div class="mv">${qr.length}</div><div class="ml">Quizzes Taken</div></div>
-    <div class="metric"><div class="mv">${ports.length}</div><div class="ml">Portfolio Items</div></div>
-  </div>
-  <div class="card"><div class="ct">🎯 My Modules</div>
-    ${VOS_MODULES.map(m=>{
-      const cnt=att.filter(a=>a.module===m.id).length;
-      return `<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${cnt} session(s)</div></div></div>`;
-    }).join('')}
-  </div>`;
-}
 
 function vAttendance(){
   const settings=S.get('vos_att_settings',{});
@@ -2678,51 +2692,9 @@ function vAttendance(){
   return html;
 }
 
-function vMarkAtt(moduleId,status){
-  const att=S.arr('vos_attendance');
-  att.push({
-    id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,
-    module:moduleId,date:new Date().toISOString(),
-    time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),
-    status,
-  });
-  S.set('vos_attendance',att);
-  toast(`Marked ${status} ✅`,'success');
-  vosRender('v-attendance');
-}
 
-function vQuiz(){
-  const u=VAPP.user;const quizzes=vpQuizzesByAccess(u).filter(q=>q.published);
-  const results=S.arr('vos_quiz_results').filter(r=>r.matric===VAPP.user.matric);
-  if(!quizzes.length) return ph('📝 CBT Quiz')+'<div class="al ai">No quizzes available right now.</div>';
-  return ph('📝 CBT Quiz','Available quizzes')+
-    quizzes.map(q=>{
-      const done=results.find(r=>r.quizId===q.id);
-      const m=VOS_MODULES.find(mm=>mm.id===q.module);
-      return `<div class="card"><div class="ct">${m?m.icon:'📝'} ${q.title}</div>
-        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} · ${q.questions.length} questions · ${q.duration} mins</p>
-        ${done?`<div class="al as">✅ Completed — Score: ${done.score}/${done.total} (${done.percent}%)</div>`
-              :`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz →</button>`}
-      </div>`;
-    }).join('');
-}
 
 let vQuizState=null;
-function vStartQuiz(id){
-  const q=S.arr('vos_quizzes').find(x=>x.id===id);
-  if(!q)return;
-  vQuizState={quiz:q,current:0,answers:{},timeLeft:q.duration*60};
-  vRenderQ();
-  vQuizState.timer=setInterval(()=>{
-    vQuizState.timeLeft--;
-    const t=document.getElementById('v-timer');
-    if(t){
-      const mn=Math.floor(vQuizState.timeLeft/60),sc=vQuizState.timeLeft%60;
-      t.textContent=`${mn}:${String(sc).padStart(2,'0')}`;
-    }
-    if(vQuizState.timeLeft<=0){clearInterval(vQuizState.timer);vSubmitQuiz();}
-  },1000);
-}
 function vRenderQ(){
   const {quiz,current,answers,timeLeft}=vQuizState;
   const q=quiz.questions[current];
@@ -2748,369 +2720,12 @@ function vRenderQ(){
 }
 function vSelectAns(i){vQuizState.answers[vQuizState.current]=i;vRenderQ();}
 function vNavQ(d){vQuizState.current+=d;vRenderQ();}
-function vSubmitQuiz(){
-  if(vQuizState.timer)clearInterval(vQuizState.timer);
-  const {quiz,answers}=vQuizState;
-  let score=0;
-  quiz.questions.forEach((q,i)=>{if(answers[i]===q.correct)score++;});
-  const result={id:'qr_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
-    quizId:quiz.id,quizTitle:quiz.title,module:quiz.module,score,total:quiz.questions.length,
-    percent:Math.round(score/quiz.questions.length*100),date:new Date().toISOString()};
-  const results=S.arr('vos_quiz_results');results.push(result);S.set('vos_quiz_results',results);
-  vQuizState=null;
-  document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel">
-    <div class="card" style="text-align:center;padding:2rem">
-      <div style="font-size:3rem">${result.percent>=70?'🏆':result.percent>=50?'👍':'📚'}</div>
-      <h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted</h2>
-      <p style="color:var(--dim)">${result.quizTitle}</p>
-      <div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">${score}/${result.total}</div>
-      <div style="font-size:1.2rem">${result.percent}%</div>
-      <button class="btn btn-p" style="margin-top:1.2rem" onclick="vosSetTab('v-quiz')">Back to Quizzes</button>
-    </div></div>`;
-}
 
-function vResults(){
-  const results=S.arr('vos_quiz_results').filter(r=>r.matric===VAPP.user.matric);
-  const att=S.arr('vos_attendance').filter(a=>a.matric===VAPP.user.matric);
-  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percent,0)/results.length):0;
-  return ph('📊 My Results')+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${results.length}</div><div class="ml">Quizzes</div></div>
-    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Average</div></div>
-    <div class="metric"><div class="mv">${att.length}</div><div class="ml">Attendance</div></div>
-  </div>
-  <div class="card"><div class="ct">Quiz Results</div>
-    ${results.length?`<div class="tw"><table>
-      <thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
-      <tbody>${results.map(r=>`<tr><td>${r.quizTitle}</td><td>${VOS_MODULES.find(m=>m.id===r.module)?.name||'—'}</td>
-        <td>${r.score}/${r.total}</td><td>${r.percent}%</td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join('')}</tbody>
-    </table></div>`:'<div class="al ai">No quiz results yet.</div>'}
-  </div>
-  <div class="card"><div class="ct">Attendance</div>
-    ${att.length?`<div class="tw"><table>
-      <thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
-      <tbody>${att.map(a=>`<tr><td>${VOS_MODULES.find(m=>m.id===a.module)?.name||a.module}</td>
-        <td>${new Date(a.date).toLocaleDateString()}</td><td>${a.time}</td>
-        <td><span class="badge ${a.status==='Present'?'bg':'ba'}">${a.status}</span></td></tr>`).join('')}</tbody>
-    </table></div>`:'<div class="al ai">No attendance records yet.</div>'}
-  </div>`;
-}
 
-function vPortfolio(){
-  const ports=S.arr('vos_portfolios').filter(p=>p.matric===VAPP.user.matric);
-  return ph('🖼️ My Portfolio','Upload practical work photos')+`
-  <div class="card"><div class="ct">➕ Upload Practical Work</div>
-    <div class="field"><label>Module</label>
-      <select id="port-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
-    <div class="field"><label>Caption</label><input id="port-caption" placeholder="What did you make?"></div>
-    <div class="field"><label>Photo</label><input type="file" id="port-file" accept="image/*"></div>
-    <button class="btn btn-p" onclick="vUploadPort()">📸 Upload</button>
-  </div>
-  <div class="card"><div class="ct">🖼️ My Items (${ports.length})</div>
-    ${ports.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem">
-      ${ports.map(p=>`<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">
-        ${p.thumb?`<img src="${p.thumb}" style="width:100%;height:120px;object-fit:cover">`:'<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--panel)">🖼️</div>'}
-        <div style="padding:.5rem;font-size:.7rem"><b>${p.caption}</b><br><span style="color:var(--dim)">${VOS_MODULES.find(m=>m.id===p.module)?.icon||''} ${new Date(p.date).toLocaleDateString()}</span></div>
-      </div>`).join('')}
-    </div>`:'<div class="al ai">No items yet.</div>'}
-  </div>`;
-}
-function vUploadPort(){
-  const moduleId=document.getElementById('port-module').value;
-  const caption=document.getElementById('port-caption').value.trim();
-  const file=document.getElementById('port-file').files[0];
-  if(!caption){toast('Add a caption','error');return}
-  const save=thumb=>{
-    const ports=S.arr('vos_portfolios');
-    ports.push({id:'p_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,
-      module:moduleId,caption,thumb,date:new Date().toISOString()});
-    S.set('vos_portfolios',ports);
-    toast('Uploaded ✅','success');vosRender('v-portfolio');
-  };
-  if(file){
-    if(file.size>5*1024*1024){toast('Max 5MB','error');return}
-    const r=new FileReader();r.onload=e=>save(e.target.result);r.readAsDataURL(file);
-  } else save('');
-}
 
-function vNotices(){
-  const ann=S.arr('vos_announcements').slice().reverse();
-  return ph('📢 Announcements')+(ann.length?ann.map(a=>`
-    <div class="card" style="${a.priority==='urgent'?'border-color:rgba(239,68,68,.4)':''}">
-      <div class="ct">${a.priority==='urgent'?'🔴 ':''}${a.title}</div>
-      <p style="font-size:.78rem;color:var(--dim);margin-bottom:.4rem">${new Date(a.createdAt).toLocaleString()} · ${a.author}</p>
-      <p style="font-size:.83rem;line-height:1.6">${a.body}</p>
-    </div>`).join(''):'<div class="al ai">No announcements yet.</div>');
-}
 
-function vProfile(){
-  const u=VAPP.user;
-  const att=S.arr('vos_attendance').filter(a=>a.matric===u.matric);
-  return ph('👤 My Profile')+`
-  <div class="card">
-    <div class="istrip">
-      <div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-      <div><div class="in">${u.name}</div><div class="im">${u.dept} · Level ${u.level}</div></div>
-    </div>
-    <div class="fr">
-      <div><div class="ml">Matric</div><div class="crn">${u.matric}</div></div>
-      <div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div>
-      <div><div class="ml">Total Attendance</div><div class="crn">${att.length} sessions</div></div>
-      <div><div class="ml">Member Since</div><div class="crn">${new Date(u.createdAt).toLocaleDateString()}</div></div>
-    </div>
-  </div>`;
-}
 
 // ── VOS ADMIN
-function vaDashboard(){
-  const students=S.arr('vos_students');
-  const att=S.arr('vos_attendance');
-  const today=new Date().toDateString();
-  return ph('🏠 Admin Dashboard','VOS 102 Overview')+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${students.length}</div><div class="ml">Students</div></div>
-    <div class="metric"><div class="mv">${att.filter(a=>new Date(a.date).toDateString()===today).length}</div><div class="ml">Today</div></div>
-    <div class="metric"><div class="mv">${S.arr('vos_quizzes').filter(q=>q.published).length}</div><div class="ml">Active Quizzes</div></div>
-    <div class="metric"><div class="mv">${S.arr('vos_announcements').length}</div><div class="ml">Announcements</div></div>
-  </div>
-  <div class="card"><div class="ct">📋 Module Attendance</div>
-    ${VOS_MODULES.map(m=>{
-      const ma=att.filter(a=>a.module===m.id);
-      return `<div class="crow">
-        <div><div class="crn">${m.icon} ${m.name}</div><div class="crc">${ma.length} entries</div></div>
-        <div><span class="badge bg">${ma.filter(a=>a.status==='Present').length} P</span> 
-          <span class="badge ba">${ma.filter(a=>a.status==='Late').length} L</span></div>
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
-function vaAttendance(){
-  const settings=S.get('vos_att_settings',{});
-  return ph('⏱️ Attendance Control','Open/close per module')+
-    VOS_MODULES.map(m=>{
-      const s=settings[m.id]||{open:false};
-      return `<div class="card">
-        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem">
-          <span style="font-size:1.6rem">${m.icon}</span>
-          <div style="flex:1"><div class="crn">${m.name}</div></div>
-          <span class="badge ${s.open?'bg':'br'}">${s.open?'OPEN':'CLOSED'}</span>
-        </div>
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-          <button class="btn btn-g" onclick="vaSetAtt('${m.id}',true)">🟢 Open</button>
-          <button class="btn btn-d" onclick="vaSetAtt('${m.id}',false)">🔴 Close</button>
-          <button class="btn btn-s" onclick="vaViewRoll('${m.id}')">📋 View Roll</button>
-        </div>
-      </div>`;
-    }).join('');
-}
-function vaSetAtt(id,open){
-  const s=S.get('vos_att_settings',{});s[id]={...(s[id]||{}),open};S.set('vos_att_settings',s);
-  toast(`${open?'Opened':'Closed'} ✅`,open?'success':'info');vosRender('va-attendance');
-}
-function vaViewRoll(id){
-  const att=S.arr('vos_attendance').filter(a=>a.module===id);
-  const m=VOS_MODULES.find(x=>x.id===id);
-  alert(`${m.name} — ${att.length} entries\n\n`+att.slice(0,20).map(a=>`${a.name} (${a.matric}) · ${a.status} · ${new Date(a.date).toLocaleDateString()}`).join('\n')||'No entries');
-}
-
-function vaStudents(){
-  const students=S.arr('vos_students');
-  const att=S.arr('vos_attendance');
-  return ph('👥 Students',`${students.length} registered`)+
-  `<div class="card"><div class="tw"><table>
-    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Level</th><th>Phone</th><th>Att.</th></tr></thead>
-    <tbody>${students.length?students.map((s,i)=>`<tr>
-      <td>${i+1}</td><td>${s.name}</td><td>${s.matric}</td><td>${s.dept}</td>
-      <td>${s.level}</td><td>${s.phone||'—'}</td>
-      <td>${att.filter(a=>a.matric===s.matric).length}</td>
-    </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--dim);padding:2rem">No students registered yet</td></tr>'}</tbody>
-  </table></div></div>`;
-}
-
-let vQuizDraft=[];
-
-function isPublished(q){return q.published===true||q.published==='true';}
-
-function vaQuiz(){
-  const quizzes=S.arr('vos_quizzes');
-  vQuizDraft=[];
-  return ph('📋 Quiz Manager')+`
-  <div class="card"><div class="ct">➕ Create Quiz</div>
-    <div class="field"><label>Title</label><input id="qm-title" placeholder="Quiz title"></div>
-    <div class="fr">
-      <div class="field"><label>Module</label>
-        <select id="qm-module">${VOS_MODULES.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
-      <div class="field"><label>Duration (mins)</label><input type="number" id="qm-dur" value="20" min="1"></div>
-    </div>
-    <div class="card" style="background:var(--panel);margin-bottom:1rem">
-      <div class="ct">📥 Bulk Import Questions</div>
-      <div class="al ai" style="font-size:.75rem;line-height:1.8">
-        Format each block as:<br>
-        <code>QUESTION: Your question here</code><br>
-        <code>A. Option one</code><br>
-        <code>B. Option two</code><br>
-        <code>C. Option three</code><br>
-        <code>D. Option four</code><br>
-        <code>ANSWER: B</code>
-      </div>
-      <textarea id="qm-bulk" placeholder="Paste multiple questions here…" style="min-height:160px"></textarea>
-      <button class="btn btn-v sm" style="margin-top:.7rem" onclick="vBulkImportQ()">📥 Import Questions</button>
-    </div>
-    <div id="qm-questions"></div>
-    <button class="btn btn-s sm" onclick="vAddQ()">+ Add Question</button>
-    <div style="display:flex;gap:.5rem;margin-top:.8rem">
-      <button class="btn btn-p" onclick="vSaveQuiz(false)">💾 Save Draft</button>
-      <button class="btn btn-g" onclick="vSaveQuiz(true)">📢 Publish</button>
-    </div>
-  </div>
-  <div class="card"><div class="ct">All Quizzes (${quizzes.length})</div>
-    ${quizzes.length?quizzes.map(q=>`<div class="crow">
-      <div><div class="crn">${q.title}</div>
-        <div class="crc">${VOS_MODULES.find(m=>m.id===q.module)?.name} · ${q.questions.length} Qs · ${q.duration}min</div></div>
-      <div class="cra">
-        <span class="badge ${isPublished(q)?'bg':'bv'}">${isPublished(q)?'Published':'Draft'}</span>
-        ${!isPublished(q)?`<button class="btn btn-g sm" onclick="vPubQuiz('${q.id}')">Publish</button>`:''}
-        <button class="btn btn-d sm" onclick="vDelQuiz('${q.id}')">🗑</button>
-      </div>
-    </div>`).join(''):'<div class="al ai">No quizzes yet.</div>'}
-  </div>`;
-}
-
-function vAddQ(){
-  const idx=vQuizDraft.length;
-  vQuizDraft.push({text:'',options:['','','',''],correct:0});
-  const div=document.createElement('div');
-  div.id='qm-q-'+idx;
-  div.className='card';
-  div.style.background='var(--panel)';
-  div.innerHTML=`
-    <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
-      <b style="color:var(--cyan);font-size:.8rem">QUESTION ${idx+1}</b>
-      <button class="btn btn-d sm" onclick="vRmQ(${idx})">✕</button>
-    </div>
-    <input placeholder="Question text" style="margin-bottom:.4rem" onchange="vQuizDraft[${idx}].text=this.value">
-    ${['A','B','C','D'].map((l,i)=>`
-      <div style="display:flex;gap:.4rem;margin-bottom:.3rem;align-items:center">
-        <input type="radio" name="c-${idx}" value="${i}" ${i===0?'checked':''} onchange="vQuizDraft[${idx}].correct=${i}">
-        <input placeholder="Option ${l}" onchange="vQuizDraft[${idx}].options[${i}]=this.value" style="flex:1">
-      </div>`).join('')}`;
-  document.getElementById('qm-questions').appendChild(div);
-}
-
-/* FIX: remove by data-index to avoid stale index references after deletions */
-function vRmQ(i){
-  const el=document.getElementById('qm-q-'+i);
-  if(el) el.remove();
-  if(i>=0&&i<vQuizDraft.length) vQuizDraft.splice(i,1);
-}
-
-function vBulkImportQ(){
-  const raw=document.getElementById('qm-bulk')?.value.trim();
-  if(!raw){toast('Paste questions first','error');return}
-  const blocks=raw.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
-  let added=0;
-  const imported=[];
-  blocks.forEach(block=>{
-    const lines=block.split('\n').map(x=>x.trim()).filter(Boolean);
-    if(!lines.length)return;
-    const qLine=lines.find(l=>/^QUESTION\s*:/i.test(l));
-    const answerLine=lines.find(l=>/^ANSWER\s*:/i.test(l));
-    const optLines=lines.filter(l=>/^[A-D][.)]\s*/i.test(l));
-    if(!qLine||!answerLine||optLines.length<2)return;
-    const text=qLine.replace(/^QUESTION\s*:/i,'').trim();
-    const options=['','','',''];
-    optLines.forEach(l=>{
-      const m=l.match(/^([A-D])[.)]\s*(.+)$/i);
-      if(m) options[m[1].toUpperCase().charCodeAt(0)-65]=m[2].trim();
-    });
-    const ansLetter=answerLine.replace(/^ANSWER\s*:/i,'').trim().toUpperCase();
-    const correct=Math.max(0,Math.min(3,ansLetter.charCodeAt(0)-65));
-    if(text&&options.filter(Boolean).length>=2){
-      while(options.length<4) options.push('');
-      imported.push({text,options:options.slice(0,4),correct});
-      added++;
-    }
-  });
-  if(!added){toast('No valid questions found','error');return}
-  vQuizDraft=[];
-  const box=document.getElementById('qm-questions');
-  box.innerHTML='';
-  imported.forEach(q=>{
-    const idx=vQuizDraft.length;
-    vQuizDraft.push({...q});
-    const div=document.createElement('div');
-    div.id='qm-q-'+idx;
-    div.className='card';
-    div.style.background='var(--panel)';
-    div.innerHTML=`
-      <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
-        <b style="color:var(--cyan);font-size:.8rem">QUESTION ${idx+1}</b>
-        <button class="btn btn-d sm" onclick="vRmQ(${idx})">✕</button>
-      </div>
-      <input value="${q.text.replace(/"/g,'&quot;')}" placeholder="Question text" style="margin-bottom:.4rem" onchange="vQuizDraft[${idx}].text=this.value">
-      ${['A','B','C','D'].map((l,i)=>`
-        <div style="display:flex;gap:.4rem;margin-bottom:.3rem;align-items:center">
-          <input type="radio" name="c-${idx}" value="${i}" ${i===q.correct?'checked':''} onchange="vQuizDraft[${idx}].correct=${i}">
-          <input value="${(q.options[i]||'').replace(/"/g,'&quot;')}" placeholder="Option ${l}" onchange="vQuizDraft[${idx}].options[${i}]=this.value" style="flex:1">
-        </div>`).join('')}`;
-    box.appendChild(div);
-  });
-  toast(`Imported ${added} question${added>1?'s':''} ✅`,'success');
-}
-
-function vSaveQuiz(publish){
-  const title=document.getElementById('qm-title').value.trim();
-  const module=document.getElementById('qm-module').value;
-  const duration=parseInt(document.getElementById('qm-dur').value)||20;
-  if(!title){toast('Enter title','error');return}
-  if(!vQuizDraft.length){toast('Add at least 1 question','error');return}
-  const quizzes=S.arr('vos_quizzes');
-  quizzes.push({
-    id:'q_'+Date.now(),
-    title,
-    module,
-    duration,
-    questions:vQuizDraft.map(q=>({...q})),
-    published:publish===true,   /* FIX: always store as strict boolean */
-    createdAt:new Date().toISOString(),
-    author:VAPP.user.full_name||VAPP.user.name
-  });
-  S.set('vos_quizzes',quizzes);
-  toast(publish?'Published ✅':'Draft saved','success');
-  vosRender('va-quiz');
-}
-
-function vPubQuiz(id){
-  const qs=S.arr('vos_quizzes');
-  const q=qs.find(x=>x.id===id);
-  if(q){
-    q.published=true;           /* FIX: always store as strict boolean */
-    S.set('vos_quizzes',qs);
-    toast('Published ✅','success');
-    vosRender('va-quiz');
-  }
-}
-
-function vDelQuiz(id){
-  if(!confirm('Delete?'))return;
-  S.set('vos_quizzes',S.arr('vos_quizzes').filter(q=>q.id!==id));
-  vosRender('va-quiz');
-}
-
-
-function vaResults(){
-  const results=S.arr('vos_quiz_results');
-  return ph('📊 Results',`${results.length} attempts`)+`
-  <div class="card"><div class="tw"><table>
-    <thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Dept</th><th>Quiz</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
-    <tbody>${results.length?results.sort((a,b)=>b.percent-a.percent).map((r,i)=>`<tr>
-      <td>${i+1}</td><td>${r.name}</td><td>${r.matric}</td><td>${r.dept||'—'}</td>
-      <td>${r.quizTitle}</td><td>${r.score}/${r.total}</td>
-      <td><b>${r.percent}%</b></td><td>${new Date(r.date).toLocaleDateString()}</td>
-    </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:2rem">No results yet</td></tr>'}</tbody>
-  </table></div></div>`;
-}
 
 function vaNotices(){
   const ann=S.arr('vos_announcements').slice().reverse();
@@ -3379,25 +2994,6 @@ function vaChangeMyPW(){
 }
 
 const VOS_BACKUP_KEYS=['vos_students','vos_attendance','vos_quiz_results','vos_quizzes','vos_portfolios','vos_announcements','vos_att_settings','vos_admins','vos_assignments','vos_assignment_submissions','vos_forums','vos_lms_logo','vos_scopes','vos_active_scope'];
-function vaExport(){
-  const isSA=vpIsSuperAdmin(VAPP.user);
-  return ph('📤 Export & Backup','Download reports or backup all portal data')+`
-  <div class="card" style="border-color:rgba(99,179,237,.35)">
-    <div class="ct">💾 Full Data Backup <span class="badge bv" style="font-size:.65rem;margin-left:.4rem">Prevents data loss on redeployment</span></div>
-    <p style="font-size:.78rem;color:var(--dim);line-height:1.6;margin-bottom:.8rem">Export a complete snapshot of all portal data (students, attendance, quizzes, portfolios, announcements, assignments). Save this file before any redeployment — you can restore it immediately after.</p>
-    <div style="display:flex;gap:.55rem;flex-wrap:wrap">
-      <button class="btn btn-p" onclick="vaBackupAll()">📦 Download Full Backup (.json)</button>
-      ${isSA?`<label class="btn btn-g" style="cursor:pointer">📥 Restore from Backup <input type="file" accept=".json" style="display:none" onchange="vaRestoreBackup(this)"></label>`:''}
-    </div>
-    ${isSA?`<div class="al ai" style="margin-top:.7rem;font-size:.75rem">⚠️ Restore overwrites current data. Only Super Admin can restore.</div>`:''}
-  </div>
-  <div class="card"><div class="ct">📋 Export Attendance (Excel)</div>
-    <button class="btn btn-p" onclick="vaExportAtt()">⬇️ Download Attendance</button></div>
-  <div class="card"><div class="ct">📊 Export Quiz Results (Excel)</div>
-    <button class="btn btn-p" onclick="vaExportRes()">⬇️ Download Results</button></div>
-  <div class="card"><div class="ct">👥 Export Students (Excel)</div>
-    <button class="btn btn-p" onclick="vaExportStu()">⬇️ Download Students</button></div>`;
-}
 function vaBackupAll(){
   const snapshot={_meta:{version:2,exportedAt:new Date().toISOString(),exportedBy:VAPP.user.full_name||VAPP.user.name}};
   VOS_BACKUP_KEYS.forEach(k=>{try{const v=S.get(k,null);if(v!==null&&v!==undefined)snapshot[k]=v;}catch{}});
@@ -3480,27 +3076,33 @@ function vpModuleLabel(user=VAPP.user){
 }
 function vpFilterByAccess(items,key='module',user=VAPP.user){return (items||[]).filter(item=>vpCanAccessModule(item[key],user));}
 function vpStudentsByAccess(user=VAPP.user){
-  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
+  user=user||VAPP.user;
+  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
   return vpIsSuperAdmin(user)?students:students.filter(s=>vpCanAccessModule(s.module,user));
 }
-function vpResultsByAccess(user=VAPP.user){return vpFilterByAccess(S.arr('vos_quiz_results'),'module',user);}
-function vpAttendanceByAccess(user=VAPP.user){return vpFilterByAccess(S.arr('vos_attendance'),'module',user);}
+function vpResultsByAccess(user=VAPP.user){user=user||VAPP.user;return (S.arr('vos_quiz_results')||[]).filter(r=>vpCanAccessModule(r.module,user));}
+function vpAttendanceByAccess(user=VAPP.user){user=user||VAPP.user;return (S.arr('vos_attendance')||[]).filter(a=>vpCanAccessModule(a.module,user));}
 function vpQuizzesByAccess(user=VAPP.user){return vpFilterByAccess(S.arr('vos_quizzes'),'module',user);}
-function vpPortsByAccess(user=VAPP.user){return vpFilterByAccess(S.arr('vos_portfolios'),'module',user);}
+function vpPortsByAccess(user=VAPP.user){user=user||VAPP.user;return (S.arr('vos_portfolios')||[]).filter(p=>vpCanAccessModule(p.module,user));}
 function vpAnnsByAccess(user=VAPP.user){
   return (S.arr('vos_announcements')||[]).filter(a=>a.module==='all' || vpCanAccessModule(a.module,user));
 }
 function vpMigrateData(){
-  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
+  vpEnsureScopes();
+  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
   S.set('vos_students',students);
   const portfolios=(S.arr('vos_portfolios')||[]).map(p=>{
     const stu=students.find(s=>s.matric===p.matric);
     const module=p.module||stu?.module||VOS_MODULES[0].id;
-    return {...p,module,verified:!!p.verified,verifiedBy:p.verifiedBy||'',verifiedAt:p.verifiedAt||''};
+    return vpScopedRecord({...p,module,verified:!!p.verified,verifiedBy:p.verifiedBy||'',verifiedAt:p.verifiedAt||''},stu||vpScope());
   });
   S.set('vos_portfolios',portfolios);
-  const anns=(S.arr('vos_announcements')||[]).map(a=>({...a,module:a.module||'all'}));
+  const anns=(S.arr('vos_announcements')||[]).map(a=>vpScopedRecord({...a,module:a.module||'all'}));
   S.set('vos_announcements',anns);
+  ['vos_attendance','vos_quiz_results','vos_assignment_submissions'].forEach(key=>{
+    const items=(S.arr(key)||[]).map(item=>vpScopedRecord(item));
+    S.set(key,items);
+  });
 }
 
 function vpBrandMarkup(label,size='md'){
@@ -3589,95 +3191,17 @@ function initVOSPatch(){
     .verify-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.22rem .58rem;border-radius:999px;font-size:.64rem;font-weight:700;border:1px solid rgba(255,255,255,.08);margin-top:.3rem}
     .verify-pill.ok{background:rgba(16,185,129,.12);color:var(--green);border-color:rgba(16,185,129,.28)}
     .verify-pill.pending{background:rgba(245,158,11,.12);color:var(--amber);border-color:rgba(245,158,11,.28)}
+    .scope-readout{display:flex;align-items:center;min-height:2.55rem;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.65rem .95rem;color:var(--bright);font-weight:700}
+    .scope-pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;background:rgba(11,117,165,.08);border:1px solid rgba(11,117,165,.22);color:var(--cyan);padding:.25rem .7rem;font-size:.68rem}
   `;
   document.head.appendChild(st);
   vpMigrateData();
   vpFillRegisterModules();
   vpRenderBrandSlots();
+  vpUpdateScopeStrip();
 }
 
 // vosRegisterScreen override removed — consolidated above
-function vosRegister(){
-  const name=document.getElementById('reg-name').value.trim();
-  const matric=document.getElementById('reg-matric').value.trim();
-  const dept=document.getElementById('reg-dept').value;
-  const level=document.getElementById('reg-level').value;
-  const module=document.getElementById('reg-module')?.value||'';
-  const phone=document.getElementById('reg-phone').value.trim();
-  const pw1=document.getElementById('reg-pw').value;
-  const pw2=document.getElementById('reg-pw2').value;
-  const err=document.getElementById('reg-err'),ok=document.getElementById('reg-ok');
-  hideEl('reg-err');hideEl('reg-ok');
-  if(!name||!matric||!dept||!level||!module||!pw1){err.textContent='❌ Fill all required fields.';showEl('reg-err');return;}
-  if(pw1!==pw2){err.textContent='❌ Passwords do not match.';showEl('reg-err');return;}
-  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
-  if(students.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){err.textContent='❌ Matric number already registered.';showEl('reg-err');return;}
-  students.push({id:'s_'+Date.now(),name,matric,dept,level,module,module_name:vpModuleName(module),modules:[module],phone,pw:pw1,createdAt:new Date().toISOString()});
-  S.set('vos_students',students);
-  // Store matric hint so login screen can pre-fill after redirect
-  try{sessionStorage.setItem('vos_reg_matric',matric);}catch{}
-  ok.textContent='✅ Registration successful! Redirecting to login…';showEl('reg-ok');
-  // Delay redirect slightly longer to allow Firestore write to propagate,
-  // then redirect. On login the app will re-read from localStorage (already updated).
-  setTimeout(()=>vosLoginScreen('student'),1800);
-}
-function vosLogin(){
-  const id=document.getElementById('vos-un').value.trim();
-  const pw=document.getElementById('vos-pw').value;
-  const errEl=document.getElementById('vos-err');
-  if(!id||!pw){
-    if(errEl){errEl.textContent='❌ Please enter both username/matric and password.';}
-    showEl('vos-err');
-    return;
-  }
-  initVOSDefaults();
-  try{vpMigrateData();}catch(e){console.warn('migrate skipped',e);}
-  if(VAPP.loginType==='admin'){
-    const admins=S.arr('vos_admins')||[];
-    const idLow=id.toLowerCase();
-    const a=admins.find(x=>{
-      const uname=String(x.username||x.id||'').toLowerCase();
-      const stored=String(x.pw||x.pw_hash||x.password||'');
-      return uname===idLow && stored===pw;
-    });
-    if(!a){
-      if(errEl){errEl.textContent='❌ Invalid admin credentials. Check username and password.';}
-      showEl('vos-err');return;
-    }
-    VAPP.user={...a,type:'admin'};
-    if(errEl){errEl.className='ae al hidden';}
-    buildVOSAdminShell();
-  } else {
-    // Search across ALL students regardless of active scope so logout/login works after scope switches
-    const allStudents=(S.arr('vos_students')||[]).map(vpNormalizeStudent);
-    const idUp=id.toUpperCase();
-    const s=allStudents.find(x=>String(x.matric||'').toUpperCase()===idUp && String(x.pw||x.password||'')===pw);
-    if(!s){
-      // Provide a helpful diagnostic
-      const sameMatric=allStudents.find(x=>String(x.matric||'').toUpperCase()===idUp);
-      if(errEl){
-        errEl.textContent=sameMatric?'❌ Wrong password for that matric number.':'❌ No student account found with that matric number. Please register first.';
-      }
-      showEl('vos-err');return;
-    }
-    // Auto-switch active scope to where this student is registered
-    if(s.academicSession && s.cohort){
-      const scope=vpNormalizeScope({session:s.academicSession,cohort:s.cohort});
-      try{
-        const scopes=S.arr('vos_scopes')||[];
-        if(!scopes.find(x=>x.key===scope.key)){
-          scopes.push({session:scope.session,cohort:scope.cohort,key:scope.key});
-          S.set('vos_scopes',scopes);
-        }
-        S.set('vos_active_scope',{session:scope.session,cohort:scope.cohort,key:scope.key});
-      }catch(e){console.warn('scope set fail',e);}
-    }
-    VAPP.user={...s,type:'student'};
-    if(errEl){errEl.className='ae al hidden';}
-    try{sessionStorage.removeItem('vos_reg_matric');}catch{}
-    buildVOSStudentShell();
-  }
-}
 function buildVOSStudentShell(){
   VAPP.user=vpNormalizeStudent(VAPP.user||{});
   document.getElementById('vos-user-name').textContent=VAPP.user.name;
@@ -3687,6 +3211,7 @@ function buildVOSStudentShell(){
   const _vs=document.getElementById('vos-shell');if(_vs){_vs.classList.remove('hidden');_vs.style.display='flex';}
   const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
   vpRenderBrandSlots();
+  vpUpdateScopeStrip();
   vosSetTab('v-dashboard');
 }
 function buildVOSAdminShell(){
@@ -3698,6 +3223,7 @@ function buildVOSAdminShell(){
   const _vs=document.getElementById('vos-shell');if(_vs){_vs.classList.remove('hidden');_vs.style.display='flex';}
   const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
   vpRenderBrandSlots();
+  vpUpdateScopeStrip();
   vosSetTab('va-dashboard');
 }
 function vosRender(id){
@@ -3716,28 +3242,6 @@ function vosRender(id){
   try{c.innerHTML=`<div class="tab-panel">${fn()}</div>`;}
   catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error loading tab: '+e.message+'</div></div>';console.error(e);}
 }
-function vDashboard(){
-  const u=vpNormalizeStudent(VAPP.user);
-  const mods=vpVisibleModules(u);
-  const att=(S.arr('vos_attendance')||[]).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
-  const qr=(S.arr('vos_quiz_results')||[]).filter(r=>r.matric===u.matric&&vpCanAccessModule(r.module,u));
-  const ports=(S.arr('vos_portfolios')||[]).filter(p=>p.matric===u.matric&&vpCanAccessModule(p.module,u));
-  const myAssignments=(S.arr('vos_assignment_submissions')||[]).filter(s=>s.matric===u.matric&&vpCanAccessModule(s.module,u));
-  return ph('🏠 Welcome, '+u.name.split(' ')[0],u.dept+' · Level '+u.level)+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${mods.length}</div><div class="ml">My Module</div></div>
-    <div class="metric"><div class="mv">${qr.length}</div><div class="ml">Quizzes Taken</div></div>
-    <div class="metric"><div class="mv">${myAssignments.length}</div><div class="ml">Assignments Sent</div></div>
-  </div>
-  <div class="card"><div class="ct">🎯 Assigned Module</div>
-    ${mods.map(m=>`<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">Only this module is available on your dashboard.</div></div><span class="module-chip">Student Access</span></div>`).join('')}
-  </div>
-  <div class="card"><div class="ct">📌 Quick Progress</div>
-    <div class="crow"><div><div class="crn">✅ Attendance Marked</div><div class="crc">${att.length} total record(s)</div></div><span class="badge bg">${att.filter(a=>a.status==='Present').length} present</span></div>
-    <div class="crow"><div><div class="crn">🖼️ Portfolio Uploads</div><div class="crc">${ports.length} practical item(s) uploaded</div></div><span class="badge ba">Trackable</span></div>
-    <div class="crow"><div><div class="crn">📂 Assignment Area</div><div class="crc">Upload files or type your answers for automatic grading.</div></div><button class="btn btn-p sm" onclick="vosSetTab('v-assignments')">Open</button></div>
-  </div>`;
-}
 // duplicate vAttendance removed
 
 function vStartQuiz(id){
@@ -3751,20 +3255,6 @@ function vStartQuiz(id){
     if(t){const mn=Math.floor(vQuizState.timeLeft/60),sc=vQuizState.timeLeft%60;t.textContent=`${mn}:${String(sc).padStart(2,'0')}`;}
     if(vQuizState.timeLeft<=0){clearInterval(vQuizState.timer);vSubmitQuiz();}
   },1000);
-}
-function vQuiz(){
-  const quizzes=(S.arr('vos_quizzes')||[]).filter(q=>q.published&&vpCanAccessModule(q.module,VAPP.user));
-  const results=(S.arr('vos_quiz_results')||[]).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
-  if(!quizzes.length) return ph('📝 CBT Quiz')+'<div class="al ai">No quizzes available for your module right now.</div>';
-  return ph('📝 CBT Quiz','Only quizzes for your selected module are shown')+
-    quizzes.map(q=>{
-      const done=results.find(r=>r.quizId===q.id);
-      const m=vpModule(q.module);
-      return `<div class="card"><div class="ct">${m?m.icon:'📝'} ${q.title}</div>
-        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} · ${q.questions.length} questions · ${q.duration} mins</p>
-        ${done?`<div class="al as">✅ Completed — Score: ${done.score}/${done.total} (${done.percent}%)</div>`:`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz →</button>`}
-      </div>`;
-    }).join('');
 }
 function vpAssignmentsByAccess(user=VAPP.user,includeDraft=false){
   return (S.arr('vos_assignments')||[]).filter(a=>vpCanAccessModule(a.module,user)&&(includeDraft||a.published));
@@ -3804,182 +3294,9 @@ function vpAutoGradeAssignment(assignment,text){
     : `Auto-grade estimated from answer completeness (${words} words). Add rubric keywords in admin view for more precise scoring.`;
   return {score,percent,maxScore,feedback,matched:uniqueMatched.length,total:phrases.length,words};
 }
-function vAssignments(){
-  const assignments=vpAssignmentsByAccess(VAPP.user);
-  const subs=(S.arr('vos_assignment_submissions')||[]).filter(s=>s.matric===VAPP.user.matric&&vpCanAccessModule(s.module,VAPP.user));
-  const graded=subs.filter(s=>typeof s.score==='number');
-  const avg=graded.length?Math.round(graded.reduce((sum,s)=>sum+(s.percent||0),0)/graded.length):0;
-  return ph('📂 Assignments','Upload a document or type your answer for automatic grading')+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${assignments.length}</div><div class="ml">Available</div></div>
-    <div class="metric"><div class="mv">${subs.length}</div><div class="ml">Submitted</div></div>
-    <div class="metric"><div class="mv">${graded.length}</div><div class="ml">Graded</div></div>
-    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Assignment Avg</div></div>
-  </div>
-  ${assignments.length?assignments.map(a=>{
-    const sub=subs.find(s=>s.assignmentId===a.id);
-    const due=a.dueDate?new Date(a.dueDate):null;
-    const isLate=sub?.isLate;
-    return `<div class="card">
-      <div class="crow" style="align-items:flex-start;gap:1rem">
-        <div style="flex:1">
-          <div class="ct">📝 ${vpEsc(a.title)}</div>
-          <div class="crc">${vpModuleIcon(a.module)} ${vpModuleName(a.module)} · ${due?`Due ${due.toLocaleString('en-NG')}`:'No due date'} · Max ${a.maxScore||100} marks</div>
-        </div>
-        <div class="cra">
-          ${sub?`<span class="badge ${typeof sub.score==='number'?(sub.percent>=70?'bg':sub.percent>=50?'ba':'br'):'bv'}">${typeof sub.score==='number'?`${sub.score}/${sub.maxScore||a.maxScore} • ${sub.percent||0}%`:'Submitted'}</span>`:'<span class="badge bc">Open</span>'}
-          ${isLate?'<span class="badge br">Late</span>':''}
-        </div>
-      </div>
-      <p style="font-size:.87rem;color:var(--bright);line-height:1.8;margin:.75rem 0;background:rgba(0,212,255,.06);padding:.7rem;border-radius:6px;border-left:3px solid var(--cyan)">${vpEsc(a.instructions||'No instructions added yet.').replace(/\n/g,'<br>')}</p>
-      <div class="al ai" style="margin-bottom:.7rem;font-size:.77rem">Auto-grading checks your typed answer against the lecturer's keywords. You may also upload a file (max 800 KB to ensure cloud sync).</div>
-      ${sub?`<div class="card" style="background:var(--panel);margin-bottom:.8rem"><div class="ct">Current Submission</div><div style="font-size:.78rem;color:var(--dim);line-height:1.8">Submitted ${new Date(sub.submittedAt).toLocaleString('en-NG')} · Status: <b>${sub.status||'submitted'}</b>${typeof sub.score==='number'?` · Score: <b>${sub.score}/${sub.maxScore||a.maxScore}</b> (${sub.percent||0}%)`:''}</div>${sub.feedback?`<div class="al as" style="margin-top:.7rem">${vpEsc(sub.feedback)}</div>`:''}${sub.fileData?`<div style="margin-top:.7rem"><a href="${sub.fileData}" download="${sub.fileName||'assignment'}" class="btn btn-s sm">📎 Download ${vpEsc(sub.fileName||'attachment')}</a></div>`:''}</div>`:''}
-      <div class="fr">
-        ${a.allowText!==false?`<div class="field"><label>Typed Answer</label><textarea id="asg-text-${a.id}" placeholder="Type your answer here for automatic grading…" style="min-height:140px">${sub?vpEsc(sub.textAnswer||''):''}</textarea></div>`:''}
-        ${a.allowFile!==false?`<div class="field"><label>Upload File</label><input type="file" id="asg-file-${a.id}" accept=".pdf,.doc,.docx,.txt,.zip,.jpg,.jpeg,.png" style="color:var(--text);font-size:.8rem"><div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Recommended max size: 1.5 MB for this offline LMS demo.</div></div>`:''}
-      </div>
-      <div class="field"><label>Notes to Lecturer</label><input id="asg-note-${a.id}" value="${sub?vpEsc(sub.notes||''):''}" placeholder="Optional note for grading or clarification"></div>
-      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-p" onclick="vSubmitAssignment('${a.id}')">${sub?'Resubmit Assignment':'Submit Assignment'}</button>
-        <span style="font-size:.74rem;color:var(--dim)">${a.allowText!==false?'🧠 typed answer enabled':''} ${a.allowFile!==false?'📎 file upload enabled':''}</span>
-      </div>
-    </div>`;
-  }).join(''):'<div class="al ai">No assignments have been posted for your module yet.</div>'}`;
-}
-function vSubmitAssignment(id){
-  const assignment=(S.arr('vos_assignments')||[]).find(a=>a.id===id&&a.published&&vpCanAccessModule(a.module,VAPP.user));
-  if(!assignment){toast('Assignment not available','error');return;}
-  const textEl=document.getElementById('asg-text-'+id);
-  const fileEl=document.getElementById('asg-file-'+id);
-  const noteEl=document.getElementById('asg-note-'+id);
-  const textAnswer=(textEl?.value||'').trim();
-  const notes=(noteEl?.value||'').trim();
-  const file=fileEl?.files?.[0]||null;
-  if(!textAnswer && !file){toast('Type an answer or upload a file first','error');return;}
-  if(file && file.size>1.5*1024*1024){toast('File must be 1.5MB or less in this offline LMS demo','error');return;}
-  const auto=textAnswer?vpAutoGradeAssignment(assignment,textAnswer):null;
-  const persist=(fileData='')=>{
-    const submissions=(S.arr('vos_assignment_submissions')||[]).filter(s=>!(s.assignmentId===id&&s.matric===VAPP.user.matric));
-    submissions.push({
-      id:'vas_'+Date.now(),assignmentId:id,module:assignment.module,assignmentTitle:assignment.title,
-      matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,
-      textAnswer,notes,fileData,fileName:file?.name||'',fileSize:file?.size||0,fileType:file?.type||'',
-      autoScore:auto?.score??null,score:auto?.score??null,maxScore:auto?.maxScore??(+assignment.maxScore||100),
-      percent:auto?.percent??null,feedback:auto?auto.feedback:'File uploaded successfully. Awaiting lecturer review.',
-      status:auto?'auto-graded':'submitted',isLate:!!(assignment.dueDate&&Date.now()>new Date(assignment.dueDate).getTime()),
-      submittedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),gradedBy:auto?'Auto-grader':'',gradedAt:auto?new Date().toISOString():'',
-    });
-    S.set('vos_assignment_submissions',submissions);
-    toast(auto?`Assignment submitted — auto score ${auto.score}/${auto.maxScore}`:'Assignment submitted ✅',auto?'success':'info');
-    vosRender('v-assignments');
-  };
-  if(file){
-    const reader=new FileReader();
-    reader.onload=e=>persist(e.target.result||'');
-    reader.readAsDataURL(file);
-  } else persist('');
-}
-function vResults(){
-  const results=(S.arr('vos_quiz_results')||[]).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
-  const att=(S.arr('vos_attendance')||[]).filter(a=>a.matric===VAPP.user.matric&&vpCanAccessModule(a.module,VAPP.user));
-  const assigns=(S.arr('vos_assignment_submissions')||[]).filter(s=>s.matric===VAPP.user.matric&&vpCanAccessModule(s.module,VAPP.user));
-  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percent,0)/results.length):0;
-  const graded=assigns.filter(s=>typeof s.score==='number');
-  const aAvg=graded.length?Math.round(graded.reduce((s,r)=>s+(r.percent||0),0)/graded.length):0;
-  return ph('📊 My Results')+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${results.length}</div><div class="ml">Quizzes</div></div>
-    <div class="metric"><div class="mv">${avg}%</div><div class="ml">Quiz Avg</div></div>
-    <div class="metric"><div class="mv">${assigns.length}</div><div class="ml">Assignments</div></div>
-    <div class="metric"><div class="mv">${aAvg}%</div><div class="ml">Assignment Avg</div></div>
-  </div>
-  <div class="card"><div class="ct">Quiz Results</div>
-    ${results.length?`<div class="tw"><table>
-      <thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
-      <tbody>${results.map(r=>`<tr><td>${r.quizTitle}</td><td>${vpModuleName(r.module)}</td><td>${r.score}/${r.total}</td><td>${r.percent}%</td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join('')}</tbody>
-    </table></div>`:'<div class="al ai">No quiz results yet.</div>'}
-  </div>
-  <div class="card"><div class="ct">Assignment Results</div>
-    ${assigns.length?`<div class="tw"><table>
-      <thead><tr><th>Assignment</th><th>Module</th><th>Status</th><th>Score</th><th>Date</th></tr></thead>
-      <tbody>${assigns.map(a=>`<tr><td>${vpEsc(a.assignmentTitle||'Assignment')}</td><td>${vpModuleName(a.module)}</td><td><span class="badge ${typeof a.score==='number'?(a.percent>=70?'bg':a.percent>=50?'ba':'br'):'bv'}">${a.status||'submitted'}</span></td><td>${typeof a.score==='number'?`${a.score}/${a.maxScore||100} (${a.percent||0}%)`:'Pending review'}</td><td>${new Date(a.submittedAt).toLocaleDateString()}</td></tr>`).join('')}</tbody>
-    </table></div>`:'<div class="al ai">No assignment submissions yet.</div>'}
-  </div>
-  <div class="card"><div class="ct">Attendance</div>
-    ${att.length?`<div class="tw"><table>
-      <thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
-      <tbody>${att.map(a=>`<tr><td>${vpModuleName(a.module)}</td><td>${new Date(a.date).toLocaleDateString()}</td><td>${a.time}</td><td><span class="badge ${a.status==='Present'?'bg':'ba'}">${a.status}</span></td></tr>`).join('')}</tbody>
-    </table></div>`:'<div class="al ai">No attendance records yet.</div>'}
-  </div>`;
-}
-function vPortfolio(){
-  const mods=vpVisibleModules(VAPP.user);
-  const ports=(S.arr('vos_portfolios')||[]).filter(p=>p.matric===VAPP.user.matric&&vpCanAccessModule(p.module,VAPP.user));
-  return ph('🖼️ My Portfolio','Upload practical work only for your assigned module')+`
-  <div class="card"><div class="ct">➕ Upload Practical Work</div>
-    <div class="field"><label>Module</label><select id="port-module">${mods.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
-    <div class="field"><label>Caption</label><input id="port-caption" placeholder="What did you make?"></div>
-    <div class="field"><label>Photo</label><input type="file" id="port-file" accept="image/*"></div>
-    <button class="btn btn-p" onclick="vUploadPort()">📸 Upload</button>
-  </div>
-  <div class="card"><div class="ct">🖼️ My Items (${ports.length})</div>
-    ${ports.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem">${ports.map(p=>`<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">${p.thumb?`<img src="${p.thumb}" style="width:100%;height:120px;object-fit:cover">`:'<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--panel)">🖼️</div>'}<div style="padding:.5rem;font-size:.7rem"><b>${vpEsc(p.caption)}</b><br><span style="color:var(--dim)">${vpModuleIcon(p.module)} ${new Date(p.date).toLocaleDateString()}</span><br><span class="verify-pill ${p.verified?'ok':'pending'}">${p.verified?'✅ Verified':'⏳ Pending review'}</span></div></div>`).join('')}</div>`:'<div class="al ai">No items yet.</div>'}
-  </div>`;
-}
-function vUploadPort(){
-  const moduleId=document.getElementById('port-module').value;
-  const caption=document.getElementById('port-caption').value.trim();
-  const file=document.getElementById('port-file').files[0];
-  if(!vpCanAccessModule(moduleId,VAPP.user)){toast('You can only upload work for your selected module','error');return;}
-  if(!caption){toast('Add a caption','error');return}
-  const save=thumb=>{
-    const ports=S.arr('vos_portfolios');
-    ports.push({id:'p_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,module:moduleId,caption,thumb,date:new Date().toISOString(),verified:false,verifiedBy:'',verifiedAt:''});
-    S.set('vos_portfolios',ports);
-    toast('Uploaded ✅','success');vosRender('v-portfolio');
-  };
-  if(file){
-    if(file.size>5*1024*1024){toast('Max 5MB','error');return}
-    const r=new FileReader();r.onload=e=>save(e.target.result);r.readAsDataURL(file);
-  } else save('');
-}
 function vNotices(){
   const ann=vpAnnsByAccess(VAPP.user).slice().reverse();
   return ph('📢 Announcements')+(ann.length?ann.map(a=>`<div class="card" style="${a.priority==='urgent'?'border-color:rgba(239,68,68,.4)':''}"><div class="ct">${a.priority==='urgent'?'🔴 ':''}${a.title}</div><p style="font-size:.78rem;color:var(--dim);margin-bottom:.4rem">${new Date(a.createdAt).toLocaleString()} · ${a.author} · ${a.module==='all'?'All modules':vpModuleName(a.module)}</p><p style="font-size:.83rem;line-height:1.6">${a.body}</p></div>`).join(''):'<div class="al ai">No announcements yet.</div>');
-}
-function vProfile(){
-  const u=vpNormalizeStudent(VAPP.user);
-  const att=(S.arr('vos_attendance')||[]).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
-  return ph('👤 My Profile')+`
-  <div class="card">
-    <div class="istrip">
-      <div class="iav">${u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-      <div style="flex:1">
-        <div class="in">${u.name}</div>
-        <div class="im">${u.dept} · Level ${u.level}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin-top:.8rem">
-      <div><div class="ml">Matric Number</div><div class="crn">${u.matric}</div></div>
-      <div><div class="ml">Phone</div><div class="crn">${u.phone||'—'}</div></div>
-      <div><div class="ml">Practical Module</div><div class="crn">${vpModuleIcon(u.module)} ${vpModuleName(u.module)}</div></div>
-      <div><div class="ml">Total Attendance</div><div class="crn">${att.length} session${att.length!==1?'s':''}</div></div>
-      <div><div class="ml">Department</div><div class="crn">${u.dept}</div></div>
-      <div><div class="ml">Level</div><div class="crn">${u.level}</div></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ct">🔒 Change Password</div>
-    <p style="font-size:.76rem;color:var(--dim);margin-bottom:.9rem">Your password is never displayed. Enter your current password to set a new one.</p>
-    <div class="field"><label>Current Password</label><input type="password" id="cp-old" placeholder="Current password…" autocomplete="current-password"></div>
-    <div class="fr">
-      <div class="field"><label>New Password</label><input type="password" id="cp-new" placeholder="New password (min 4 chars)…" autocomplete="new-password"></div>
-      <div class="field"><label>Confirm New Password</label><input type="password" id="cp-confirm" placeholder="Confirm new password…" autocomplete="new-password"></div>
-    </div>
-    <div class="ae al hidden" id="cp-err"></div>
-    <div class="as al hidden" id="cp-ok">✅ Password changed successfully!</div>
-    <button class="btn btn-p" onclick="vChangePassword()">🔑 Change Password</button>
-  </div>`;
 }
 
 function vChangePassword(){
@@ -4008,34 +3325,11 @@ function vChangePassword(){
 }
 
 
-function vaDashboard(){
-  const students=vpStudentsByAccess(VAPP.user);
-  const att=vpAttendanceByAccess(VAPP.user);
-  const quizzes=vpQuizzesByAccess(VAPP.user);
-  const ports=vpPortsByAccess(VAPP.user);
-  const mods=vpVisibleModules(VAPP.user);
-  const today=new Date().toDateString();
-  return ph(vpIsSuperAdmin()?'🏠 Super Admin Dashboard':'🏠 Module Admin Dashboard',vpIsSuperAdmin()?'Full access across all modules':'Access limited to your assigned module(s)')+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${students.length}</div><div class="ml">Students</div></div>
-    <div class="metric"><div class="mv">${att.filter(a=>new Date(a.date).toDateString()===today).length}</div><div class="ml">Today</div></div>
-    <div class="metric"><div class="mv">${quizzes.filter(q=>q.published).length}</div><div class="ml">Active Quizzes</div></div>
-    <div class="metric"><div class="mv">${ports.length}</div><div class="ml">Portfolio Uploads</div></div>
-  </div>
-  <div class="card"><div class="ct">🧭 Module Access</div>${mods.map(m=>`<div class="crow"><div><div class="crn">${m.icon} ${m.name}</div><div class="crc">Students: ${students.filter(s=>s.module===m.id).length} · Uploads: ${ports.filter(p=>p.module===m.id).length}</div></div><span class="module-chip">${vpIsSuperAdmin()?'Full Control':'Assigned Module'}</span></div>`).join('')}</div>
-  ${vpIsSuperAdmin()?`<div class="card"><div class="ct">🪪 LMS Logo</div><div class="field"><label>Upload Logo (shows across landing, login, sidebar, footer)</label><input type="file" id="brand-logo-input" accept="image/*"></div><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p" onclick="saveLMSLogo()">Upload Logo</button><button class="btn btn-s" onclick="clearLMSLogo()">Remove Logo</button></div><div class="ps" style="margin-top:.7rem">Current scope: all modules, uploads, questions, results and verification.</div></div>`:''}`;
-}
 function vaAttendance(){
   const settings=S.get('vos_att_settings',{});
   return ph('⏱️ Attendance Control','Only assigned modules are manageable here')+vpVisibleModules(VAPP.user).map(m=>{const s=settings[m.id]||{open:false};return `<div class="card"><div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.7rem"><span style="font-size:1.6rem">${m.icon}</span><div style="flex:1"><div class="crn">${m.name}</div></div><span class="badge ${s.open?'bg':'br'}">${s.open?'OPEN':'CLOSED'}</span></div><div style="display:flex;gap:.6rem;flex-wrap:wrap"><button class="btn btn-g" onclick="vaSetAtt('${m.id}',true)">🟢 Open</button><button class="btn btn-d" onclick="vaSetAtt('${m.id}',false)">🔴 Close</button><button class="btn btn-s" onclick="vaViewRoll('${m.id}')">📋 View Roll</button></div></div>`;}).join('');
 }
 function vaSetAtt(id,open){if(!vpCanAccessModule(id,VAPP.user)){toast('Access denied for this module','error');return} const s=S.get('vos_att_settings',{});s[id]={...(s[id]||{}),open};S.set('vos_att_settings',s);toast(`${open?'Opened':'Closed'} ✅`,open?'success':'info');vosRender('va-attendance');}
-function vaViewRoll(id){if(!vpCanAccessModule(id,VAPP.user)){toast('Access denied for this module','error');return} const att=S.arr('vos_attendance').filter(a=>a.module===id);const m=vpModule(id);alert(`${m.name} — ${att.length} entries\n\n`+(att.slice(0,20).map(a=>`${a.name} (${a.matric}) · ${a.status} · ${new Date(a.date).toLocaleDateString()}`).join('\n')||'No entries'));}
-function vaStudents(){
-  const students=vpStudentsByAccess(VAPP.user);
-  const att=vpAttendanceByAccess(VAPP.user);
-  return ph('👥 Students',`${students.length} visible in your access scope`)+`<div class="card"><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Dept</th><th>Level</th><th>Phone</th><th>Att.</th></tr></thead><tbody>${students.length?students.map((s,i)=>`<tr><td>${i+1}</td><td>${s.name}</td><td>${s.matric}</td><td>${vpModuleIcon(s.module)} ${vpModuleName(s.module)}</td><td>${s.dept}</td><td>${s.level}</td><td>${s.phone||'—'}</td><td>${att.filter(a=>a.matric===s.matric).length}</td></tr>`).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:2rem">No students registered yet</td></tr>'}</tbody></table></div></div>`;
-}
 function vaQuiz(){
   const quizzes=vpQuizzesByAccess(VAPP.user);
   const mods=vpVisibleModules(VAPP.user);
@@ -4064,102 +3358,6 @@ function vSaveQuiz(publish){
 }
 function vPubQuiz(id){const qs=S.arr('vos_quizzes');const q=qs.find(x=>x.id===id);if(q&&!vpCanAccessModule(q.module,VAPP.user)){toast('Access denied for this quiz','error');return} if(q){q.published=true;S.set('vos_quizzes',qs);toast('Published ✅','success');vosRender('va-quiz');}}
 function vDelQuiz(id){const q=S.arr('vos_quizzes').find(x=>x.id===id);if(q&&!vpCanAccessModule(q.module,VAPP.user)){toast('Access denied for this quiz','error');return} if(!confirm('Delete?'))return;S.set('vos_quizzes',S.arr('vos_quizzes').filter(x=>x.id!==id));vosRender('va-quiz');}
-function vaAssignments(){
-  const mods=vpVisibleModules(VAPP.user);
-  const assignments=vpAssignmentsByAccess(VAPP.user,true).slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
-  const submissions=vpAssignmentSubsByAccess(VAPP.user).slice().sort((a,b)=>new Date(b.submittedAt||0)-new Date(a.submittedAt||0));
-  return ph('📂 Assignment Manager','Create assignments, collect uploads and review auto-grades')+`
-  <div class="card"><div class="ct">➕ Create Assignment</div>
-    <div class="field"><label>Title</label><input id="va-asg-title" placeholder="e.g. VOS 102 Reflection Exercise"></div>
-    <div class="fr">
-      <div class="field"><label>Module</label><select id="va-asg-module">${mods.map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('')}</select></div>
-      <div class="field"><label>Due Date</label><input type="datetime-local" id="va-asg-due"></div>
-    </div>
-    <div class="fr">
-      <div class="field"><label>Maximum Score</label><input type="number" id="va-asg-score" value="100" min="1"></div>
-      <div class="field"><label>Submission Mode</label><div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.85rem 0"><label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-text" checked> Typed answer</label><label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-file" checked> File upload</label></div></div>
-    </div>
-    <div class="field"><label>Instructions</label><textarea id="va-asg-inst" placeholder="Assignment brief, expectations and grading directions…" style="min-height:120px"></textarea></div>
-    <div class="field"><label>Auto-grade keywords / rubric</label><textarea id="va-asg-rubric" placeholder="Enter keywords or key points separated by commas or new lines…" style="min-height:100px"></textarea><div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">The browser will score typed answers by checking these keywords and answer completeness.</div></div>
-    <div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-s" onclick="vaSaveAssignment(false)">💾 Save Draft</button><button class="btn btn-g" onclick="vaSaveAssignment(true)">📢 Publish Assignment</button></div>
-  </div>
-  <div class="card"><div class="ct">Posted Assignments (${assignments.length})</div>
-    ${assignments.length?assignments.map(a=>{const subCount=submissions.filter(s=>s.assignmentId===a.id).length;return `<div class="crow" style="align-items:flex-start;gap:.8rem"><div style="flex:1"><div class="crn">${vpEsc(a.title)}</div><div class="crc">${vpModuleIcon(a.module)} ${vpModuleName(a.module)} · ${a.dueDate?`Due ${new Date(a.dueDate).toLocaleString('en-NG')}`:'No due date'} · Max ${a.maxScore||100}</div><div class="crc">${subCount} submission(s) · ${a.allowText!==false?'Typed':''}${a.allowText!==false&&a.allowFile!==false?' + ':''}${a.allowFile!==false?'File upload':''}</div></div><div class="cra"><span class="badge ${a.published?'bg':'bv'}">${a.published?'Published':'Draft'}</span><button class="btn btn-s sm" onclick="vaToggleAssignment('${a.id}')">${a.published?'Unpublish':'Publish'}</button><button class="btn btn-d sm" onclick="vaDeleteAssignment('${a.id}')">🗑</button></div></div>`;}).join(''):'<div class="al ai">No assignments created yet.</div>'}
-  </div>
-  <div class="card"><div class="ct">Submissions (${submissions.length})</div>
-    ${submissions.length?submissions.map(s=>`<div style="border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.8rem;background:var(--panel)"><div class="crow" style="align-items:flex-start;gap:.8rem"><div style="flex:1"><div class="crn">${vpEsc(s.assignmentTitle||'Assignment')} — ${vpEsc(s.name)}</div><div class="crc">${vpEsc(s.matric)} · ${vpModuleIcon(s.module)} ${vpModuleName(s.module)} · Submitted ${new Date(s.submittedAt).toLocaleString('en-NG')}</div><div class="crc">Status: ${s.status||'submitted'} ${s.isLate?'· Late':''}</div></div><span class="badge ${typeof s.score==='number'?(s.percent>=70?'bg':s.percent>=50?'ba':'br'):'bv'}">${typeof s.score==='number'?`${s.score}/${s.maxScore||100}`:'Pending'}</span></div>${s.textAnswer?`<div class="al ai" style="margin-top:.7rem;white-space:pre-wrap;line-height:1.7">${vpEsc(s.textAnswer).slice(0,1200)}${s.textAnswer.length>1200?'…':''}</div>`:''}${s.fileData?`<div style="margin-top:.7rem"><a href="${s.fileData}" download="${s.fileName||'submission'}" class="btn btn-s sm">📎 Download ${vpEsc(s.fileName||'attachment')}</a> <span style="font-size:.72rem;color:var(--dim)">${vpFormatBytes(s.fileSize)}</span></div>`:''}<div class="fr" style="margin-top:.8rem"><div class="field"><label>Score</label><input type="number" id="grade-score-${s.id}" value="${typeof s.score==='number'?s.score:''}" min="0" max="${s.maxScore||100}"></div><div class="field"><label>Feedback</label><textarea id="grade-feedback-${s.id}" style="min-height:90px">${vpEsc(s.feedback||'')}</textarea></div></div><div style="display:flex;gap:.55rem;flex-wrap:wrap"><button class="btn btn-p sm" onclick="vaSaveAssignmentGrade('${s.id}')">Save Grade</button>${s.autoScore!=null?`<span class="badge bc">Auto: ${s.autoScore}/${s.maxScore||100}</span>`:''}</div></div>`).join(''):'<div class="al ai">No submissions yet.</div>'}
-  </div>`;
-}
-function vaSaveAssignment(publish){
-  const title=document.getElementById('va-asg-title')?.value.trim();
-  const module=document.getElementById('va-asg-module')?.value;
-  const instructions=document.getElementById('va-asg-inst')?.value.trim();
-  const dueDate=document.getElementById('va-asg-due')?.value||'';
-  const maxScore=Math.max(1,parseInt(document.getElementById('va-asg-score')?.value)||100);
-  const rubric=document.getElementById('va-asg-rubric')?.value.trim();
-  const allowText=!!document.getElementById('va-asg-text')?.checked;
-  const allowFile=!!document.getElementById('va-asg-file')?.checked;
-  if(!title){toast('Enter assignment title','error');return;}
-  if(!vpCanAccessModule(module,VAPP.user)){toast('You cannot create an assignment for this module','error');return;}
-  if(!allowText && !allowFile){toast('Enable typed answer or file upload','error');return;}
-  const assignments=S.arr('vos_assignments')||[];
-  assignments.push({id:'asg_'+Date.now(),title,module,instructions,dueDate,maxScore,rubric,allowText,allowFile,published:!!publish,createdAt:new Date().toISOString(),author:VAPP.user.full_name||VAPP.user.name});
-  S.set('vos_assignments',assignments);
-  toast(publish?'Assignment published ✅':'Assignment draft saved ✅','success');
-  vosRender('va-assignments');
-}
-function vaToggleAssignment(id){
-  const assignments=S.arr('vos_assignments')||[];
-  const item=assignments.find(a=>a.id===id);
-  if(!item||!vpCanAccessModule(item.module,VAPP.user)){toast('Access denied for this assignment','error');return;}
-  item.published=!item.published;
-  S.set('vos_assignments',assignments);
-  toast(item.published?'Assignment published ✅':'Assignment moved to draft','info');
-  vosRender('va-assignments');
-}
-function vaDeleteAssignment(id){
-  const assignments=S.arr('vos_assignments')||[];
-  const item=assignments.find(a=>a.id===id);
-  if(!item||!vpCanAccessModule(item.module,VAPP.user)){toast('Access denied for this assignment','error');return;}
-  if(!confirm('Delete this assignment and its submissions?')) return;
-  S.set('vos_assignments',assignments.filter(a=>a.id!==id));
-  S.set('vos_assignment_submissions',(S.arr('vos_assignment_submissions')||[]).filter(s=>s.assignmentId!==id));
-  toast('Assignment deleted','success');
-  vosRender('va-assignments');
-}
-function vaSaveAssignmentGrade(id){
-  const submissions=S.arr('vos_assignment_submissions')||[];
-  const sub=submissions.find(s=>s.id===id);
-  if(!sub||!vpCanAccessModule(sub.module,VAPP.user)){toast('Access denied for this submission','error');return;}
-  const score=Math.max(0,parseInt(document.getElementById('grade-score-'+id)?.value)||0);
-  const maxScore=Math.max(1,+sub.maxScore||100);
-  const feedback=document.getElementById('grade-feedback-'+id)?.value.trim()||'';
-  sub.score=Math.min(score,maxScore);
-  sub.percent=Math.round((sub.score/maxScore)*100);
-  sub.feedback=feedback||sub.feedback||'Graded by lecturer.';
-  sub.status='graded';
-  sub.gradedBy=VAPP.user.full_name||VAPP.user.name;
-  sub.gradedAt=new Date().toISOString();
-  S.set('vos_assignment_submissions',submissions);
-  toast('Assignment grade saved ✅','success');
-  vosRender('va-assignments');
-}
-function vaResults(){
-  const results=vpResultsByAccess(VAPP.user);
-  const assigns=vpAssignmentSubsByAccess(VAPP.user);
-  const quizAvg=results.length?Math.round(results.reduce((s,r)=>s+(r.percent||0),0)/results.length):0;
-  const graded=assigns.filter(s=>typeof s.score==='number');
-  const asgAvg=graded.length?Math.round(graded.reduce((s,r)=>s+(r.percent||0),0)/graded.length):0;
-  return ph('📊 Results',`${results.length} quiz attempt(s) and ${assigns.length} assignment submission(s)`)+`
-  <div class="metrics">
-    <div class="metric"><div class="mv">${results.length}</div><div class="ml">Quiz Attempts</div></div>
-    <div class="metric"><div class="mv">${quizAvg}%</div><div class="ml">Quiz Avg</div></div>
-    <div class="metric"><div class="mv">${assigns.length}</div><div class="ml">Assignments</div></div>
-    <div class="metric"><div class="mv">${asgAvg}%</div><div class="ml">Assignment Avg</div></div>
-  </div>
-  <div class="card"><div class="ct">Quiz Results</div><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Dept</th><th>Quiz</th><th>Score</th><th>%</th><th>Date</th></tr></thead><tbody>${results.length?results.sort((a,b)=>b.percent-a.percent).map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td>${r.matric}</td><td>${vpModuleIcon(r.module)} ${vpModuleName(r.module)}</td><td>${r.dept||'—'}</td><td>${r.quizTitle}</td><td>${r.score}/${r.total}</td><td><b>${r.percent}%</b></td><td>${new Date(r.date).toLocaleDateString()}</td></tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:2rem">No quiz results yet</td></tr>'}</tbody></table></div></div>
-  <div class="card"><div class="ct">Assignment Results</div><div class="tw"><table><thead><tr><th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Assignment</th><th>Status</th><th>Score</th><th>Date</th></tr></thead><tbody>${assigns.length?assigns.map((s,i)=>`<tr><td>${i+1}</td><td>${vpEsc(s.name)}</td><td>${vpEsc(s.matric)}</td><td>${vpModuleIcon(s.module)} ${vpModuleName(s.module)}</td><td>${vpEsc(s.assignmentTitle||'Assignment')}</td><td>${vpEsc(s.status||'submitted')}</td><td>${typeof s.score==='number'?`${s.score}/${s.maxScore||100} (${s.percent||0}%)`:'Pending review'}</td><td>${new Date(s.submittedAt).toLocaleDateString()}</td></tr>`).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:2rem">No assignment results yet</td></tr>'}</tbody></table></div></div>`;
-}
 function vaPortfolioAdmin(){
   const items=vpPortsByAccess(VAPP.user).slice().reverse();
   return ph('🖼️ Portfolio Review',vpIsSuperAdmin()?'Review and verify uploads across all modules':'Review uploads for your assigned module(s)')+`<div class="card"><div class="ct">Uploads (${items.length})</div>${items.length?items.map(p=>`<div class="crow" style="align-items:flex-start"><div style="display:flex;gap:.8rem;align-items:flex-start;flex:1">${p.thumb?`<img src="${p.thumb}" style="width:70px;height:70px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">`:'<div style="width:70px;height:70px;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--border);border-radius:10px">🖼️</div>'}<div><div class="crn">${vpEsc(p.caption)}</div><div class="crc">${vpEsc(p.name)} · ${vpEsc(p.matric)} · ${vpModuleIcon(p.module)} ${vpModuleName(p.module)}</div><div class="crc">Uploaded ${new Date(p.date).toLocaleString()}${p.verifiedAt?` · Verified ${new Date(p.verifiedAt).toLocaleString()} by ${vpEsc(p.verifiedBy||'Admin')}`:''}</div><span class="verify-pill ${p.verified?'ok':'pending'}">${p.verified?'✅ Verified':'⏳ Pending review'}</span></div></div><div class="cra">${p.verified?`<button class="btn btn-s sm" onclick="vaVerifyPort('${p.id}',false)">Unverify</button>`:`<button class="btn btn-g sm" onclick="vaVerifyPort('${p.id}',true)">Verify</button>`}<button class="btn btn-d sm" onclick="vaDelPort('${p.id}')">🗑</button></div></div>`).join(''):'<div class="al ai">No uploads yet.</div>'}</div>`;
@@ -4168,9 +3366,6 @@ function vaVerifyPort(id,verified){const items=S.arr('vos_portfolios');const p=i
 function vaDelPort(id){const p=S.arr('vos_portfolios').find(x=>x.id===id);if(!p||!vpCanAccessModule(p.module,VAPP.user)){toast('Access denied for this upload','error');return} if(!confirm('Delete this upload?'))return;S.set('vos_portfolios',S.arr('vos_portfolios').filter(x=>x.id!==id));toast('Upload removed','success');vosRender('va-portfolio');}
 // vaNotices consolidated above
 
-function vaExportAtt(){const rows=vpAttendanceByAccess(VAPP.user).map(a=>({Matric:a.matric,Name:a.name,Department:a.dept||'',Level:a.level||'',Module:vpModuleName(a.module),Date:new Date(a.date).toLocaleDateString('en-NG'),Time:a.time,Status:a.status}));vaXlsx(rows,'VOS102_Attendance');}
-function vaExportRes(){const rows=vpResultsByAccess(VAPP.user).map(r=>({Matric:r.matric,Name:r.name,Department:r.dept||'',Quiz:r.quizTitle,Module:vpModuleName(r.module),Score:r.score,Total:r.total,Percent:r.percent+'%',Date:new Date(r.date).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Results');}
-function vaExportStu(){const att=vpAttendanceByAccess(VAPP.user);const rows=vpStudentsByAccess(VAPP.user).map(s=>({Name:s.name,Matric:s.matric,Module:vpModuleName(s.module),Department:s.dept,Level:s.level,Phone:s.phone||'',Attendance:att.filter(a=>a.matric===s.matric).length,Registered:new Date(s.createdAt).toLocaleDateString('en-NG')}));vaXlsx(rows,'VOS102_Students');}
 
 // VOS academic session / cohort separation.
 function vpDefaultSession(){
@@ -4296,67 +3491,6 @@ function vpUpdateScopeStrip(){
     strip.innerHTML=`<div style="color:var(--dim)">Academic Scope</div><div style="font-family:var(--head);font-weight:700;color:var(--bright);margin-top:.15rem">${vpEsc(vpScopeLabel(scope))}</div>`;
   }
 }
-
-const _vosScopeBaseMigrateData=vpMigrateData;
-vpMigrateData=function(){
-  _vosScopeBaseMigrateData();
-  vpEnsureScopes();
-  ['vos_students','vos_attendance','vos_quiz_results','vos_portfolios','vos_assignment_submissions'].forEach(key=>{
-    const items=(S.arr(key)||[]).map(item=>vpScopedRecord(item));
-    S.set(key,items);
-  });
-};
-
-const _vosScopeBaseInitPatch=initVOSPatch;
-initVOSPatch=function(){
-  _vosScopeBaseInitPatch();
-  if(!document.getElementById('vp-scope-style')){
-    const st=document.createElement('style');
-    st.id='vp-scope-style';
-    st.textContent='.scope-readout{display:flex;align-items:center;min-height:2.55rem;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:.65rem .95rem;color:var(--bright);font-weight:700}.scope-pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;background:rgba(11,117,165,.08);border:1px solid rgba(11,117,165,.22);color:var(--cyan);padding:.25rem .7rem;font-size:.68rem}';
-    document.head.appendChild(st);
-  }
-  vpMigrateData();
-  vpUpdateScopeStrip();
-};
-
-// ── REPLACE the five vpXxxByAccess overrides ─────────────────────────────
-// Admins see all records within their module access regardless of scope.
-// Students still see only their own scope (handled inside each student tab).
-vpStudentsByAccess = function(user){
-  user = user || VAPP.user;
-  const students = (S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
-  return vpIsSuperAdmin(user)
-    ? students
-    : students.filter(s => vpCanAccessModule(s.module, user));
-};
-vpResultsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_quiz_results')||[]).filter(r => vpCanAccessModule(r.module, user));
-};
-vpAttendanceByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_attendance')||[]).filter(a => vpCanAccessModule(a.module, user));
-};
-vpPortsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_portfolios')||[]).filter(p => vpCanAccessModule(p.module, user));
-};
-vpAssignmentSubsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_assignment_submissions')||[]).filter(s => vpCanAccessModule(s.module, user));
-};
-
-const _vosScopeBaseStudentShell=buildVOSStudentShell;
-buildVOSStudentShell=function(){
-  _vosScopeBaseStudentShell();
-  vpUpdateScopeStrip();
-};
-const _vosScopeBaseAdminShell=buildVOSAdminShell;
-buildVOSAdminShell=function(){
-  _vosScopeBaseAdminShell();
-  vpUpdateScopeStrip();
-};
 
 vosRegister=function(){
   const name=document.getElementById('reg-name').value.trim();
@@ -4805,31 +3939,12 @@ function nmActiveScope(){
   scope.key = `${scope.session} | ${scope.cohort}`;
   return scope;
 }
-function nmSetScope(){
-  const session = (document.getElementById('nm-scope-session')?.value||'').trim();
-  const cohort  = (document.getElementById('nm-scope-cohort')?.value||'').trim();
-  if(!session || !cohort){ toast('Enter both session and cohort','error'); return; }
-  const scope = {session, cohort, key:`${session} | ${cohort}`};
-  let arr = []; try{ arr = JSON.parse(localStorage.getItem('nm_scopes'))||[]; }catch(e){}
-  if(!Array.isArray(arr)) arr = [];
-  if(!arr.find(x=>x.key===scope.key)) arr.push(scope);
-  localStorage.setItem('nm_scopes', JSON.stringify(arr));
-  const fk = window._fkey ? window._fkey('nm_active_scope') : 'nm_active_scope';
-  try { localStorage.setItem(fk, JSON.stringify({session, cohort})); } catch(e){}
-  // push both values to Firestore so every device picks them up
-  if(window._fbSet){
-    window._fbSet('nm_active_scope', {session, cohort});
-    window._fbSet('nm_scopes', arr);
-  }
-  toast('Scope active: '+nmScopeLabel(scope),'success');
-  if(typeof renderTab==='function' && APP.tab) renderTab(APP.tab);
-}
 
 function nmScopeLabel(scope){scope=scope||nmActiveScope();return `${scope.session} · ${scope.cohort}`;}
 function nmScopeSuffix(){const s=nmActiveScope();return `__nm_${s.session.replace(/[^A-Za-z0-9]/g,'-')}__${s.cohort.replace(/[^A-Za-z0-9]/g,'-')}`;}
 
 // Wrap selected nm_* localStorage keys with active scope suffix so different academic years stay separated.
-const NM_SCOPED_PREFIXES=['nm_att_','nm_cw_','nm_quiz_','nm_assignment_','nm_seminar_','nm_grades_','nm_subs_','nm_stu_log','nm_lec_log'];
+const NM_SCOPED_PREFIXES=['nm_att_','nm_attendance_sessions','nm_attendance_records','nm_cw_','nm_quiz_','nm_assignment_','nm_seminar_','nm_grades_','nm_subs_','nm_stu_log','nm_lec_log'];
 function nmShouldScopeKey(k){return typeof k==='string' && NM_SCOPED_PREFIXES.some(p=>k.startsWith(p));}
 (function patchSforNeuroScope(){
   if(window._nmScopePatched) return;
@@ -4970,858 +4085,8 @@ if(document.readyState === 'loading'){
 window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._fbDidBoot=true;_bootApp();} }, {once:true});
 </script>
 
-<script>
-(function applyVOSFixes() {
-  'use strict';
-
-  /* ── Wait until core functions are ready ────────────────────────── */
-  function whenReady(fn) {
-    if (typeof vosRender === 'function') { fn(); }
-    else { window.addEventListener('firebase-ready', fn, { once: true }); }
-  }
-
-  whenReady(function () {
-
-    /* =================================================================
-       FIX 1 ─ STUDENT QUIZ VIEW
-       Issue: quizzes filtered too strictly; students can't see questions.
-       Fix: broaden published check, skip module filter for question render.
-    ================================================================= */
-    window.vQuiz = function () {
-      /* Quizzes are reusable across scopes — no scope filter here */
-      const allQuizzes = S.arr('vos_quizzes') || [];
-      const published = allQuizzes.filter(function (q) {
-        return (q.published === true || q.published === 'true' || q.published === 1);
-      });
-
-      /* Filter to student's assigned module only */
-      const myModules = vpGetModuleIds(VAPP.user);
-      const quizzes = published.filter(function (q) {
-        return !myModules.length || myModules.includes(q.module);
-      });
-
-      /* Results: search ALL results for this student, no scope limit */
-      const allResults = S.arr('vos_quiz_results') || [];
-      const myResults = allResults.filter(function (r) {
-        return r.matric === VAPP.user.matric;
-      });
-
-      if (!quizzes.length) {
-        return ph('📝 CBT Quiz', 'No quizzes published for your module yet') +
-          '<div class="al ai">Your lecturer has not published any quizzes yet. Check back later.</div>';
-      }
-
-      return ph('📝 CBT Quiz', 'Your module: ' + vpModuleLabel(VAPP.user)) +
-        quizzes.map(function (q) {
-          const done = myResults.find(function (r) { return r.quizId === q.id; });
-          const m = vpModule(q.module);
-          const qCount = Array.isArray(q.questions) ? q.questions.length : 0;
-          return '<div class="card"><div class="ct">' +
-            (m ? m.icon : '📝') + ' ' + vpEsc(q.title) + '</div>' +
-            '<p style="font-size:.78rem;color:var(--dim)">' +
-            (m ? m.name : '') + ' · ' + qCount + ' question' + (qCount !== 1 ? 's' : '') +
-            ' · ' + q.duration + ' mins</p>' +
-            (done
-              ? '<div class="al as">✅ Completed — Score: ' + done.score + '/' + done.total +
-                ' (' + done.percent + '%)</div>'
-              : '<button class="btn btn-p" onclick="vStartQuiz(\'' + q.id + '\')">▶ Start Quiz</button>') +
-            '</div>';
-        }).join('');
-    };
-
-
-    /* =================================================================
-       FIX 2 ─ QUIZ QUESTION RENDERING
-       Issue: vRenderQ crashes if questions array is malformed.
-       Fix: guard against missing fields, handle both array-options
-            (VOS student quizzes) and object-options (NM style).
-    ================================================================= */
-    window.vRenderQ = function () {
-      if (!vQuizState) return;
-      var quiz = vQuizState.quiz;
-      var current = vQuizState.current;
-      var answers = vQuizState.answers;
-      var timeLeft = vQuizState.timeLeft;
-
-      if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
-        document.getElementById('vos-tab-content').innerHTML =
-          '<div class="tab-panel"><div class="al ae">❌ This quiz has no questions yet. Please inform your lecturer.</div></div>';
-        return;
-      }
-
-      var q = quiz.questions[current];
-      if (!q) {
-        document.getElementById('vos-tab-content').innerHTML =
-          '<div class="tab-panel"><div class="al ae">❌ Question ' + (current + 1) + ' could not be loaded.</div></div>';
-        return;
-      }
-
-      var mn = Math.floor(timeLeft / 60);
-      var sc = timeLeft % 60;
-      var timerStr = String(mn).padStart(2, '0') + ':' + String(sc).padStart(2, '0');
-
-      /* Build options — support both array and object formats */
-      var optionsHtml = '';
-      if (Array.isArray(q.options)) {
-        /* VOS format: options is an array of strings */
-        optionsHtml = q.options.map(function (opt, i) {
-          var sel = answers[current] === i ? 'sel' : '';
-          return '<div class="mopt ' + sel + '" onclick="vSelectAns(' + i + ')">' +
-            '<b>' + String.fromCharCode(65 + i) + '.</b> ' + vpEsc(opt) + '</div>';
-        }).join('');
-      } else if (q.options && typeof q.options === 'object') {
-        /* Object format: {A: '...', B: '...' } */
-        var keys = Object.keys(q.options);
-        optionsHtml = keys.map(function (k, i) {
-          var sel = (answers[current] === i || answers[current] === k) ? 'sel' : '';
-          return '<div class="mopt ' + sel + '" onclick="vSelectAnsKey(' + i + ',\'' + k + '\')">' +
-            '<b>' + k + '.</b> ' + vpEsc(q.options[k]) + '</div>';
-        }).join('');
-      } else {
-        optionsHtml = '<div class="al aw">No options found for this question.</div>';
-      }
-
-      var total = quiz.questions.length;
-      document.getElementById('vos-tab-content').innerHTML =
-        '<div class="tab-panel">' +
-        '<div class="istrip" style="margin-bottom:.8rem">' +
-          '<div style="flex:1;font-size:.8rem;color:var(--dim)">Question ' + (current + 1) + ' of ' + total + '</div>' +
-          '<span id="v-timer" class="badge ba" style="font-size:1rem;font-weight:700">' + timerStr + '</span>' +
-        '</div>' +
-        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
-          '<div class="mqt" style="font-size:.95rem;font-weight:600;color:#1a2744;margin-bottom:.8rem">' +
-            (current + 1) + '. ' + vpEsc(q.text || q.q || q.question || '') +
-          '</div>' +
-          '<div class="mopts">' + optionsHtml + '</div>' +
-        '</div>' +
-        '<div class="pbw" style="margin:.6rem 0 1rem"><div class="pbf" style="width:' +
-          Math.round(((current + 1) / total) * 100) + '%"></div></div>' +
-        '<div style="display:flex;justify-content:space-between;gap:.6rem">' +
-          (current > 0 ? '<button class="btn btn-s" onclick="vNavQ(-1)">← Previous</button>' : '<span></span>') +
-          (current < total - 1
-            ? '<button class="btn btn-p" onclick="vNavQ(1)">Next →</button>'
-            : '<button class="btn btn-g" onclick="vSubmitQuiz()">✅ Submit Test</button>') +
-        '</div></div>';
-    };
-
-    /* Support object-key option selection */
-    window.vSelectAnsKey = function (i, k) {
-      vQuizState.answers[vQuizState.current] = i;
-      window.vRenderQ();
-    };
-    window.vSelectAns = function (i) {
-      vQuizState.answers[vQuizState.current] = i;
-      window.vRenderQ();
-    };
-    window.vNavQ = function (d) {
-      vQuizState.current += d;
-      window.vRenderQ();
-    };
-
-
-    /* =================================================================
-       FIX 3 ─ QUIZ START — MORE ROBUST
-    ================================================================= */
-    window.vStartQuiz = function (id) {
-      var allQuizzes = S.arr('vos_quizzes') || [];
-      var q = allQuizzes.find(function (x) { return x.id === id; });
-      if (!q) { toast('Quiz not found. Try syncing.', 'error'); return; }
-      if (!Array.isArray(q.questions) || q.questions.length === 0) {
-        toast('This quiz has no questions yet.', 'error'); return;
-      }
-      vQuizState = { quiz: q, current: 0, answers: {}, timeLeft: (q.duration || 20) * 60 };
-      window.vRenderQ();
-      vQuizState.timer = setInterval(function () {
-        vQuizState.timeLeft--;
-        var t = document.getElementById('v-timer');
-        if (t) {
-          var mn = Math.floor(vQuizState.timeLeft / 60);
-          var sc = vQuizState.timeLeft % 60;
-          t.textContent = String(mn).padStart(2, '0') + ':' + String(sc).padStart(2, '0');
-          if (vQuizState.timeLeft <= 120) t.style.color = 'var(--red)';
-        }
-        if (vQuizState.timeLeft <= 0) { clearInterval(vQuizState.timer); vSubmitQuiz(); }
-      }, 1000);
-    };
-
-
-    /* =================================================================
-       FIX 4 ─ QUIZ SUBMISSION — save immediately, no scope blocking
-    ================================================================= */
-    window.vSubmitQuiz = function () {
-      if (vQuizState && vQuizState.timer) clearInterval(vQuizState.timer);
-      var quiz = vQuizState.quiz;
-      var answers = vQuizState.answers;
-      var questions = quiz.questions || [];
-
-      var score = 0;
-      questions.forEach(function (q, i) {
-        /* Support numeric correct index OR letter key */
-        var ans = answers[i];
-        var correct = q.correct;
-        if (typeof correct === 'number' && ans === correct) score++;
-        else if (typeof correct === 'string') {
-          /* letter key — convert stored index back to letter */
-          var letter = String.fromCharCode(65 + ans);
-          if (letter === correct.toUpperCase()) score++;
-        }
-      });
-
-      var total = questions.length || 1;
-      var percent = Math.round((score / total) * 100);
-      var scope = vpScope();
-
-      var result = {
-        id: 'qr_' + Date.now(),
-        matric: VAPP.user.matric,
-        name: VAPP.user.name,
-        dept: VAPP.user.dept,
-        level: VAPP.user.level,
-        quizId: quiz.id,
-        quizTitle: quiz.title,
-        module: quiz.module,
-        score: score,
-        total: total,
-        percent: percent,
-        date: new Date().toISOString(),
-        academicSession: scope.session,
-        cohort: scope.cohort,
-        scopeKey: scope.key
-      };
-
-      var results = S.arr('vos_quiz_results') || [];
-      results.push(result);
-      S.set('vos_quiz_results', results);
-
-      vQuizState = null;
-
-      var emoji = percent >= 70 ? '🏆' : percent >= 50 ? '👍' : '📚';
-      document.getElementById('vos-tab-content').innerHTML =
-        '<div class="tab-panel"><div class="card" style="text-align:center;padding:2rem">' +
-        '<div style="font-size:3rem">' + emoji + '</div>' +
-        '<h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted!</h2>' +
-        '<p style="color:var(--dim)">' + vpEsc(quiz.title) + '</p>' +
-        '<div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">' +
-          score + '/' + total + '</div>' +
-        '<div style="font-size:1.2rem">' + percent + '%</div>' +
-        '<div style="display:flex;gap:.8rem;justify-content:center;margin-top:1.2rem">' +
-          '<button class="btn btn-p" onclick="vosSetTab(\'v-results\')">📊 View Results</button>' +
-          '<button class="btn btn-s" onclick="vosSetTab(\'v-quiz\')">Back to Quizzes</button>' +
-        '</div></div></div>';
-
-      toast('Submitted! ' + score + '/' + total + ' (' + percent + '%) ✅', 'success');
-    };
-
-
-    /* =================================================================
-       FIX 5 ─ STUDENT RESULTS VIEW
-       Issue: vpScopeFilter blocks results if scope doesn't match exactly.
-       Fix: show all results for this student, any scope, scoped display label.
-    ================================================================= */
-    window.vResults = function () {
-      var allResults = S.arr('vos_quiz_results') || [];
-      var myResults = allResults.filter(function (r) {
-        return r.matric === VAPP.user.matric;
-      });
-
-      var allAtt = S.arr('vos_attendance') || [];
-      var myAtt = allAtt.filter(function (a) {
-        return a.matric === VAPP.user.matric;
-      });
-
-      var allSubs = S.arr('vos_assignment_submissions') || [];
-      var mySubs = allSubs.filter(function (s) {
-        return s.matric === VAPP.user.matric;
-      });
-
-      var allRecipes = S.arr('vos_recipes') || [];
-      var myRecipes = allRecipes.filter(function (r) {
-        return r.matric === VAPP.user.matric;
-      });
-
-      var avg = myResults.length
-        ? Math.round(myResults.reduce(function (s, r) { return s + r.percent; }, 0) / myResults.length)
-        : 0;
-      var graded = mySubs.filter(function (s) { return typeof s.score === 'number'; });
-      var aAvg = graded.length
-        ? Math.round(graded.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / graded.length)
-        : 0;
-
-      return ph('📊 My Results', 'All your submissions across sessions') +
-        '<div class="metrics">' +
-          '<div class="metric"><div class="mv">' + myResults.length + '</div><div class="ml">Quizzes Taken</div></div>' +
-          '<div class="metric"><div class="mv">' + avg + '%</div><div class="ml">Quiz Average</div></div>' +
-          '<div class="metric"><div class="mv">' + mySubs.length + '</div><div class="ml">Assignments</div></div>' +
-          '<div class="metric"><div class="mv">' + myAtt.length + '</div><div class="ml">Attendance Records</div></div>' +
-        '</div>' +
-
-        '<div class="card"><div class="ct">📝 Quiz Results (' + myResults.length + ')</div>' +
-        (myResults.length
-          ? '<div class="tw"><table><thead><tr><th>Quiz</th><th>Module</th><th>Score</th><th>%</th><th>Session</th><th>Date</th></tr></thead><tbody>' +
-            myResults.slice().reverse().map(function (r) {
-              return '<tr><td>' + vpEsc(r.quizTitle) + '</td><td>' +
-                vpModuleName(r.module) + '</td><td>' + r.score + '/' + r.total + '</td>' +
-                '<td><b>' + r.percent + '%</b></td>' +
-                '<td>' + vpEsc(r.academicSession || '') + '</td>' +
-                '<td>' + new Date(r.date).toLocaleDateString() + '</td></tr>';
-            }).join('') +
-            '</tbody></table></div>'
-          : '<div class="al ai">No quiz results yet. Complete a quiz to see your score here.</div>') +
-        '</div>' +
-
-        '<div class="card"><div class="ct">📂 Assignment Results (' + mySubs.length + ')</div>' +
-        (mySubs.length
-          ? '<div class="tw"><table><thead><tr><th>Assignment</th><th>Status</th><th>Score</th><th>Feedback</th><th>Date</th></tr></thead><tbody>' +
-            mySubs.slice().reverse().map(function (s) {
-              var scoreStr = typeof s.score === 'number'
-                ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)'
-                : 'Awaiting review';
-              var cls = typeof s.score === 'number'
-                ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
-              return '<tr><td>' + vpEsc(s.assignmentTitle || 'Assignment') + '</td>' +
-                '<td><span class="badge ' + cls + '">' + (s.status || 'submitted') + '</span></td>' +
-                '<td>' + scoreStr + '</td>' +
-                '<td style="max-width:200px;font-size:.75rem">' + vpEsc((s.feedback || '').slice(0, 80)) + '</td>' +
-                '<td>' + new Date(s.submittedAt).toLocaleDateString() + '</td></tr>';
-            }).join('') +
-            '</tbody></table></div>'
-          : '<div class="al ai">No assignments submitted yet.</div>') +
-        '</div>' +
-
-        '<div class="card"><div class="ct">🍳 Weekly Recipes (' + myRecipes.length + ')</div>' +
-        (myRecipes.length
-          ? '<div class="tw"><table><thead><tr><th>Week</th><th>Title</th><th>Score</th><th>Feedback</th></tr></thead><tbody>' +
-            myRecipes.map(function (r) {
-              var scoreStr = typeof r.score === 'number'
-                ? r.score + '/' + (r.maxScore || 100) + ' (' + (r.percent || 0) + '%)'
-                : '⏳ Pending';
-              return '<tr><td>' + vpEsc(r.week) + '</td><td>' + vpEsc(r.title) + '</td>' +
-                '<td>' + scoreStr + '</td>' +
-                '<td style="font-size:.75rem">' + vpEsc((r.feedback || '').slice(0, 80)) + '</td></tr>';
-            }).join('') +
-            '</tbody></table></div>'
-          : '<div class="al ai">No recipes submitted yet.</div>') +
-        '</div>' +
-
-        '<div class="card"><div class="ct">✅ Attendance (' + myAtt.length + ' records)</div>' +
-        (myAtt.length
-          ? '<div class="tw"><table><thead><tr><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead><tbody>' +
-            myAtt.slice().reverse().slice(0, 30).map(function (a) {
-              return '<tr><td>' + vpModuleName(a.module) + '</td>' +
-                '<td>' + new Date(a.date).toLocaleDateString() + '</td>' +
-                '<td>' + a.time + '</td>' +
-                '<td><span class="badge ' + (a.status === 'Present' ? 'bg' : 'ba') + '">' + a.status + '</span></td></tr>';
-            }).join('') +
-            '</tbody></table></div>'
-          : '<div class="al ai">No attendance records yet.</div>') +
-        '</div>';
-    };
-
-
-    /* =================================================================
-       FIX 6 ─ ADMIN RESULTS — see ALL submissions immediately
-    ================================================================= */
-    window.vaResults = function () {
-      /* Admin sees ALL results for modules they have access to */
-      var allQResults = S.arr('vos_quiz_results') || [];
-      var allASubs = S.arr('vos_assignment_submissions') || [];
-
-      var qResults = allQResults.filter(function (r) {
-        return vpCanAccessModule(r.module, VAPP.user);
-      });
-      var aSubs = allASubs.filter(function (s) {
-        return vpCanAccessModule(s.module, VAPP.user);
-      });
-
-      var quizAvg = qResults.length
-        ? Math.round(qResults.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / qResults.length) : 0;
-      var graded = aSubs.filter(function (s) { return typeof s.score === 'number'; });
-      var asgAvg = graded.length
-        ? Math.round(graded.reduce(function (s, r) { return s + (r.percent || 0); }, 0) / graded.length) : 0;
-
-      return ph('📊 Results', qResults.length + ' quiz attempt(s) · ' + aSubs.length + ' assignment submission(s)') +
-        '<div class="metrics">' +
-          '<div class="metric"><div class="mv">' + qResults.length + '</div><div class="ml">Quiz Attempts</div></div>' +
-          '<div class="metric"><div class="mv">' + quizAvg + '%</div><div class="ml">Quiz Avg</div></div>' +
-          '<div class="metric"><div class="mv">' + aSubs.length + '</div><div class="ml">Assignments</div></div>' +
-          '<div class="metric"><div class="mv">' + asgAvg + '%</div><div class="ml">Assignment Avg</div></div>' +
-        '</div>' +
-
-        '<div class="card"><div class="ct">Quiz Results (' + qResults.length + ')</div>' +
-        (qResults.length
-          ? '<div class="tw"><table><thead><tr>' +
-              '<th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Quiz</th><th>Score</th><th>%</th><th>Session</th><th>Date</th>' +
-            '</tr></thead><tbody>' +
-            qResults.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); })
-              .map(function (r, i) {
-                return '<tr><td>' + (i + 1) + '</td><td>' + vpEsc(r.name) + '</td><td>' + vpEsc(r.matric) +
-                  '</td><td>' + vpModuleName(r.module) + '</td><td>' + vpEsc(r.quizTitle) +
-                  '</td><td>' + r.score + '/' + r.total + '</td><td><b>' + r.percent + '%</b></td>' +
-                  '<td>' + vpEsc(r.academicSession || '') + '</td>' +
-                  '<td>' + new Date(r.date).toLocaleDateString() + '</td></tr>';
-              }).join('') +
-            '</tbody></table></div>'
-          : '<div class="al ai">No quiz results yet.</div>') +
-        '</div>' +
-
-        '<div class="card">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">' +
-            '<div class="ct" style="margin:0">Assignment Results (' + aSubs.length + ')</div>' +
-            '<button class="btn btn-v sm" onclick="vaExportAssignmentResults()">📥 Export</button>' +
-          '</div>' +
-          (aSubs.length
-            ? '<div class="tw"><table><thead><tr>' +
-                '<th>#</th><th>Name</th><th>Matric</th><th>Module</th><th>Assignment</th><th>Status</th><th>Score</th><th>Session</th><th>Date</th>' +
-              '</tr></thead><tbody>' +
-              aSubs.slice().sort(function (a, b) { return new Date(b.submittedAt) - new Date(a.submittedAt); })
-                .map(function (s, i) {
-                  var scoreStr = typeof s.score === 'number'
-                    ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)' : 'Pending';
-                  var cls = typeof s.score === 'number'
-                    ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
-                  return '<tr><td>' + (i + 1) + '</td><td>' + vpEsc(s.name) + '</td><td>' + vpEsc(s.matric) +
-                    '</td><td>' + vpModuleName(s.module) + '</td><td>' + vpEsc(s.assignmentTitle || '') +
-                    '</td><td><span class="badge ' + cls + '">' + (s.status || 'submitted') + '</span></td>' +
-                    '<td>' + scoreStr + '</td>' +
-                    '<td>' + vpEsc(s.academicSession || '') + '</td>' +
-                    '<td>' + new Date(s.submittedAt).toLocaleDateString() + '</td></tr>';
-                }).join('') +
-              '</tbody></table></div>'
-            : '<div class="al ai">No assignment results yet.</div>') +
-        '</div>';
-    };
-
-
-    /* =================================================================
-       FIX 7 ─ ADMIN ASSIGNMENT VIEW — see ALL submissions immediately
-    ================================================================= */
-    var _origVaAssignments = window.vaAssignments;
-    window.vaAssignments = function () {
-      /* Fetch fresh data directly — bypass scope filter for admin */
-      var mods = vpVisibleModules(VAPP.user);
-      var allAssignments = S.arr('vos_assignments') || [];
-      var assignments = allAssignments
-        .filter(function (a) { return vpCanAccessModule(a.module, VAPP.user); })
-        .sort(function (a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
-
-      var allSubs = S.arr('vos_assignment_submissions') || [];
-      var submissions = allSubs
-        .filter(function (s) { return vpCanAccessModule(s.module, VAPP.user); })
-        .sort(function (a, b) { return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0); });
-
-      var createCard = '<div class="card"><div class="ct">➕ Create Assignment</div>' +
-        '<div class="field"><label>Title</label><input id="va-asg-title" placeholder="e.g. VOS 102 Reflection Exercise"></div>' +
-        '<div class="fr"><div class="field"><label>Module</label><select id="va-asg-module">' +
-          mods.map(function (m) { return '<option value="' + m.id + '">' + m.icon + ' ' + m.name + '</option>'; }).join('') +
-        '</select></div><div class="field"><label>Due Date</label><input type="datetime-local" id="va-asg-due"></div></div>' +
-        '<div class="fr"><div class="field"><label>Maximum Score</label><input type="number" id="va-asg-score" value="100" min="1"></div>' +
-        '<div class="field"><label>Submission Mode</label><div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.85rem 0">' +
-          '<label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-text" checked> Typed answer</label>' +
-          '<label style="display:flex;gap:.45rem;align-items:center"><input type="checkbox" id="va-asg-file" checked> File upload</label>' +
-        '</div></div></div>' +
-        '<div class="field"><label>Instructions</label><textarea id="va-asg-inst" placeholder="Assignment brief..." style="min-height:120px"></textarea></div>' +
-        '<div class="field"><label>Auto-grade keywords / rubric</label>' +
-          '<textarea id="va-asg-rubric" placeholder="Enter keywords separated by commas or new lines..." style="min-height:100px"></textarea>' +
-          '<div style="font-size:.72rem;color:var(--dim);margin-top:.35rem">Typed answers will be scored against these keywords automatically.</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
-          '<button class="btn btn-s" onclick="vaSaveAssignment(false)">💾 Save Draft</button>' +
-          '<button class="btn btn-g" onclick="vaSaveAssignment(true)">📢 Publish Assignment</button>' +
-        '</div></div>';
-
-      var postedCard = '<div class="card"><div class="ct">Posted Assignments (' + assignments.length + ')</div>' +
-        (assignments.length
-          ? assignments.map(function (a) {
-              var subCount = submissions.filter(function (s) { return s.assignmentId === a.id; }).length;
-              return '<div class="crow" style="align-items:flex-start;gap:.8rem">' +
-                '<div style="flex:1"><div class="crn">' + vpEsc(a.title) + '</div>' +
-                '<div class="crc">' + vpModuleIcon(a.module) + ' ' + vpModuleName(a.module) +
-                  (a.dueDate ? ' · Due ' + new Date(a.dueDate).toLocaleString('en-NG') : '') +
-                  ' · Max ' + (a.maxScore || 100) + ' marks</div>' +
-                '<div class="crc">' + subCount + ' submission(s)</div></div>' +
-                '<div class="cra"><span class="badge ' + (a.published ? 'bg' : 'bv') + '">' +
-                  (a.published ? 'Published' : 'Draft') + '</span>' +
-                '<button class="btn btn-s sm" onclick="vaToggleAssignment(\'' + a.id + '\')">' +
-                  (a.published ? 'Unpublish' : 'Publish') + '</button>' +
-                '<button class="btn btn-d sm" onclick="vaDeleteAssignment(\'' + a.id + '\')">🗑</button>' +
-                '</div></div>';
-            }).join('')
-          : '<div class="al ai">No assignments created yet.</div>') +
-        '</div>';
-
-      var subCard = '<div class="card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem">' +
-          '<div class="ct" style="margin:0">All Submissions (' + submissions.length + ')</div>' +
-          '<button class="btn btn-v sm" onclick="vaExportAssignmentResults()">📥 Export</button>' +
-        '</div>' +
-        (submissions.length
-          ? submissions.map(function (s) {
-              var scoreStr = typeof s.score === 'number'
-                ? s.score + '/' + (s.maxScore || 100) + ' (' + (s.percent || 0) + '%)' : 'Pending';
-              var cls = typeof s.score === 'number'
-                ? (s.percent >= 70 ? 'bg' : s.percent >= 50 ? 'ba' : 'br') : 'bv';
-              return '<div style="border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:.8rem;background:var(--panel)">' +
-                '<div class="crow" style="align-items:flex-start;gap:.8rem">' +
-                  '<div style="flex:1">' +
-                    '<div class="crn">' + vpEsc(s.assignmentTitle || 'Assignment') + ' — ' + vpEsc(s.name) + '</div>' +
-                    '<div class="crc">' + vpEsc(s.matric) + ' · ' + vpModuleName(s.module) +
-                      ' · Submitted ' + new Date(s.submittedAt).toLocaleString('en-NG') + '</div>' +
-                    '<div class="crc">Status: ' + (s.status || 'submitted') +
-                      (s.isLate ? ' · <span style="color:var(--red)">Late</span>' : '') +
-                      (s.academicSession ? ' · ' + vpEsc(s.academicSession) : '') + '</div>' +
-                  '</div>' +
-                  '<span class="badge ' + cls + '">' + scoreStr + '</span>' +
-                '</div>' +
-                (s.textAnswer
-                  ? '<div class="al ai" style="margin-top:.7rem;white-space:pre-wrap;font-size:.8rem">' +
-                    vpEsc(s.textAnswer.slice(0, 1200)) + (s.textAnswer.length > 1200 ? '…' : '') + '</div>'
-                  : '') +
-                (s.fileData
-                  ? '<div style="margin-top:.7rem"><a href="' + s.fileData + '" download="' +
-                    (s.fileName || 'submission') + '" class="btn btn-s sm">📎 Download ' + vpEsc(s.fileName || 'attachment') + '</a></div>'
-                  : '') +
-                '<div class="fr" style="margin-top:.8rem">' +
-                  '<div class="field"><label>Score (0–' + (s.maxScore || 100) + ')</label>' +
-                    '<input type="number" id="grade-score-' + s.id + '" value="' +
-                    (typeof s.score === 'number' ? s.score : '') + '" min="0" max="' + (s.maxScore || 100) + '">' +
-                  '</div>' +
-                  '<div class="field"><label>Feedback</label>' +
-                    '<textarea id="grade-feedback-' + s.id + '" style="min-height:80px">' +
-                    vpEsc(s.feedback || '') + '</textarea>' +
-                  '</div>' +
-                '</div>' +
-                '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
-                  '<button class="btn btn-p sm" onclick="vaSaveAssignmentGrade(\'' + s.id + '\')">💾 Save Grade</button>' +
-                  (s.autoScore != null ? '<span class="badge bc">Auto: ' + s.autoScore + '/' + (s.maxScore || 100) + '</span>' : '') +
-                '</div></div>';
-            }).join('')
-          : '<div class="al ai">No submissions yet. Students will appear here as soon as they submit.</div>') +
-        '</div>';
-
-      return ph('📂 Assignment Manager', 'All modules you have access to') +
-        createCard + postedCard + subCard;
-    };
-
-
-    /* =================================================================
-       FIX 8 ─ ADMIN DASHBOARD — show live submission count
-    ================================================================= */
-    var _origVaDashboard = window.vaDashboard;
-    window.vaDashboard = function () {
-      var students = vpStudentsByAccess(VAPP.user) || [];
-      var att = S.arr('vos_attendance') || [];
-      var attMine = att.filter(function (a) { return vpCanAccessModule(a.module, VAPP.user); });
-      var quizzes = (S.arr('vos_quizzes') || []).filter(function (q) {
-        return q.published && vpCanAccessModule(q.module, VAPP.user);
-      });
-      var allSubs = S.arr('vos_assignment_submissions') || [];
-      var mySubs = allSubs.filter(function (s) { return vpCanAccessModule(s.module, VAPP.user); });
-      var allQRes = S.arr('vos_quiz_results') || [];
-      var myQRes = allQRes.filter(function (r) { return vpCanAccessModule(r.module, VAPP.user); });
-      var mods = vpVisibleModules(VAPP.user);
-      var today = new Date().toDateString();
-
-      return ph(vpIsSuperAdmin() ? '🏠 Super Admin Dashboard' : '🏠 Module Admin Dashboard',
-        'Showing live data for your access scope') +
-        (typeof vpScopeManager === 'function' ? vpScopeManager() : '') +
-        '<div class="metrics">' +
-          '<div class="metric"><div class="mv">' + students.length + '</div><div class="ml">Students</div></div>' +
-          '<div class="metric"><div class="mv">' +
-            attMine.filter(function (a) { return new Date(a.date).toDateString() === today; }).length +
-          '</div><div class="ml">Attendance Today</div></div>' +
-          '<div class="metric"><div class="mv">' + quizzes.length + '</div><div class="ml">Active Quizzes</div></div>' +
-          '<div class="metric"><div class="mv">' + mySubs.length + '</div><div class="ml">Submissions</div></div>' +
-          '<div class="metric"><div class="mv">' + myQRes.length + '</div><div class="ml">Quiz Results</div></div>' +
-        '</div>' +
-        '<div class="card"><div class="ct">🧭 Module Overview</div>' +
-          mods.map(function (m) {
-            var stuCount = students.filter(function (s) { return s.module === m.id; }).length;
-            var subCount = mySubs.filter(function (s) { return s.module === m.id; }).length;
-            var qCount = myQRes.filter(function (r) { return r.module === m.id; }).length;
-            return '<div class="crow"><div>' +
-              '<div class="crn">' + m.icon + ' ' + m.name + '</div>' +
-              '<div class="crc">Students: ' + stuCount + ' · Submissions: ' + subCount + ' · Quiz results: ' + qCount + '</div>' +
-            '</div><span class="module-chip">' + (vpIsSuperAdmin() ? 'Full Control' : 'Assigned') + '</span></div>';
-          }).join('') +
-        '</div>' +
-        (vpIsSuperAdmin()
-          ? '<div class="card"><div class="ct">🪪 LMS Logo</div>' +
-              '<div class="field"><label>Upload Logo (shows across landing, login, sidebar, footer)</label>' +
-                '<input type="file" id="brand-logo-input" accept="image/*"></div>' +
-              '<div style="display:flex;gap:.55rem;flex-wrap:wrap">' +
-                '<button class="btn btn-p" onclick="saveLMSLogo()">Upload Logo</button>' +
-                '<button class="btn btn-s" onclick="clearLMSLogo()">Remove Logo</button>' +
-              '</div></div>'
-          : '');
-    };
-
-
-    /* =================================================================
-       FIX 9 ─ NEUROMATRIX: MST SUBMIT — ensure save + immediate visibility
-    ================================================================= */
-    var _origNMMSTSubmit = window.mstSubmit;
-    window.mstSubmit = function (qCount) {
-      clearInterval(_mstTimerInterval);
-      var qs = S.arr('nm_mst_questions_' + APP.course.code);
-      var answers = [];
-      var autoScore = 0;
-      var autoTotal = 0;
-      var hasPendingManual = false;
-
-      for (var i = 0; i < qCount; i++) {
-        var q = qs[i];
-        if (!q) continue;
-        var marks = q.marks || 1;
-        if (q.type === 'mcq') {
-          var sel = document.querySelector('input[name="mst-q-' + i + '"]:checked');
-          var ans = sel ? sel.value : '';
-          var earned = (ans === q.answer) ? marks : 0;
-          autoScore += earned;
-          autoTotal += marks;
-          answers.push({ type: 'mcq', q: q.q, ans: ans, correct: ans === q.answer, earned: earned, marks: marks });
-        } else {
-          var el = document.getElementById('mst-ans-' + i);
-          var textAns = (el ? el.value : '').trim();
-          var keywords = (q.keywords || '').split(',').map(function (k) { return k.trim().toLowerCase(); }).filter(Boolean);
-          var matched = keywords.filter(function (kw) { return textAns.toLowerCase().includes(kw); });
-          var textEarned = keywords.length > 0 ? Math.round((matched.length / keywords.length) * marks) : 0;
-          if (keywords.length > 0) { autoScore += textEarned; autoTotal += marks; }
-          else { hasPendingManual = true; autoTotal += marks; }
-          answers.push({ type: q.type, q: q.q, ans: textAns, keywords: q.keywords, earned: textEarned, marks: marks, awarded: keywords.length > 0 ? textEarned : null });
-        }
-      }
-
-      var total = qs.reduce(function (s, q) { return s + (q.marks || 1); }, 0);
-      var pct = total > 0 ? Math.round(autoScore / total * 100) : 0;
-      var sub = {
-        name: APP.student.name, matric: APP.student.matric, course: APP.course.code,
-        answers: answers, score: autoScore, total: total, pct: pct,
-        pendingManual: hasPendingManual, ts: new Date().toISOString()
-      };
-
-      var subs = S.arr('nm_mst_subs_' + APP.course.code);
-      var idx = subs.findIndex(function (s) { return s.matric === APP.student.matric; });
-      if (idx >= 0) subs[idx] = sub; else subs.push(sub);
-      S.set('nm_mst_subs_' + APP.course.code, subs);
-
-      toast('Submitted! ' + autoScore + '/' + total + ' (' + pct + '%)' +
-        (hasPendingManual ? ' — short answers pending review' : '') + ' ✅', 'success');
-      renderTab('mst');
-    };
-
-
-    /* =================================================================
-       FIX 10 ─ NEUROMATRIX PROGRESS — show MST and CW results immediately
-    ================================================================= */
-    var _origRProgress = window.rProgress;
-    window.rProgress = function () {
-      /* Force-read fresh data */
-      var matric = APP.student.matric;
-      var code = APP.course.code;
-      if (!matric || !code) return _origRProgress();
-
-      var attCnt = 0;
-      WEEKS.forEach(function (w) { if (S.get('nm_att_' + code + '_' + w + '_' + matric, null)) attCnt++; });
-      var attPct = Math.round(attCnt / 15 * 100);
-
-      var cwDone = 0, cwScore = 0, cwTotal = 0;
-      WEEKS.forEach(function (w) {
-        var sub = S.get('nm_cw_' + code + '_' + w + '_' + matric, null);
-        if (sub) {
-          cwDone++;
-          cwScore += sub.total_score || sub.auto_score || 0;
-          cwTotal += sub.auto_total || 0;
-        }
-      });
-      var cwPct = cwTotal > 0 ? Math.round(cwScore / cwTotal * 100) : null;
-
-      var mstSubs = S.arr('nm_mst_subs_' + code);
-      var mstSub = mstSubs.find(function (s) { return s.matric === matric; });
-
-      var semSub = S.get('nm_seminar_' + code + '_' + matric, null);
-      var semScore = S.get('nm_sem_score_' + code + '_' + matric, null);
-
-      var stored = S.get('nm_scores_' + code + '_' + matric, {});
-      var override = stored.override_grade !== undefined ? stored.override_grade : null;
-      var finalGrade = override !== null ? override : cwPct;
-      var gl = finalGrade === null ? '—'
-        : finalGrade >= 70 ? 'A' : finalGrade >= 60 ? 'B' : finalGrade >= 50 ? 'C'
-        : finalGrade >= 45 ? 'D' : finalGrade >= 40 ? 'E' : 'F';
-      var gradeColor = gl === 'F' ? 'var(--red)' : gl === 'A' ? 'var(--green)' : 'var(--amber)';
-
-      function bar(pct, color) {
-        return '<div style="background:var(--border);border-radius:99px;height:8px;overflow:hidden;margin:.4rem 0">' +
-          '<div style="width:' + Math.max(0, Math.min(100, pct || 0)) + '%;background:' + color +
-          ';height:100%;border-radius:99px;transition:width .6s"></div></div>';
-      }
-
-      return (typeof istrip === 'function' ? istrip() : '') +
-        ph('📊 My Progress', APP.course.name) +
-        '<div class="metrics">' +
-          '<div class="metric"><div class="mv">' + attCnt + '/15</div><div class="ml">Attendance</div></div>' +
-          '<div class="metric"><div class="mv">' + (cwPct !== null ? cwPct + '%' : '—') + '</div><div class="ml">Classwork</div></div>' +
-          '<div class="metric"><div class="mv">' + (mstSub ? mstSub.pct + '%' : '—') + '</div><div class="ml">MST Score</div></div>' +
-          '<div class="metric"><div class="mv" style="color:' + gradeColor + '">' + gl + '</div><div class="ml">Grade</div></div>' +
-        '</div>' +
-
-        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
-          '<div class="ct" style="color:#1a2744">🕒 Attendance</div>' +
-          '<div style="font-size:.82rem;color:#555">' + attCnt + ' of 15 weeks · ' + attPct + '%</div>' +
-          bar(attPct, '#00d4ff') +
-          '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.6rem">' +
-            WEEKS.map(function (w) {
-              var done = S.get('nm_att_' + code + '_' + w + '_' + matric, null);
-              return '<span style="font-size:.7rem;padding:.25rem .5rem;border-radius:6px;background:' +
-                (done ? '#10b981' : '#e5e7eb') + ';color:' + (done ? '#fff' : '#888') + '">' +
-                w.replace('Week ', 'W') + '</span>';
-            }).join('') +
-          '</div>' +
-        '</div>' +
-
-        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
-          '<div class="ct" style="color:#1a2744">🧩 Classwork</div>' +
-          '<div style="font-size:.82rem;color:#555">' + cwDone + ' weeks submitted' +
-            (cwTotal > 0 ? ' · ' + cwScore + '/' + cwTotal + ' (' + cwPct + '%)' : '') + '</div>' +
-          (cwTotal > 0 ? bar(cwPct, '#7c3aed') : '') +
-        '</div>' +
-
-        '<div class="card" style="background:#f8faff;border:1px solid rgba(99,179,237,.3)">' +
-          '<div class="ct" style="color:#1a2744">🧪 Mid-Semester Test</div>' +
-          (mstSub
-            ? '<div style="font-size:.82rem;color:#555">Score: ' + mstSub.score + '/' + mstSub.total +
-              ' · ' + mstSub.pct + '%</div>' +
-              bar(mstSub.pct, '#f59e0b') +
-              (mstSub.pendingManual
-                ? '<div style="font-size:.75rem;color:#f59e0b;margin-top:.4rem">⏳ Short answers pending review</div>' : '') +
-              '<div style="font-size:.72rem;color:#888;margin-top:.3rem">Submitted: ' +
-                new Date(mstSub.ts).toLocaleString('en-NG') + '</div>'
-            : '<div style="font-size:.82rem;color:#888">Not submitted yet.</div>') +
-        '</div>' +
-
-        '<div class="card" style="background:#1a1a2e;border:2px solid var(--cyan)">' +
-          '<div class="ct">🏅 Overall Grade</div>' +
-          '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">' +
-            '<div style="font-size:3rem;font-weight:800;font-family:var(--head);color:' + gradeColor + '">' + gl + '</div>' +
-            '<div style="font-size:.82rem;color:var(--dim);line-height:1.9">' +
-              (cwPct !== null ? 'Classwork avg: ' + cwPct + '%<br>' : '') +
-              (override !== null ? 'Lecturer override: ' + override + '%<br>' : '') +
-              (mstSub ? 'MST: ' + mstSub.pct + '%<br>' : '') +
-              (semScore !== null ? 'Seminar: ' + semScore + '/100' : '') +
-            '</div>' +
-          '</div>' +
-        '</div>';
-    };
-
-
-    /* =================================================================
-       FIX 11 ─ ADMIN: CBT QUESTION SAVE (NeuroMatrix)
-       Ensure questions save correctly and show immediately
-    ================================================================= */
-    var _origMstAddQ = window.mstAddQ;
-    window.mstAddQ = function () {
-      var type = document.getElementById('mst-qtype') ? document.getElementById('mst-qtype').value : 'mcq';
-      var qtext = document.getElementById('mst-qtext') ? document.getElementById('mst-qtext').value.trim() : '';
-      var marks = parseInt(document.getElementById('mst-marks') ? document.getElementById('mst-marks').value : '2') || 2;
-      if (!qtext) { toast('Enter question text', 'error'); return; }
-
-      var qs = S.arr('nm_mst_questions_' + APP.course.code) || [];
-
-      if (type === 'mcq') {
-        var oa = document.getElementById('mst-oa') ? document.getElementById('mst-oa').value.trim() : '';
-        var ob = document.getElementById('mst-ob') ? document.getElementById('mst-ob').value.trim() : '';
-        var oc = document.getElementById('mst-oc') ? document.getElementById('mst-oc').value.trim() : '';
-        var od = document.getElementById('mst-od') ? document.getElementById('mst-od').value.trim() : '';
-        if (!oa || !ob) { toast('Enter at least options A and B', 'error'); return; }
-        var opts = { A: oa, B: ob };
-        if (oc) opts.C = oc;
-        if (od) opts.D = od;
-        qs.push({ type: 'mcq', q: qtext, options: opts, answer: document.getElementById('mst-correct') ? document.getElementById('mst-correct').value : 'A', marks: marks });
-      } else {
-        qs.push({ type: type, q: qtext, keywords: document.getElementById('mst-keywords') ? document.getElementById('mst-keywords').value.trim() : '', marks: marks });
-      }
-
-      S.set('nm_mst_questions_' + APP.course.code, qs);
-      toast('Question added ✅ (' + qs.length + ' total)', 'success');
-      renderTab('mst-ctrl');
-    };
-
-
-    /* =================================================================
-       FIX 12 ─ SYNC BUTTON: force-pull then re-render current tab
-    ================================================================= */
-    window.nmForceSync = function () {
-      toast('Syncing…', 'info');
-      if (window._fbPullAll) {
-        window._fbPullAll().then(function () {
-          toast('Synced ✅', 'success');
-          if (APP.tab) renderTab(APP.tab);
-        }).catch(function () { toast('Sync error — using cached data', 'error'); });
-      } else {
-        toast('Sync not available offline', 'error');
-      }
-    };
-
-    window.vosForceSync = function () {
-      toast('Syncing…', 'info');
-      if (window._fbPullAll) {
-        window._fbPullAll().then(function () {
-          toast('Synced ✅', 'success');
-          if (VAPP.tab) vosRender(VAPP.tab);
-        }).catch(function () { toast('Sync error — using cached data', 'error'); });
-      } else {
-        toast('Sync not available offline', 'error');
-      }
-    };
-
-
-    /* =================================================================
-       FIX 13 ─ ADMIN QUIZ PUBLISH: ensure boolean true is stored
-    ================================================================= */
-    var _origVPubQuiz = window.vPubQuiz;
-    window.vPubQuiz = function (id) {
-      var qs = S.arr('vos_quizzes') || [];
-      var q = qs.find(function (x) { return x.id === id; });
-      if (!q) { toast('Quiz not found', 'error'); return; }
-      if (!vpCanAccessModule(q.module, VAPP.user)) { toast('Access denied for this quiz', 'error'); return; }
-      q.published = true;
-      S.set('vos_quizzes', qs);
-      toast('Quiz published ✅ — students can now see it', 'success');
-      vosRender('va-quiz');
-    };
-
-    /* Ensure vSaveQuiz stores published as strict boolean */
-    var _origVSaveQuiz = window.vSaveQuiz;
-    window.vSaveQuiz = function (publish) {
-      var title = document.getElementById('qm-title') ? document.getElementById('qm-title').value.trim() : '';
-      var module = document.getElementById('qm-module') ? document.getElementById('qm-module').value : '';
-      var duration = parseInt(document.getElementById('qm-dur') ? document.getElementById('qm-dur').value : '20') || 20;
-      if (!title) { toast('Enter quiz title', 'error'); return; }
-      if (!vQuizDraft || !vQuizDraft.length) { toast('Add at least 1 question first', 'error'); return; }
-      if (!vpCanAccessModule(module, VAPP.user)) { toast('You cannot create a quiz for this module', 'error'); return; }
-
-      var quizzes = S.arr('vos_quizzes') || [];
-      quizzes.push({
-        id: 'q_' + Date.now(),
-        title: title,
-        module: module,
-        duration: duration,
-        questions: vQuizDraft.map(function (q) { return Object.assign({}, q); }),
-        published: publish === true,
-        createdAt: new Date().toISOString(),
-        author: VAPP.user.full_name || VAPP.user.name || 'Admin'
-      });
-      S.set('vos_quizzes', quizzes);
-      toast(publish === true ? '✅ Quiz published — students can take it now' : '💾 Draft saved', 'success');
-      vosRender('va-quiz');
-    };
-
-
-    console.log('[VOS Fixes] All 13 patches applied ✅');
-  });
-
-})();
-</script>  
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
