@@ -428,9 +428,24 @@ function _fbStartRealTimeSync(){
           window._fbRenderDebounce = setTimeout(() => {
             try{
               if(window.VAPP && window.VAPP.tab && window.vosRender){
+                // User is logged in — re-render their current tab
                 window.vosRender(window.VAPP.tab);
               } else if(window.APP && window.APP.tab && window.renderTab){
                 window.renderTab(window.APP.tab);
+              } else {
+                // Nobody is logged in yet — if the VOS login form is visible and
+                // the user has typed their matric/password, auto-retry login.
+                // This fires when a student on a fresh browser typed credentials
+                // before Firestore had finished syncing their registration.
+                const unEl = document.getElementById('vos-un');
+                const pwEl = document.getElementById('vos-pw');
+                const loginVisible = unEl && pwEl &&
+                  unEl.offsetParent !== null &&   // element is visible
+                  unEl.value.trim() && pwEl.value;
+                if(loginVisible && window.vosLogin){
+                  console.log('[Firebase] Sync arrived — retrying login automatically');
+                  window.vosLogin();
+                }
               }
             }catch(e){}
           }, 1200);
@@ -3568,60 +3583,102 @@ vosRegister=function(){
   ok.textContent='Registration successful for '+vpScopeLabel(scope)+'. Redirecting to login...';showEl('reg-ok');
   setTimeout(()=>vosLoginScreen('student'),1200);
 };
-// ── REPLACE the vosLogin = function(){...}; override at the bottom ────────
+// ── Helper: finalise a successful student login (shared by sync + async paths) ──
+function _vosCompleteStudentLogin(s, pw, errEl){
+  // Restore the scope the student belongs to so their data is visible
+  if(s.academicSession && s.cohort){
+    try{
+      const sc = vpNormalizeScope({session:s.academicSession, cohort:s.cohort});
+      const scopes = S.arr('vos_scopes')||[];
+      if(!scopes.find(x=>x.key===sc.key)){
+        scopes.push({session:sc.session, cohort:sc.cohort, key:sc.key});
+        S.set('vos_scopes', scopes);
+      }
+      S.set('vos_active_scope', {session:sc.session, cohort:sc.cohort, key:sc.key});
+    }catch(e){ console.warn('[login] scope restore fail',e); }
+  }
+  VAPP.user = {...s, type:'student'};
+  if(errEl) errEl.className = 'ae al hidden';
+  try{ sessionStorage.removeItem('vos_reg_matric'); }catch(e){}
+  // Persist identity so this device auto-logs in next time
+  try{ localStorage.setItem('vos_identity', JSON.stringify({matric:s.matric, pw:s.pw||s.pw_hash||s.password, type:'student'})); }catch(e){}
+  buildVOSStudentShell();
+}
+
+// ── vosLogin: reads local cache first; if miss, re-pulls Firestore then retries ──
 vosLogin = function(){
-  const id = document.getElementById('vos-un').value.trim();
-  const pw = document.getElementById('vos-pw').value;
+  const id  = document.getElementById('vos-un').value.trim();
+  const pw  = document.getElementById('vos-pw').value;
   const errEl = document.getElementById('vos-err');
   if(!id || !pw){ showEl('vos-err'); return; }
   initVOSDefaults();
   try{ vpMigrateData(); }catch(e){ console.warn('migrate skipped',e); }
 
+  // ── Admin login path ────────────────────────────────────────────────────
   if(VAPP.loginType === 'admin'){
-    const admins = S.arr('vos_admins') || [];
-    const a = admins.find(x =>
+    // Try local cache first
+    let admins = S.arr('vos_admins') || [];
+    const tryAdmin = (list) => list.find(x =>
       String(x.username||x.id||'').toLowerCase() === id.toLowerCase() &&
       (x.pw===pw || x.pw_hash===pw || x.password===pw)
     );
-    if(!a){ showEl('vos-err'); return; }
-    VAPP.user = {...a, type:'admin'};
-    buildVOSAdminShell();
-  } else {
-    // Search ALL students — no scope guard — so a student can always log in
-    // even when the active scope on this browser differs from their registration scope.
-    const allStudents = (S.arr('vos_students')||[]).map(vpNormalizeStudent);
-    const s = allStudents.find(x =>
-      x.matric.toUpperCase() === id.toUpperCase() &&
-      (x.pw===pw || x.password===pw || x.pw_hash===pw)
-    );
-    if(!s){
+    const a = tryAdmin(admins);
+    if(a){ VAPP.user = {...a, type:'admin'}; buildVOSAdminShell(); return; }
+    // Not found locally — re-pull from Firestore once, then retry
+    if(window._fbPullAll){
+      if(errEl){ errEl.textContent = '⏳ Syncing from cloud…'; showEl('vos-err'); }
+      window._fbPullAll().then(()=>{
+        const a2 = tryAdmin(S.arr('vos_admins')||[]);
+        if(a2){ VAPP.user = {...a2, type:'admin'}; buildVOSAdminShell(); return; }
+        if(errEl) errEl.textContent = '❌ Admin credentials not found.';
+        showEl('vos-err');
+      }).catch(()=>{ if(errEl) errEl.textContent = '❌ Cloud sync failed. Try again.'; showEl('vos-err'); });
+      return;
+    }
+    showEl('vos-err'); return;
+  }
+
+  // ── Student login path ──────────────────────────────────────────────────
+  // Search ALL students (no scope guard) — a student can log in from any device
+  // regardless of which scope is currently active on that browser.
+  const tryStudent = (list) => list.find(x =>
+    x.matric.toUpperCase() === id.toUpperCase() &&
+    (x.pw===pw || x.password===pw || x.pw_hash===pw)
+  );
+  const allStudents = (S.arr('vos_students')||[]).map(vpNormalizeStudent);
+  const s = tryStudent(allStudents);
+  if(s){ _vosCompleteStudentLogin(s, pw, errEl); return; }
+
+  // Not found in local cache — re-pull from Firestore and retry once.
+  // This is the fix for "credentials not found on another browser":
+  // the student registered on device A; device B may not have synced yet.
+  if(window._fbPullAll){
+    if(errEl){ errEl.textContent = '⏳ Syncing from cloud, please wait…'; showEl('vos-err'); }
+    window._fbPullAll().then(()=>{
+      const fresh = (S.arr('vos_students')||[]).map(vpNormalizeStudent);
+      const s2 = tryStudent(fresh);
+      if(s2){ _vosCompleteStudentLogin(s2, pw, errEl); return; }
       if(errEl){
-        const sameMatric = allStudents.find(x => x.matric.toUpperCase()===id.toUpperCase());
+        const sameMatric = fresh.find(x => x.matric.toUpperCase()===id.toUpperCase());
         errEl.textContent = sameMatric
           ? '❌ Wrong password for that matric number.'
-          : '❌ No account found with that matric number. Please register first.';
+          : '❌ No account found. Please register first.';
       }
-      showEl('vos-err'); return;
-    }
-    // Auto-restore the scope the student belongs to so their data is visible
-    if(s.academicSession && s.cohort){
-      const sc = vpNormalizeScope({session:s.academicSession, cohort:s.cohort});
-      try{
-        const scopes = S.arr('vos_scopes')||[];
-        if(!scopes.find(x=>x.key===sc.key)){
-          scopes.push({session:sc.session, cohort:sc.cohort, key:sc.key});
-          S.set('vos_scopes', scopes);
-        }
-        S.set('vos_active_scope', {session:sc.session, cohort:sc.cohort, key:sc.key});
-      }catch(e){ console.warn('scope restore fail',e); }
-    }
-    VAPP.user = {...s, type:'student'};
-    if(errEl) errEl.className = 'ae al hidden';
-    try{ sessionStorage.removeItem('vos_reg_matric'); }catch(e){}
-    // Persist identity so this device auto-logs in next time (like NM does with nm_student)
-    try{ localStorage.setItem('vos_identity', JSON.stringify({matric:s.matric, pw:s.pw||s.pw_hash||s.password, type:'student'})); }catch(e){}
-    buildVOSStudentShell();
+      showEl('vos-err');
+    }).catch(()=>{
+      if(errEl) errEl.textContent = '❌ Could not reach cloud. Check your internet and try again.';
+      showEl('vos-err');
+    });
+    return;
   }
+  // Offline fallback — no Firestore available at all
+  if(errEl){
+    const sameMatric = allStudents.find(x => x.matric.toUpperCase()===id.toUpperCase());
+    errEl.textContent = sameMatric
+      ? '❌ Wrong password for that matric number.'
+      : '❌ No account found. Please register first.';
+  }
+  showEl('vos-err');
 };
 
 vDashboard=function(){
@@ -4323,7 +4380,36 @@ function _bootApp(){
       );
 
       if (!s) {
-        // Credentials no longer valid (e.g. password changed) — clear and let them log in normally
+        // Not found in local cache. Could be a timing issue — Firestore may not have
+        // finished populating localStorage yet. Re-pull and try once more.
+        if(window._fbPullAll){
+          window._fbPullAll().then(()=>{
+            const fresh = (S.arr('vos_students')||[]).map(vpNormalizeStudent);
+            const s2 = fresh.find(x =>
+              x.matric.toUpperCase() === saved.matric.toUpperCase() &&
+              (x.pw === saved.pw || x.password === saved.pw || x.pw_hash === saved.pw)
+            );
+            if(!s2){ localStorage.removeItem('vos_identity'); return; }
+            // Resume auto-login with the freshly-pulled student record
+            if(s2.academicSession && s2.cohort){
+              try{
+                const sc2 = vpNormalizeScope({session:s2.academicSession, cohort:s2.cohort});
+                const sc2s = S.arr('vos_scopes')||[];
+                if(!sc2s.find(x=>x.key===sc2.key)){
+                  sc2s.push({session:sc2.session, cohort:sc2.cohort, key:sc2.key});
+                  S.set('vos_scopes', sc2s);
+                }
+                S.set('vos_active_scope', {session:sc2.session, cohort:sc2.cohort, key:sc2.key});
+              }catch(e){}
+            }
+            VAPP.user = {...s2, type:'student'};
+            const landingEl = document.getElementById('landing');
+            if(landingEl){ landingEl.style.display='none'; landingEl.classList.add('hidden'); }
+            buildVOSStudentShell();
+          }).catch(()=>{ localStorage.removeItem('vos_identity'); });
+          return;
+        }
+        // No Firestore available — credentials can't be verified, clear and fall through
         localStorage.removeItem('vos_identity');
         return;
       }
