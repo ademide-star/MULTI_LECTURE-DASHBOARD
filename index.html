@@ -2653,7 +2653,7 @@ function vosLoginScreen(type){
 
 // vosRegister and vosLogin are defined further below (full versions with module/scope support)
 
-function vosLogout(){VAPP.user=null;try{sessionStorage.removeItem('vos_reg_matric');}catch{}backToLanding();}
+function vosLogout(){VAPP.user=null;try{sessionStorage.removeItem('vos_reg_matric');}catch{}try{localStorage.removeItem('vos_identity');}catch{}backToLanding();}
 
 // Sync latest data from Firestore then re-attempt login (fixes "invalid credentials" on fresh browser)
 async function vosSyncAndRetry(){
@@ -3618,6 +3618,8 @@ vosLogin = function(){
     VAPP.user = {...s, type:'student'};
     if(errEl) errEl.className = 'ae al hidden';
     try{ sessionStorage.removeItem('vos_reg_matric'); }catch(e){}
+    // Persist identity so this device auto-logs in next time (like NM does with nm_student)
+    try{ localStorage.setItem('vos_identity', JSON.stringify({matric:s.matric, pw:s.pw||s.pw_hash||s.password, type:'student'})); }catch(e){}
     buildVOSStudentShell();
   }
 };
@@ -4296,9 +4298,62 @@ function _bootApp(){
   initVOSDefaults();
   setTimeout(initVOSPatch, 80);
 
-  // ── 3. Student identity restore ─────────────────────────
+  // ── 3. NM student identity restore (unchanged) ────────────────────────
   const stu = S.get('nm_student', {name:'',matric:''});
   APP.student = stu;
+
+  // ── 4. VOS auto-login ─────────────────────────────────────────────────
+  // If a student previously logged in on this device, their identity is stored
+  // in localStorage under 'vos_identity'. Re-authenticate them silently so they
+  // land straight in their portal — no login screen needed (same as NM's saveIdent).
+  (function _vosAutoLogin(){
+    try {
+      const raw = localStorage.getItem('vos_identity');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || !saved.matric || !saved.pw || saved.type !== 'student') return;
+
+      initVOSDefaults();
+      try { vpMigrateData(); } catch(e) {}
+
+      const allStudents = (S.arr('vos_students') || []).map(vpNormalizeStudent);
+      const s = allStudents.find(x =>
+        x.matric.toUpperCase() === saved.matric.toUpperCase() &&
+        (x.pw === saved.pw || x.password === saved.pw || x.pw_hash === saved.pw)
+      );
+
+      if (!s) {
+        // Credentials no longer valid (e.g. password changed) — clear and let them log in normally
+        localStorage.removeItem('vos_identity');
+        return;
+      }
+
+      // Restore scope so their data is visible
+      if (s.academicSession && s.cohort) {
+        try {
+          const sc = vpNormalizeScope({session: s.academicSession, cohort: s.cohort});
+          const scopes = S.arr('vos_scopes') || [];
+          if (!scopes.find(x => x.key === sc.key)) {
+            scopes.push({session: sc.session, cohort: sc.cohort, key: sc.key});
+            S.set('vos_scopes', scopes);
+          }
+          S.set('vos_active_scope', {session: sc.session, cohort: sc.cohort, key: sc.key});
+        } catch(e) { console.warn('[autoLogin] scope restore:', e); }
+      }
+
+      VAPP.user = {...s, type: 'student'};
+      console.log('[VOS] Auto-logged in:', s.matric);
+
+      // Hide landing, go straight to student shell
+      const landing = document.getElementById('landing');
+      if (landing) { landing.style.display = 'none'; landing.classList.add('hidden'); }
+      buildVOSStudentShell();
+
+    } catch(e) {
+      console.warn('[VOS] Auto-login failed:', e);
+      localStorage.removeItem('vos_identity');
+    }
+  })();
 }
 
 // Wait for Firebase module to signal ready; fall back to DOMContentLoaded
