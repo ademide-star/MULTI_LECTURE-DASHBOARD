@@ -3737,7 +3737,32 @@ function vaExportAssignmentResults(){
   vaXlsx(rows,'VOS102_Assignment_Results_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));
 }
 
-
+// ── REPLACE the five vpXxxByAccess overrides ─────────────────────────────
+// Admins see all records within their module access regardless of scope.
+// Students still see only their own scope (handled inside each student tab).
+vpStudentsByAccess = function(user){
+  user = user || VAPP.user;
+  const students = (S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
+  return vpIsSuperAdmin(user)
+    ? students
+    : students.filter(s => vpCanAccessModule(s.module, user));
+};
+vpResultsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_quiz_results')||[]).filter(r => vpCanAccessModule(r.module, user));
+};
+vpAttendanceByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_attendance')||[]).filter(a => vpCanAccessModule(a.module, user));
+};
+vpPortsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_portfolios')||[]).filter(p => vpCanAccessModule(p.module, user));
+};
+vpAssignmentSubsByAccess = function(user){
+  user = user || VAPP.user;
+  return (S.arr('vos_assignment_submissions')||[]).filter(s => vpCanAccessModule(s.module, user));
+};
 // ═══════════════════════════════════════════════════════════
 // VOS 102 — WEEKLY RECIPE MODULE (scoped per session/cohort + graded)
 // ═══════════════════════════════════════════════════════════
