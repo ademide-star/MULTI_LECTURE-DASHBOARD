@@ -447,10 +447,23 @@ window._fbStartRealTimeSync = _fbStartRealTimeSync;
 const loadMsg = document.createElement('div');
 loadMsg.id = 'fb-load-msg';
 loadMsg.style.cssText='position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.8rem;padding:.5rem 1rem;z-index:9999;text-align:center;';
-loadMsg.textContent = '⟳ Connecting to NeuroMatrix cloud…';
+loadMsg.textContent = '\u23F3 Connecting to NeuroMatrix cloud\u2026';
 document.body ? document.body.prepend(loadMsg) : document.addEventListener('DOMContentLoaded',()=>document.body.prepend(loadMsg));
 
-await _fbPullAll();
+// Race the Firestore pull against a 6 s timeout so the app never hangs
+// on a slow / blocked network — local cache is always the fallback.
+const _fbTimeout = new Promise(resolve =>
+  setTimeout(() => {
+    console.warn('[Firebase] Pull timed out — booting from local cache');
+    resolve('timeout');
+  }, 6000)
+);
+const _fbResult = await Promise.race([_fbPullAll().then(() => 'ok'), _fbTimeout]);
+if (_fbResult === 'timeout') {
+  loadMsg.textContent = '\u26A0 Cloud unreachable — using local data';
+  await new Promise(r => setTimeout(r, 1200)); // brief pause so user sees the message
+}
+
 _fbStartRealTimeSync(); // Start real-time sync AFTER initial pull
 loadMsg.remove();
 window.dispatchEvent(new Event('firebase-ready'));
