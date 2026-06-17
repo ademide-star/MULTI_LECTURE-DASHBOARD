@@ -332,7 +332,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 <!-- ═══════════════════ FIREBASE MODULE SCRIPT ═══════════════════ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
+import { initializeFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const _fbApp = initializeApp({
@@ -343,7 +343,14 @@ const _fbApp = initializeApp({
   messagingSenderId: "758646781731",
   appId: "1:758646781731:web:f9bbe82438dc5baa39fe96"
 });
-const _db = getFirestore(_fbApp);
+// CRITICAL FIX: force long-polling instead of the default WebChannel/QUIC transport.
+// Some networks (campus Wi-Fi, certain antivirus/firewalls) drop the UDP packets QUIC
+// needs, which silently breaks the Listen + Write streams (ERR_QUIC_PROTOCOL_ERROR)
+// while a one-shot getDocs() pull still succeeds — explaining "works on phone, not laptop".
+const _db = initializeFirestore(_fbApp, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
 
 function _fkey(k){ return String(k).replace(/[\/\.#\$\[\]]/g,'__').substring(0,1490); }
 window._fkey = _fkey;
@@ -509,6 +516,21 @@ function toast(msg,type='info'){
   t.className='';t.classList.add(type==='success'?'ts':type==='error'?'te':'ti');
   t.textContent=msg;t.classList.add('show');
   clearTimeout(window._toastTimer);window._toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// CRITICAL FIX: these were referenced by the "🔄 Sync Now" buttons but never defined,
+// so clicking either button threw a ReferenceError and did nothing.
+function nmForceSync(){
+  toast('Syncing…','info');
+  (window._fbPullAll?window._fbPullAll():Promise.resolve())
+    .then(()=>{ toast('Synced ✅','success'); if(APP.tab) renderTab(APP.tab); })
+    .catch(e=>{ toast('Sync failed — check connection','error'); console.warn('[nmForceSync]',e); });
+}
+function vosForceSync(){
+  toast('Syncing…','info');
+  (window._fbPullAll?window._fbPullAll():Promise.resolve())
+    .then(()=>{ toast('Synced ✅','success'); if(VAPP.tab) vosRender(VAPP.tab); })
+    .catch(e=>{ toast('Sync failed — check connection','error'); console.warn('[vosForceSync]',e); });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3737,32 +3759,185 @@ function vaExportAssignmentResults(){
   vaXlsx(rows,'VOS102_Assignment_Results_'+vpScope().session.replace('/','-')+'_'+vpScope().cohort.replace(/\s+/g,'_'));
 }
 
-// ── REPLACE the five vpXxxByAccess overrides ─────────────────────────────
-// Admins see all records within their module access regardless of scope.
-// Students still see only their own scope (handled inside each student tab).
-vpStudentsByAccess = function(user){
-  user = user || VAPP.user;
-  const students = (S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
-  return vpIsSuperAdmin(user)
-    ? students
-    : students.filter(s => vpCanAccessModule(s.module, user));
-};
-vpResultsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_quiz_results')||[]).filter(r => vpCanAccessModule(r.module, user));
-};
-vpAttendanceByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_attendance')||[]).filter(a => vpCanAccessModule(a.module, user));
-};
-vpPortsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_portfolios')||[]).filter(p => vpCanAccessModule(p.module, user));
-};
-vpAssignmentSubsByAccess = function(user){
-  user = user || VAPP.user;
-  return (S.arr('vos_assignment_submissions')||[]).filter(s => vpCanAccessModule(s.module, user));
-};
+
+// ═══════════════════════════════════════════════════════════
+// QUIZ BUILDER — vAddQ & vBulkImportQ
+// ═══════════════════════════════════════════════════════════
+// vQuizDraft holds the in-progress question list for the current build session.
+// vaQuiz() resets it to [] on every render, so it is always fresh.
+let vQuizDraft = [];
+
+function vRenderQuestions() {
+  const container = document.getElementById('qm-questions');
+  if (!container) return;
+  if (!vQuizDraft.length) { container.innerHTML = ''; return; }
+  container.innerHTML = vQuizDraft.map((q, idx) => `
+    <div style="border:1px solid var(--border);border-radius:11px;padding:.9rem 1rem;margin-bottom:.7rem;background:var(--surface)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;margin-bottom:.55rem">
+        <span style="font-size:.72rem;color:var(--muted);font-weight:600">Q${idx + 1}</span>
+        <button class="btn btn-d sm" onclick="vRemoveQ(${idx})">✕</button>
+      </div>
+      <div class="field" style="margin-bottom:.6rem">
+        <label>Question</label>
+        <textarea rows="2" style="min-height:56px" onchange="vQuizDraft[${idx}].q=this.value">${vpEsc(q.q)}</textarea>
+      </div>
+      ${['A','B','C','D'].map(opt => `
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem">
+          <input type="radio" name="ans_${idx}" value="${opt}" ${q.answer===opt?'checked':''} onchange="vQuizDraft[${idx}].answer=this.value" style="width:auto;flex-shrink:0">
+          <input placeholder="Option ${opt}" value="${vpEsc(q.opts[opt]||'')}" onchange="vQuizDraft[${idx}].opts['${opt}']=this.value" style="flex:1">
+        </div>`).join('')}
+      <div style="font-size:.7rem;color:var(--dim);margin-top:.3rem">Select the radio button beside the correct answer.</div>
+    </div>`).join('');
+}
+
+function vAddQ() {
+  if (typeof vQuizDraft === 'undefined') window.vQuizDraft = [];
+  vQuizDraft.push({ q: '', opts: { A: '', B: '', C: '', D: '' }, answer: 'A' });
+  vRenderQuestions();
+  // Scroll new question into view
+  const container = document.getElementById('qm-questions');
+  if (container) container.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function vRemoveQ(idx) {
+  vQuizDraft.splice(idx, 1);
+  vRenderQuestions();
+}
+
+function vBulkImportQ() {
+  const raw = (document.getElementById('qm-bulk')?.value || '').trim();
+  if (!raw) { toast('Paste question text first', 'error'); return; }
+
+  // Split on blank lines between question blocks
+  const blocks = raw.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+  let imported = 0;
+  const errors = [];
+
+  blocks.forEach((block, bi) => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    let qText = '', opts = { A: '', B: '', C: '', D: '' }, answer = '';
+
+    lines.forEach(line => {
+      if (/^QUESTION\s*:/i.test(line))       qText = line.replace(/^QUESTION\s*:/i, '').trim();
+      else if (/^A[.)]\s*/i.test(line))      opts.A = line.replace(/^A[.)]\s*/i, '').trim();
+      else if (/^B[.)]\s*/i.test(line))      opts.B = line.replace(/^B[.)]\s*/i, '').trim();
+      else if (/^C[.)]\s*/i.test(line))      opts.C = line.replace(/^C[.)]\s*/i, '').trim();
+      else if (/^D[.)]\s*/i.test(line))      opts.D = line.replace(/^D[.)]\s*/i, '').trim();
+      else if (/^ANSWER\s*:/i.test(line))    answer = line.replace(/^ANSWER\s*:/i, '').trim().toUpperCase().charAt(0);
+    });
+
+    if (!qText)   { errors.push(`Block ${bi + 1}: missing QUESTION line`); return; }
+    if (!answer || !['A','B','C','D'].includes(answer))
+                  { errors.push(`Block ${bi + 1}: missing or invalid ANSWER (got "${answer}")`); return; }
+
+    if (typeof vQuizDraft === 'undefined') window.vQuizDraft = [];
+    vQuizDraft.push({ q: qText, opts, answer });
+    imported++;
+  });
+
+  vRenderQuestions();
+  if (errors.length) {
+    toast(`${imported} imported, ${errors.length} skipped — check console`, 'info');
+    console.warn('[vBulkImportQ] Skipped blocks:', errors);
+  } else {
+    toast(`${imported} question${imported !== 1 ? 's' : ''} imported ✅`, 'success');
+  }
+  // Clear the textarea after a successful (or partial) import
+  const ta = document.getElementById('qm-bulk');
+  if (ta && imported) ta.value = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// ASSIGNMENT MANAGER — vaSaveAssignment, vaToggleAssignment,
+//                      vaDeleteAssignment, vaSaveAssignmentGrade
+// ═══════════════════════════════════════════════════════════
+
+function vaSaveAssignment(publish) {
+  const title    = (document.getElementById('va-asg-title')?.value || '').trim();
+  const module   = document.getElementById('va-asg-module')?.value || '';
+  const dueDate  = document.getElementById('va-asg-due')?.value || '';
+  const maxScore = parseInt(document.getElementById('va-asg-score')?.value) || 100;
+  const allowText = document.getElementById('va-asg-text')?.checked !== false;
+  const allowFile = document.getElementById('va-asg-file')?.checked !== false;
+  const instructions = (document.getElementById('va-asg-inst')?.value || '').trim();
+  const rubric   = (document.getElementById('va-asg-rubric')?.value || '').trim();
+
+  if (!title)  { toast('Enter an assignment title', 'error'); return; }
+  if (!module) { toast('Select a module', 'error'); return; }
+  if (!vpCanAccessModule(module, VAPP.user)) { toast('You cannot create an assignment for this module', 'error'); return; }
+  if (!allowText && !allowFile) { toast('Enable at least one submission mode', 'error'); return; }
+
+  const assignments = S.arr('vos_assignments');
+  assignments.push({
+    id:           'asg_' + Date.now(),
+    title,
+    module,
+    dueDate:      dueDate || null,
+    maxScore,
+    allowText,
+    allowFile,
+    instructions,
+    rubric,
+    published:    !!publish,
+    createdAt:    new Date().toISOString(),
+    author:       VAPP.user?.full_name || VAPP.user?.name || 'Admin',
+  });
+  S.set('vos_assignments', assignments);
+  toast(publish ? 'Assignment published ✅' : 'Draft saved', 'success');
+  vosRender('va-assignments');
+}
+
+function vaToggleAssignment(id) {
+  const assignments = S.arr('vos_assignments');
+  const a = assignments.find(x => x.id === id);
+  if (!a) { toast('Assignment not found', 'error'); return; }
+  if (!vpCanAccessModule(a.module, VAPP.user)) { toast('Access denied for this assignment', 'error'); return; }
+  a.published = !a.published;
+  S.set('vos_assignments', assignments);
+  toast(a.published ? 'Assignment published ✅' : 'Assignment unpublished', a.published ? 'success' : 'info');
+  vosRender('va-assignments');
+}
+
+function vaDeleteAssignment(id) {
+  const a = (S.arr('vos_assignments') || []).find(x => x.id === id);
+  if (!a) { toast('Assignment not found', 'error'); return; }
+  if (!vpCanAccessModule(a.module, VAPP.user)) { toast('Access denied for this assignment', 'error'); return; }
+  if (!confirm(`Delete "${a.title}"? This cannot be undone.`)) return;
+  S.set('vos_assignments', S.arr('vos_assignments').filter(x => x.id !== id));
+  toast('Assignment deleted', 'success');
+  vosRender('va-assignments');
+}
+
+function vaSaveAssignmentGrade(submissionId) {
+  const scoreEl    = document.getElementById('grade-score-'    + submissionId);
+  const feedbackEl = document.getElementById('grade-feedback-' + submissionId);
+  if (!scoreEl) { toast('Grade inputs not found', 'error'); return; }
+
+  const subs = S.arr('vos_assignment_submissions');
+  const sub  = subs.find(x => x.id === submissionId);
+  if (!sub) { toast('Submission not found', 'error'); return; }
+  if (!vpCanAccessModule(sub.module, VAPP.user)) { toast('Access denied for this submission', 'error'); return; }
+
+  const scoreRaw = scoreEl.value.trim();
+  if (scoreRaw === '') { toast('Enter a score before saving', 'error'); return; }
+  const score    = parseFloat(scoreRaw);
+  const maxScore = sub.maxScore || 100;
+  if (isNaN(score) || score < 0 || score > maxScore) {
+    toast(`Score must be between 0 and ${maxScore}`, 'error'); return;
+  }
+
+  sub.score     = score;
+  sub.percent   = Math.round((score / maxScore) * 100);
+  sub.feedback  = (feedbackEl?.value || '').trim();
+  sub.status    = 'graded';
+  sub.gradedBy  = VAPP.user?.full_name || VAPP.user?.name || 'Admin';
+  sub.gradedAt  = new Date().toISOString();
+
+  S.set('vos_assignment_submissions', subs);
+  toast(`Grade saved: ${score}/${maxScore} (${sub.percent}%) ✅`, 'success');
+  vosRender('va-assignments');
+}
+
 // ═══════════════════════════════════════════════════════════
 // VOS 102 — WEEKLY RECIPE MODULE (scoped per session/cohort + graded)
 // ═══════════════════════════════════════════════════════════
