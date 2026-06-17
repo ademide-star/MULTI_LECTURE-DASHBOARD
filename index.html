@@ -334,6 +334,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { initializeFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const _fbApp = initializeApp({
   apiKey: "AIzaSyC9bRjMd38DJeTuioiq9oF_GD7t4QjUi6Y",
@@ -343,14 +345,12 @@ const _fbApp = initializeApp({
   messagingSenderId: "758646781731",
   appId: "1:758646781731:web:f9bbe82438dc5baa39fe96"
 });
-// CRITICAL FIX: force long-polling instead of the default WebChannel/QUIC transport.
-// Some networks (campus Wi-Fi, certain antivirus/firewalls) drop the UDP packets QUIC
-// needs, which silently breaks the Listen + Write streams (ERR_QUIC_PROTOCOL_ERROR)
-// while a one-shot getDocs() pull still succeeds — explaining "works on phone, not laptop".
+// Force long-polling — campus Wi-Fi / firewalls often block WebChannel/QUIC.
 const _db = initializeFirestore(_fbApp, {
   experimentalForceLongPolling: true,
   useFetchStreams: false,
 });
+const _auth = getAuth(_fbApp);
 
 function _fkey(k){ return String(k).replace(/[\/\.#\$\[\]]/g,'__').substring(0,1490); }
 window._fkey = _fkey;
@@ -443,28 +443,46 @@ function _fbStartRealTimeSync(){
 }
 window._fbStartRealTimeSync = _fbStartRealTimeSync;
 
-// ── Boot: pull all data, then start real-time listener ──
+// ── Boot sequence ────────────────────────────────────────────────────────
+// Step 1: show connecting banner
+// Step 2: sign in anonymously so Firestore rules (request.auth != null) pass
+//         on EVERY device — student phones, laptops, etc.
+// Step 3: pull all cloud data into localStorage cache
+// Step 4: start real-time listener so further admin writes appear instantly
+// Step 5: fire 'firebase-ready' so the app renders
+
 const loadMsg = document.createElement('div');
 loadMsg.id = 'fb-load-msg';
-loadMsg.style.cssText='position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.8rem;padding:.5rem 1rem;z-index:9999;text-align:center;';
+loadMsg.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.85rem;padding:.55rem 1rem;z-index:9999;text-align:center;letter-spacing:.02em;';
 loadMsg.textContent = '\u23F3 Connecting to NeuroMatrix cloud\u2026';
-document.body ? document.body.prepend(loadMsg) : document.addEventListener('DOMContentLoaded',()=>document.body.prepend(loadMsg));
+document.body ? document.body.prepend(loadMsg) : document.addEventListener('DOMContentLoaded', () => document.body.prepend(loadMsg));
 
-// Race the Firestore pull against a 6 s timeout so the app never hangs
-// on a slow / blocked network — local cache is always the fallback.
-const _fbTimeout = new Promise(resolve =>
-  setTimeout(() => {
-    console.warn('[Firebase] Pull timed out — booting from local cache');
-    resolve('timeout');
-  }, 6000)
-);
-const _fbResult = await Promise.race([_fbPullAll().then(() => 'ok'), _fbTimeout]);
-if (_fbResult === 'timeout') {
-  loadMsg.textContent = '\u26A0 Cloud unreachable — using local data';
-  await new Promise(r => setTimeout(r, 1200)); // brief pause so user sees the message
+// ── Step 2: anonymous auth ────────────────────────────────────────────────
+// This gives every visitor a Firebase Auth token, which is required by
+// Firestore security rules. Without it, every read/write is rejected on
+// devices that don't share your laptop's browser storage.
+try {
+  await signInAnonymously(_auth);
+  console.log('[Firebase] Signed in anonymously \u2705', _auth.currentUser?.uid);
+} catch(authErr) {
+  // If anonymous auth is disabled in the Firebase console this will throw.
+  // Print a clear message so it's easy to diagnose.
+  console.error(
+    '[Firebase] Anonymous sign-in FAILED.\n' +
+    'Go to Firebase Console > Authentication > Sign-in method > Anonymous > Enable it.\n',
+    authErr
+  );
+  loadMsg.style.background = '#4a1010';
+  loadMsg.textContent = '\u274C Auth failed — enable Anonymous sign-in in Firebase Console';
+  // Still attempt to continue; rules permitting open access will still work.
 }
 
-_fbStartRealTimeSync(); // Start real-time sync AFTER initial pull
+// ── Step 3: pull all data ─────────────────────────────────────────────────
+loadMsg.textContent = '\u2193 Loading portal data\u2026';
+await _fbPullAll();
+
+// ── Step 4 + 5 ───────────────────────────────────────────────────────────
+_fbStartRealTimeSync();
 loadMsg.remove();
 window.dispatchEvent(new Event('firebase-ready'));
 </script>
