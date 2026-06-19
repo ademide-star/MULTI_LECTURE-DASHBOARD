@@ -3280,7 +3280,13 @@ function buildVOSStudentShell(){
   const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
   vpRenderBrandSlots();
   vpUpdateScopeStrip();
-  vosSetTab('v-dashboard');
+  // Pull fresh cloud data after login so the student sees all admin-published content
+  // (quizzes, attendance gates, announcements) immediately — even on a brand-new browser.
+  if(window._fbPullAll){
+    window._fbPullAll().then(()=>vosSetTab('v-dashboard')).catch(()=>vosSetTab('v-dashboard'));
+  } else {
+    vosSetTab('v-dashboard');
+  }
 }
 function buildVOSAdminShell(){
   const tabs=VOS_ADMIN_TABS_PATCH;
@@ -3292,7 +3298,12 @@ function buildVOSAdminShell(){
   const _ftX=document.getElementById('footer');if(_ftX){_ftX.classList.remove('hidden');_ftX.style.display='';}
   vpRenderBrandSlots();
   vpUpdateScopeStrip();
-  vosSetTab('va-dashboard');
+  // Pull fresh cloud data after admin login so newly registered students / submissions appear
+  if(window._fbPullAll){
+    window._fbPullAll().then(()=>vosSetTab('va-dashboard')).catch(()=>vosSetTab('va-dashboard'));
+  } else {
+    vosSetTab('va-dashboard');
+  }
 }
 function vosRender(id){
   const c=document.getElementById('vos-tab-content');
@@ -3574,12 +3585,18 @@ vosRegister=function(){
   hideEl('reg-err');hideEl('reg-ok');
   if(!name||!matric||!dept||!level||!module||!pw1){err.textContent='Fill all required fields.';showEl('reg-err');return;}
   if(pw1!==pw2){err.textContent='Passwords do not match.';showEl('reg-err');return;}
-  const students=(S.arr('vos_students')||[]).map(vpNormalizeStudent).map(s=>vpScopedRecord(s));
-  if(students.find(s=>vpSameScope(s,scope)&&s.matric.toUpperCase()===matric.toUpperCase())){
+  const rawStudents=S.arr('vos_students')||[];
+  // Only normalize for duplicate check — do NOT remap all records through vpScopedRecord
+  // (that would overwrite academicSession/cohort for students registered under other scopes)
+  const existingInScope=rawStudents.map(vpNormalizeStudent).filter(s=>vpSameScope(s,scope));
+  if(existingInScope.find(s=>s.matric.toUpperCase()===matric.toUpperCase())){
     err.textContent='Matric number already registered for '+vpScopeLabel(scope)+'.';showEl('reg-err');return;
   }
+  const students=[...rawStudents];
   students.push({id:'s_'+Date.now(),name,matric,dept,level,module,module_name:vpModuleName(module),modules:[module],phone,pw:pw1,createdAt:new Date().toISOString(),...vpScopePayload(scope)});
   S.set('vos_students',students);
+  // Save matric so login screen is pre-filled after redirect
+  try{ sessionStorage.setItem('vos_reg_matric', matric); }catch(e){}
   ok.textContent='Registration successful for '+vpScopeLabel(scope)+'. Redirecting to login...';showEl('reg-ok');
   setTimeout(()=>vosLoginScreen('student'),1200);
 };
@@ -3685,7 +3702,7 @@ vDashboard=function(){
   const u=vpNormalizeStudent(VAPP.user);
   const mods=vpVisibleModules(u);
   const att=vpScopeFilter(S.arr('vos_attendance')).filter(a=>a.matric===u.matric&&vpCanAccessModule(a.module,u));
-  const qr=vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>r.matric===u.matric&&vpCanAccessModule(r.module,u));
+  const qr=(S.arr('vos_quiz_results')||[]).filter(r=>r.matric===u.matric&&vpCanAccessModule(r.module,u));
   const ports=vpScopeFilter(S.arr('vos_portfolios')).filter(p=>p.matric===u.matric&&vpCanAccessModule(p.module,u));
   const myAssignments=vpScopeFilter(S.arr('vos_assignment_submissions')).filter(s=>s.matric===u.matric&&vpCanAccessModule(s.module,u));
   return ph('Welcome, '+u.name.split(' ')[0],`${u.dept} - Level ${u.level} - ${vpScopeLabel()}`)+`
@@ -3711,18 +3728,36 @@ vMarkAtt=function(moduleId,status){
   vosRender('v-attendance');
 };
 vQuiz=function(){
-  const quizzes=(S.arr('vos_quizzes')||[]).filter(q=>q.published&&vpCanAccessModule(q.module,VAPP.user));
-  const results=vpScopeFilter(S.arr('vos_quiz_results')).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
-  if(!quizzes.length) return ph('CBT Quiz')+'<div class="al ai">No quizzes available for your module right now.</div>';
-  return ph('CBT Quiz','Reusable quizzes shown for '+vpScopeLabel())+
-    quizzes.map(q=>{
-      const done=results.find(r=>r.quizId===q.id);
-      const m=vpModule(q.module);
-      return `<div class="card"><div class="ct">${m?m.icon:'Quiz'} ${q.title}</div>
-        <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} - ${q.questions.length} questions - ${q.duration} mins</p>
-        ${done?`<div class="al as">Completed in ${vpEsc(vpScopeLabel(done))} - Score: ${done.score}/${done.total} (${done.percent}%)</div>`:`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">Start Quiz</button>`}
-      </div>`;
-    }).join('');
+  // Pull quizzes fresh from Firestore if possible so a newly published quiz
+  // is visible immediately on every device (no manual Sync needed).
+  const _renderQuizTab=()=>{
+    const quizzes=(S.arr('vos_quizzes')||[]).filter(q=>q.published&&vpCanAccessModule(q.module,VAPP.user));
+    const results=(S.arr('vos_quiz_results')||[]).filter(r=>r.matric===VAPP.user.matric&&vpCanAccessModule(r.module,VAPP.user));
+    if(!quizzes.length) return ph('CBT Quiz')+'<div class="al ai">No quizzes available for your module right now. Check back after your admin publishes one.</div>';
+    return ph('CBT Quiz','Showing available quizzes for your module')+
+      quizzes.map(q=>{
+        // Match done result by quizId only — not scoped, since quizzes are reusable
+        const done=results.find(r=>r.quizId===q.id);
+        const m=vpModule(q.module);
+        return `<div class="card"><div class="ct">${m?m.icon:'📝'} ${q.title}</div>
+          <p style="font-size:.78rem;color:var(--dim)">${m?m.name:''} · ${q.questions.length} questions · ${q.duration} mins</p>
+          ${done?`<div class="al as">Completed — Score: ${done.score}/${done.total} (${done.percent}%)</div>`
+                :`<button class="btn btn-p" onclick="vStartQuiz('${q.id}')">▶ Start Quiz</button>`}
+        </div>`;
+      }).join('');
+  };
+  // Always re-pull from Firestore so newly published quizzes appear without manual sync
+  if(window._fbPullAll){
+    const c=document.getElementById('vos-tab-content');
+    if(c) c.innerHTML='<div class="tab-panel"><div class="al ai">Loading quizzes…</div></div>';
+    window._fbPullAll().then(()=>{
+      if(c) c.innerHTML=`<div class="tab-panel">${_renderQuizTab()}</div>`;
+    }).catch(()=>{
+      if(c) c.innerHTML=`<div class="tab-panel">${_renderQuizTab()}</div>`;
+    });
+    return ''; // content set async above
+  }
+  return _renderQuizTab();
 };
 vSubmitQuiz=function(){
   if(vQuizState.timer)clearInterval(vQuizState.timer);
