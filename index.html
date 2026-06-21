@@ -3305,6 +3305,10 @@ function buildVOSAdminShell(){
     vosSetTab('va-dashboard');
   }
 }
+// VOS tabs that need fresh data from Firestore before rendering
+// Note: v-quiz and va-quiz are NOT included because they have their own refresh logic
+const _VOS_REFRESH_TABS=new Set(['v-results','va-results','v-assignments','va-assignments','va-students']);
+
 function vosRender(id){
   const c=document.getElementById('vos-tab-content');
   const map={
@@ -3318,6 +3322,19 @@ function vosRender(id){
   };
   const fn=map[id];
   if(!fn){c.innerHTML='<div class="tab-panel"><div class="al ae">Tab not found: '+id+'</div></div>';return;}
+  // Fetch fresh data from Firestore for result/assignment tabs before rendering
+  if(_VOS_REFRESH_TABS.has(id)&&window._fbPullAll){
+    c.innerHTML='<div class="tab-panel"><div class="al ai" style="padding:2rem">⟳ Loading…</div></div>';
+    window._fbPullAll().then(()=>{
+      try{c.innerHTML='<div class="tab-panel">'+fn()+'</div>';}
+      catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error loading tab: '+e.message+'</div></div>';console.error(e);}
+    }).catch(()=>{
+      // If sync fails, still render with cached data
+      try{c.innerHTML='<div class="tab-panel">'+fn()+'</div>';}
+      catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error loading tab: '+e.message+'</div></div>';console.error(e);}
+    });
+    return;
+  }
   try{c.innerHTML=`<div class="tab-panel">${fn()}</div>`;}
   catch(e){c.innerHTML='<div class="tab-panel"><div class="al ae">Error loading tab: '+e.message+'</div></div>';console.error(e);}
 }
