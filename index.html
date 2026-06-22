@@ -3404,9 +3404,8 @@ function buildVOSAdminShell(){
     vosSetTab('va-dashboard');
   }
 }
-// VOS tabs that need fresh data from Firestore before rendering
-// Note: v-quiz and va-quiz are NOT included because they have their own refresh logic
-const _VOS_REFRESH_TABS=new Set(['v-results','va-results','v-assignments','va-assignments','va-students']);
+// VOS tabs that pull fresh data from Supabase before rendering
+const _VOS_REFRESH_TABS=new Set(['v-quiz','va-quiz','v-results','va-results','v-assignments','va-assignments','va-students','v-dashboard','va-dashboard','v-attendance','va-attendance','v-portfolio','va-portfolio']);
 
 function vosRender(id){
   const c=document.getElementById('vos-tab-content');
