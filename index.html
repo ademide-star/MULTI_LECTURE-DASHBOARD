@@ -329,177 +329,276 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.2rem 0}
 <div id="toast"></div>
 </div>
 
-<!-- ═══════════════════ FIREBASE MODULE SCRIPT ═══════════════════ -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { initializeFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+<!-- ═══════════════════ SUPABASE SYNC MODULE ═══════════════════ -->
+<!--
+  Replaces Firebase/Firestore with Supabase.
+  Project: ieqfdehnsggdaiiftsvm  (neuromatrix-lms)
+  Table  : portal_data  — columns: key TEXT PRIMARY KEY, value TEXT, ts BIGINT
+  RLS    : Public read + write (anon key) — see setup SQL below
 
-const _fbApp = initializeApp({
-  apiKey: "AIzaSyC9bRjMd38DJeTuioiq9oF_GD7t4QjUi6Y",
-  authDomain: "neuromatrix-lms-a4d58.firebaseapp.com",
-  projectId: "neuromatrix-lms-a4d58",
-  storageBucket: "neuromatrix-lms-a4d58.firebasestorage.app",
-  messagingSenderId: "758646781731",
-  appId: "1:758646781731:web:f9bbe82438dc5baa39fe96"
-});
-// Force long-polling — campus Wi-Fi / firewalls often block WebChannel/QUIC.
-const _db = initializeFirestore(_fbApp, {
-  experimentalForceLongPolling: true,
-  useFetchStreams: false,
-});
-const _auth = getAuth(_fbApp);
-
-function _fkey(k){ return String(k).replace(/[\/\.#\$\[\]]/g,'__').substring(0,1490); }
-window._fkey = _fkey;
-
-function _fbSet(k, v){
-  setDoc(doc(_db,'portal_data',_fkey(k)),{value:JSON.stringify(v),ts:Date.now()})
-    .catch(e=>console.warn('[FB set]',k,e));
-}
-window._fbSet = _fbSet;
-
-function _fbDel(k){
-  deleteDoc(doc(_db,'portal_data',_fkey(k)))
-    .catch(e=>console.warn('[FB del]',k,e));
-}
-window._fbDel = _fbDel;
-
-async function _fbPullAll(){
-  try{
-    const snap = await getDocs(collection(_db,'portal_data'));
-    snap.forEach(d=>{
-      try{
-        const raw = d.data().value;
-        if(raw !== undefined) localStorage.setItem(d.id, raw);
-      }catch{}
-    });
-    console.log('[Firebase] Pulled',snap.size,'keys ✅');
-  }catch(e){
-    console.warn('[Firebase] Pull failed — using local cache:',e);
-  }
-}
-window._fbPullAll = _fbPullAll;
-
-// ── CRITICAL FIX: Expose _fbRefresh so NM admin tabs can pull fresh data ──
-window._fbRefresh = _fbPullAll;
-
-async function _fbPullKey(k){
-  try{
-    const fk=_fkey(k);
-    const snap=await getDoc(doc(_db,'portal_data',fk));
-    if(snap.exists()){
-      const raw=snap.data().value;
-      if(raw!==undefined) localStorage.setItem(fk,raw);
-    }
-  }catch(e){console.warn('[FB pullKey]',k,e);}
-}
-window._fbPullKey=_fbPullKey;
-
-// ── CRITICAL FIX: Real-time Firestore listener for cross-device sync ──
-let _fbSnapshotActive = false;
-function _fbStartRealTimeSync(){
-  if(_fbSnapshotActive) return;
-  _fbSnapshotActive = true;
-  try{
-    onSnapshot(
-      collection(_db,'portal_data'),
-      {includeMetadataChanges: false},
-      snap => {
-        let anyChanged = false;
-        snap.docChanges().forEach(ch => {
-          // Only process server-confirmed changes (not local pending writes)
-          if(!ch.doc.metadata.hasPendingWrites){
-            if(ch.type==='added' || ch.type==='modified'){
-              try{
-                const raw = ch.doc.data().value;
-                if(raw !== undefined){ localStorage.setItem(ch.doc.id, raw); anyChanged = true; }
-              }catch{}
-            } else if(ch.type==='removed'){
-              try{ localStorage.removeItem(ch.doc.id); anyChanged = true; }catch{}
-            }
-          }
-        });
-        if(anyChanged){
-          // Debounce re-render to avoid flooding
-          clearTimeout(window._fbRenderDebounce);
-          window._fbRenderDebounce = setTimeout(() => {
-            try{
-              if(window.VAPP && window.VAPP.tab && window.vosRender){
-                // User is logged in — re-render their current tab
-                window.vosRender(window.VAPP.tab);
-              } else if(window.APP && window.APP.tab && window.renderTab){
-                window.renderTab(window.APP.tab);
-              } else {
-                // Nobody is logged in yet — if the VOS login form is visible and
-                // the user has typed their matric/password, auto-retry login.
-                // This fires when a student on a fresh browser typed credentials
-                // before Firestore had finished syncing their registration.
-                const unEl = document.getElementById('vos-un');
-                const pwEl = document.getElementById('vos-pw');
-                const loginVisible = unEl && pwEl &&
-                  unEl.offsetParent !== null &&   // element is visible
-                  unEl.value.trim() && pwEl.value;
-                if(loginVisible && window.vosLogin){
-                  console.log('[Firebase] Sync arrived — retrying login automatically');
-                  window.vosLogin();
-                }
-              }
-            }catch(e){}
-          }, 1200);
-        }
-      },
-      err => { console.warn('[FB onSnapshot error]', err); _fbSnapshotActive = false; }
-    );
-    console.log('[Firebase] Real-time sync active ✅');
-  }catch(e){ console.warn('[Firebase] onSnapshot setup failed:', e); }
-}
-window._fbStartRealTimeSync = _fbStartRealTimeSync;
-
-// ── Boot sequence ────────────────────────────────────────────────────────
-// Step 1: show connecting banner
-// Step 2: sign in anonymously so Firestore rules (request.auth != null) pass
-//         on EVERY device — student phones, laptops, etc.
-// Step 3: pull all cloud data into localStorage cache
-// Step 4: start real-time listener so further admin writes appear instantly
-// Step 5: fire 'firebase-ready' so the app renders
-
-const loadMsg = document.createElement('div');
-loadMsg.id = 'fb-load-msg';
-loadMsg.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.85rem;padding:.55rem 1rem;z-index:9999;text-align:center;letter-spacing:.02em;';
-loadMsg.textContent = '\u23F3 Connecting to NeuroMatrix cloud\u2026';
-document.body ? document.body.prepend(loadMsg) : document.addEventListener('DOMContentLoaded', () => document.body.prepend(loadMsg));
-
-// ── Step 2: anonymous auth ────────────────────────────────────────────────
-// This gives every visitor a Firebase Auth token, which is required by
-// Firestore security rules. Without it, every read/write is rejected on
-// devices that don't share your laptop's browser storage.
-try {
-  await signInAnonymously(_auth);
-  console.log('[Firebase] Signed in anonymously \u2705', _auth.currentUser?.uid);
-} catch(authErr) {
-  // If anonymous auth is disabled in the Firebase console this will throw.
-  // Print a clear message so it's easy to diagnose.
-  console.error(
-    '[Firebase] Anonymous sign-in FAILED.\n' +
-    'Go to Firebase Console > Authentication > Sign-in method > Anonymous > Enable it.\n',
-    authErr
+  ── Supabase setup SQL (run once in SQL Editor) ──────────────────────────
+  CREATE TABLE IF NOT EXISTS portal_data (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    ts    BIGINT NOT NULL DEFAULT 0
   );
-  loadMsg.style.background = '#4a1010';
-  loadMsg.textContent = '\u274C Auth failed — enable Anonymous sign-in in Firebase Console';
-  // Still attempt to continue; rules permitting open access will still work.
-}
+  ALTER TABLE portal_data ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "public_read"  ON portal_data FOR SELECT USING (true);
+  CREATE POLICY "public_write" ON portal_data FOR INSERT WITH CHECK (true);
+  CREATE POLICY "public_update"ON portal_data FOR UPDATE USING (true);
+  CREATE POLICY "public_delete"ON portal_data FOR DELETE USING (true);
+  ─────────────────────────────────────────────────────────────────────────
+-->
+<script>
+(async function _supabaseModule() {
 
-// ── Step 3: pull all data ─────────────────────────────────────────────────
-loadMsg.textContent = '\u2193 Loading portal data\u2026';
-await _fbPullAll();
+  // ── Config ──────────────────────────────────────────────────────────────
+  const SB_URL = 'https://ieqfdehnsggdaiiftsvm.supabase.co';
+  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllcWZkZWhuc2dnZGFpaWZ0c3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzk4MjcsImV4cCI6MjA5NzY1NTgyN30.2L4Fvbfr-y8KpSao3cjmhoDeiniaeSQ6AIqo_E0aAX4';
+  const TABLE  = 'portal_data';
 
-// ── Step 4 + 5 ───────────────────────────────────────────────────────────
-_fbStartRealTimeSync();
-loadMsg.remove();
-window.dispatchEvent(new Event('firebase-ready'));
+  // IMPORTANT: We pass apikey as a URL query param (?apikey=...) on every
+  // request instead of only in headers. Browsers can strip custom headers
+  // during CORS preflight but query params always survive — this fixes the
+  // 401 "No API key found" error on cross-origin requests from file:// or
+  // any hosted domain that isn't on Supabase's allowlist.
+  const REST = SB_URL + '/rest/v1/' + TABLE;
+
+  // Common read headers (no apikey header needed — it's in the URL param)
+  const READ_HEADERS = {
+    'apikey':        SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+  };
+  // Write headers add Content-Type
+  const WRITE_HEADERS = {
+    'apikey':        SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type':  'application/json',
+  };
+
+  // ── Loading banner ───────────────────────────────────────────────────────
+  const loadMsg = document.createElement('div');
+  loadMsg.id = 'fb-load-msg';
+  loadMsg.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#0f1724;color:#00d4ff;font-family:monospace;font-size:.85rem;padding:.55rem 1rem;z-index:9999;text-align:center;letter-spacing:.02em;';
+  loadMsg.textContent = '\u23F3 Connecting to NeuroMatrix cloud\u2026';
+  (document.body || document.documentElement).prepend(loadMsg);
+
+  // ── Key sanitiser ────────────────────────────────────────────────────────
+  function _fkey(k) { return String(k).replace(/[\/\.#\$\[\]\s]/g, '__').substring(0, 400); }
+  window._fkey = _fkey;
+
+  // ── Error banner ─────────────────────────────────────────────────────────
+  function _sbError(msg) {
+    let banner = document.getElementById('sb-err-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'sb-err-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#7f1d1d;color:#fecaca;font-family:monospace;font-size:.8rem;padding:.65rem 1.2rem;z-index:10000;text-align:center;line-height:1.7;white-space:pre-wrap;cursor:pointer;';
+      banner.title = 'Click to dismiss';
+      banner.onclick = () => banner.remove();
+      document.body.prepend(banner);
+    }
+    banner.textContent = msg;
+    console.error('[Supabase]', msg);
+  }
+
+  // ── Decode HTTP error into a human message ───────────────────────────────
+  async function _sbErrMsg(res, key) {
+    const txt = await res.text().catch(() => '');
+    const missing = txt.includes('does not exist') || txt.includes('relation') || res.status === 404;
+    const blocked = res.status === 401 || res.status === 403;
+    if (missing) {
+      _sbError(
+        '\u26a0\ufe0f  Supabase table "portal_data" not found (HTTP ' + res.status + ').\n' +
+        'Go to Supabase \u2192 SQL Editor and run the CREATE TABLE + RLS setup SQL.\n' +
+        '(The full SQL is in the comment block at the top of the SUPABASE SYNC MODULE.)\n' +
+        'Detail: ' + txt.substring(0, 180)
+      );
+    } else if (blocked) {
+      _sbError(
+        '\u26a0\ufe0f  Supabase blocked request (HTTP ' + res.status + ').\n' +
+        'Most likely cause: table exists but RLS policies are missing.\n' +
+        'Run this in Supabase \u2192 SQL Editor:\n' +
+        '  ALTER TABLE portal_data ENABLE ROW LEVEL SECURITY;\n' +
+        '  CREATE POLICY "public_read"   ON portal_data FOR SELECT USING (true);\n' +
+        '  CREATE POLICY "public_write"  ON portal_data FOR INSERT WITH CHECK (true);\n' +
+        '  CREATE POLICY "public_update" ON portal_data FOR UPDATE USING (true);\n' +
+        '  CREATE POLICY "public_delete" ON portal_data FOR DELETE USING (true);\n' +
+        'Detail: ' + txt.substring(0, 180)
+      );
+    } else {
+      console.warn('[SB] HTTP', res.status, key ? 'key:' + key : '', txt.substring(0, 120));
+    }
+    return txt;
+  }
+
+  // ── UPSERT a single key ──────────────────────────────────────────────────
+  // apikey passed as URL param to survive CORS preflight header stripping.
+  // on_conflict=key tells PostgREST to UPDATE if the primary key already exists.
+  function _sbSet(k, v) {
+    const fk   = _fkey(k);
+    const body = JSON.stringify({ key: fk, value: JSON.stringify(v), ts: Date.now() });
+    const url  = REST + '?on_conflict=key&apikey=' + SB_KEY;
+    fetch(url, {
+      method:  'POST',
+      headers: { ...WRITE_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body,
+    }).then(res => { if (!res.ok) _sbErrMsg(res, k); })
+      .catch(e => console.warn('[SB set] Network error for key:', k, '|', e.message || e));
+  }
+  window._fbSet = _sbSet;
+
+  // ── DELETE a single key ──────────────────────────────────────────────────
+  function _sbDel(k) {
+    const fk  = _fkey(k);
+    const url = REST + '?key=eq.' + encodeURIComponent(fk) + '&apikey=' + SB_KEY;
+    fetch(url, {
+      method:  'DELETE',
+      headers: { ...WRITE_HEADERS, 'Prefer': 'return=minimal' },
+    }).catch(e => console.warn('[SB del] Network error for key:', k, '|', e.message || e));
+  }
+  window._fbDel = _sbDel;
+
+  // ── PULL ALL rows → localStorage ─────────────────────────────────────────
+  async function _sbPullAll() {
+    try {
+      let allRows = [], offset = 0;
+      while (true) {
+        const url = REST + '?select=key,value&limit=1000&offset=' + offset + '&apikey=' + SB_KEY;
+        const res = await fetch(url, { headers: READ_HEADERS });
+        if (!res.ok) { await _sbErrMsg(res); break; }
+        const rows = await res.json();
+        if (!Array.isArray(rows) || !rows.length) break;
+        rows.forEach(row => {
+          try { if (row.value !== undefined) localStorage.setItem(row.key, row.value); } catch {}
+        });
+        allRows = allRows.concat(rows);
+        if (rows.length < 1000) break;
+        offset += 1000;
+      }
+      if (allRows.length > 0) {
+        const b = document.getElementById('sb-err-banner'); if (b) b.remove();
+        console.log('[Supabase] Pulled', allRows.length, 'keys \u2705');
+      } else {
+        console.log('[Supabase] Pull complete \u2014 table empty or no data yet.');
+      }
+    } catch(e) {
+      console.warn('[Supabase] Pull failed \u2014 using local cache:', e.message || e);
+    }
+  }
+  window._fbPullAll = _sbPullAll;
+  window._fbRefresh = _sbPullAll;
+
+  // ── PULL a single key ────────────────────────────────────────────────────
+  async function _sbPullKey(k) {
+    try {
+      const fk  = _fkey(k);
+      const url = REST + '?key=eq.' + encodeURIComponent(fk) + '&select=key,value&limit=1&apikey=' + SB_KEY;
+      const res = await fetch(url, { headers: READ_HEADERS });
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (rows[0]?.value !== undefined) localStorage.setItem(rows[0].key, rows[0].value);
+    } catch(e) { console.warn('[SB pullKey]', k, e); }
+  }
+  window._fbPullKey = _sbPullKey;
+
+  // ── REAL-TIME via Supabase Realtime WebSocket ────────────────────────────
+  // Listens for INSERT / UPDATE / DELETE on portal_data and mirrors changes
+  // into localStorage, then debounce-re-renders the active tab.
+  let _rtWs = null, _rtHB = null, _rtActive = false;
+
+  function _sbStartRealTime() {
+    if (_rtActive) return;
+    _rtActive = true;
+    const wsUrl = SB_URL.replace('https', 'wss') + '/realtime/v1/websocket?apikey=' + SB_KEY + '&vsn=1.0.0';
+
+    function _connect() {
+      try {
+        _rtWs = new WebSocket(wsUrl);
+
+        _rtWs.onopen = () => {
+          console.log('[Supabase RT] Connected \u2705');
+          _rtWs.send(JSON.stringify({
+            topic:   'realtime:portal_data_changes',
+            event:   'phx_join',
+            payload: {
+              config: {
+                broadcast:        { self: false },
+                presence:         { key: '' },
+                postgres_changes: [{ event: '*', schema: 'public', table: TABLE }],
+              }
+            },
+            ref: '1',
+          }));
+          clearInterval(_rtHB);
+          _rtHB = setInterval(() => {
+            try {
+              if (_rtWs && _rtWs.readyState === WebSocket.OPEN)
+                _rtWs.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
+            } catch {}
+          }, 25000);
+        };
+
+        _rtWs.onmessage = (evt) => {
+          try {
+            const msg       = JSON.parse(evt.data);
+            const eventType = msg?.payload?.data?.type;
+            const record    = msg?.payload?.data?.record;
+            const oldRecord = msg?.payload?.data?.old_record;
+            if (!eventType) return;
+            let changed = false;
+            if (eventType === 'INSERT' || eventType === 'UPDATE') {
+              if (record?.key && record?.value !== undefined) {
+                localStorage.setItem(record.key, record.value); changed = true;
+              }
+            } else if (eventType === 'DELETE') {
+              const dk = oldRecord?.key || record?.key;
+              if (dk) { localStorage.removeItem(dk); changed = true; }
+            }
+            if (changed) {
+              clearTimeout(window._fbRenderDebounce);
+              window._fbRenderDebounce = setTimeout(() => {
+                try {
+                  if (window.VAPP?.tab && window.vosRender)       window.vosRender(window.VAPP.tab);
+                  else if (window.APP?.tab && window.renderTab)   window.renderTab(window.APP.tab);
+                  else {
+                    const u = document.getElementById('vos-un');
+                    const p = document.getElementById('vos-pw');
+                    if (u && p && u.offsetParent && u.value.trim() && p.value && window.vosLogin) {
+                      console.log('[Supabase RT] Retrying login after sync');
+                      window.vosLogin();
+                    }
+                  }
+                } catch {}
+              }, 1000);
+            }
+          } catch {}
+        };
+
+        _rtWs.onerror = (e) => console.warn('[Supabase RT] WS error', e);
+        _rtWs.onclose = () => {
+          console.warn('[Supabase RT] Disconnected \u2014 reconnecting in 5s\u2026');
+          clearInterval(_rtHB);
+          _rtActive = false;
+          setTimeout(_connect, 5000);
+        };
+      } catch(e) {
+        console.warn('[Supabase RT] Setup failed:', e);
+        _rtActive = false;
+      }
+    }
+    _connect();
+  }
+  window._fbStartRealTimeSync = _sbStartRealTime;
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  loadMsg.textContent = '\u2193 Loading portal data\u2026';
+  await _sbPullAll();
+  _sbStartRealTime();
+  loadMsg.remove();
+  window.dispatchEvent(new Event('firebase-ready'));
+
+})();
 </script>
 
 <!-- ═══════════════════ MAIN APPLICATION SCRIPT ═══════════════════ -->
@@ -4515,3 +4614,4 @@ window.addEventListener('firebase-ready', ()=>{ if(!window._fbDidBoot){window._f
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
+
