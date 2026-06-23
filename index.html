@@ -3836,11 +3836,17 @@ vDashboard=function(){
   </div>`;
 };
 vMarkAtt=function(moduleId,status){
-  const att=S.arr('vos_attendance');
-  att.push({id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,module:moduleId,date:new Date().toISOString(),time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),status,...vpScopePayload()});
-  S.set('vos_attendance',att);
-  toast(`Marked ${status}`,'success');
-  vosRender('v-attendance');
+  const newRec={id:'att_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,module:moduleId,date:new Date().toISOString(),time:new Date().toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'}),status,...vpScopePayload()};
+  // Pull latest from Supabase first so we don't overwrite other students' records
+  const _save=()=>{
+    const att=S.arr('vos_attendance');
+    att.push(newRec);
+    S.set('vos_attendance',att);
+    toast(`Marked ${status}`,'success');
+    vosRender('v-attendance');
+  };
+  if(window._fbPullKey){window._fbPullKey('vos_attendance').then(_save).catch(_save);}
+  else{_save();}
 };
 vQuiz=function(){
   // Pull quizzes fresh from Firestore if possible so a newly published quiz
@@ -3880,7 +3886,16 @@ vSubmitQuiz=function(){
   let score=0;
   quiz.questions.forEach((q,i)=>{if(answers[i]===q.correct)score++;});
   const result={id:'qr_'+Date.now(),matric:VAPP.user.matric,name:VAPP.user.name,dept:VAPP.user.dept,level:VAPP.user.level,quizId:quiz.id,quizTitle:quiz.title,module:quiz.module,score,total:quiz.questions.length,percent:Math.round(score/quiz.questions.length*100),date:new Date().toISOString(),...vpScopePayload()};
-  const results=S.arr('vos_quiz_results');results.push(result);S.set('vos_quiz_results',results);
+  // Pull latest results from Supabase before saving to avoid overwriting other students' records
+  const _saveResult=()=>{
+    const results=S.arr('vos_quiz_results');
+    // Remove any existing result for this quiz+student (prevent duplicates)
+    const filtered=results.filter(r=>!(r.matric===result.matric&&r.quizId===result.quizId));
+    filtered.push(result);
+    S.set('vos_quiz_results',filtered);
+  };
+  if(window._fbPullKey){window._fbPullKey('vos_quiz_results').then(_saveResult).catch(_saveResult);}
+  else{_saveResult();}
   vQuizState=null;
   document.getElementById('vos-tab-content').innerHTML=`<div class="tab-panel"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:3rem">${result.percent>=70?'Excellent':result.percent>=50?'Good':'Review'}</div><h2 style="font-family:var(--head);color:var(--bright);margin:.5rem 0">Quiz Submitted</h2><p style="color:var(--dim)">${result.quizTitle} - ${vpEsc(vpScopeLabel(result))}</p><div style="font-size:2.5rem;font-weight:800;color:var(--cyan);margin-top:1rem">${score}/${result.total}</div><div style="font-size:1.2rem">${result.percent}%</div><button class="btn btn-p" style="margin-top:1.2rem" onclick="vosSetTab('v-quiz')">Back to Quizzes</button></div></div>`;
 };
