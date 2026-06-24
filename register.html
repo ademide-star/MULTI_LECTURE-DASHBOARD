@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini LMS · Supabase Registration</title>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* ----- GLOBAL RESET & BASE ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: #f4f7fc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem 1rem;
+        }
+
+        .app-container {
+            max-width: 1200px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0, 20, 40, 0.08);
+            padding: 2rem 2.5rem;
+            transition: all 0.2s ease;
+        }
+
+        /* ----- HEADER / NAV ----- */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #eef3f8;
+        }
+
+        .app-header h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #0b1e33;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .app-header h1 i {
+            color: #2a7de1;
+            font-size: 2rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.6rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: #1a3a5c;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0b2a47;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(26, 58, 92, 0.2);
+        }
+
+        .btn-success {
+            background: #1e7b4a;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #15653b;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(30, 123, 74, 0.25);
+        }
+
+        .btn-danger {
+            background: #c73b3b;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #a82e2e;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(199, 59, 59, 0.2);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #1a3a5c;
+            border: 1.5px solid #dce5ef;
+        }
+        .btn-outline:hover {
+            background: #f0f5fb;
+            border-color: #b0c4db;
+        }
+
+        .btn-sm {
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            border-radius: 8px;
+        }
+
+        /* ----- VIEWS (Toggle) ----- */
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+
+        /* ----- REGISTRATION FORM ----- */
+        .registration-card {
+            background: #f9fcff;
+            border-radius: 20px;
+            padding: 2rem 2.5rem;
+            border: 1px solid #e6edf5;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .registration-card h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1a3a5c;
+            margin-bottom: 0.3rem;
+        }
+
+        .registration-card .subtitle {
+            color: #5b6f87;
+            margin-bottom: 1.8rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.2rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #2d4b6e;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .form-group input {
+            padding: 0.8rem 1rem;
+            border: 1.5px solid #dce5ef;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: white;
+            transition: 0.2s;
+            outline: none;
+            width: 100%;
+        }
+
+        .form-group input:focus {
+            border-color: #2a7de1;
+            box-shadow: 0 0 0 4px rgba(42, 125, 225, 0.12);
+        }
+
+        .form-group input::placeholder {
+            color: #a5b8ce;
+        }
+
+        .form-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .message {
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+            display: none;
+        }
+        .message.success {
+            display: block;
+            background: #e3f5eb;
+            color: #15653b;
+            border: 1px solid #b7e0cc;
+        }
+        .message.error {
+            display: block;
+            background: #fde8e8;
+            color: #a82e2e;
+            border: 1px solid #f5c2c2;
+        }
+
+        /* ----- ADMIN LOGIN ----- */
+        .admin-login-box {
+            max-width: 420px;
+            margin: 2rem auto;
+            background: #f9fcff;
+            padding: 2rem;
+            border-radius: 20px;
+            border: 1px solid #e6edf5;
+        }
+
+        .admin-login-box h3 {
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: #0b1e33;
+        }
+
+        .admin-login-box .form-group {
+            margin-bottom: 1rem;
+        }
+
+        /* ----- ADMIN DASHBOARD ----- */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #f8faff;
+            border-radius: 16px;
+            padding: 0.9rem 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            border: 1px solid #e6edf5;
+            flex: 1 1 auto;
+        }
+
+        .stat-card i {
+            font-size: 1.5rem;
+            color: #2a7de1;
+            opacity: 0.8;
+        }
+        .stat-card .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0b1e33;
+        }
+        .stat-card .stat-label {
+            font-size: 0.85rem;
+            color: #5b6f87;
+            margin-left: 0.2rem;
+        }
+
+        .table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f4f7fc;
+            padding: 0.2rem 0.2rem 0.2rem 1rem;
+            border-radius: 100px;
+            border: 1px solid #dce5ef;
+            transition: 0.2s;
+        }
+        .search-box:focus-within {
+            border-color: #2a7de1;
+            box-shadow: 0 0 0 4px rgba(42, 125, 225, 0.08);
+        }
+        .search-box i {
+            color: #7a8fa8;
+            font-size: 0.9rem;
+        }
+        .search-box input {
+            border: none;
+            background: transparent;
+            padding: 0.5rem 0.2rem;
+            font-size: 0.9rem;
+            outline: none;
+            min-width: 160px;
+            color: #0b1e33;
+        }
+        .search-box input::placeholder {
+            color: #a5b8ce;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid #e6edf5;
+            background: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+        }
+
+        thead {
+            background: #f8faff;
+            border-bottom: 2px solid #e6edf5;
+        }
+        thead th {
+            padding: 0.9rem 1.2rem;
+            text-align: left;
+            font-weight: 600;
+            color: #1a3a5c;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        tbody tr {
+            border-bottom: 1px solid #eef3f8;
+            transition: background 0.1s;
+        }
+        tbody tr:hover {
+            background: #fafcff;
+        }
+        tbody td {
+            padding: 0.9rem 1.2rem;
+            color: #1f3b5a;
+            vertical-align: middle;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3.5rem 1rem;
+            color: #7a8fa8;
+        }
+        .empty-state i {
+            font-size: 3rem;
+            color: #dce5ef;
+            margin-bottom: 0.8rem;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .action-btns .btn {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.75rem;
+            border-radius: 8px;
+        }
+
+        /* ----- RESPONSIVE ----- */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 1.2rem;
+            }
+            .app-header h1 {
+                font-size: 1.4rem;
+            }
+            .registration-card {
+                padding: 1.5rem;
+            }
+            .stats-row {
+                flex-direction: column;
+                gap: 0.8rem;
+            }
+            .stat-card {
+                padding: 0.7rem 1.2rem;
+            }
+            .table-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .search-box {
+                width: 100%;
+            }
+            .search-box input {
+                width: 100%;
+                min-width: unset;
+            }
+        }
+        @media (max-width: 480px) {
+            .app-container {
+                padding: 0.8rem;
+                border-radius: 20px;
+            }
+            .registration-card {
+                padding: 1rem;
+            }
+            thead th,
+            tbody td {
+                padding: 0.6rem 0.8rem;
+                font-size: 0.82rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="app">
+
+        <!-- HEADER -->
+        <header class="app-header">
+            <h1>
+                <i class="fas fa-graduation-cap"></i>
+                Mini LMS
+            </h1>
+            <div class="header-actions">
+                <button class="btn btn-outline btn-sm" id="switchToStudentView" style="display:none;">
+                    <i class="fas fa-user-plus"></i> Student Registration
+                </button>
+                <button class="btn btn-outline btn-sm" id="switchToAdminView">
+                    <i class="fas fa-lock"></i> Admin Login
+                </button>
+                <button class="btn btn-danger btn-sm" id="logoutBtn" style="display:none;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: STUDENT REGISTRATION -->
+        <!-- ========================================== -->
+        <section id="registrationView" class="view active">
+            <div class="registration-card">
+                <h2><i class="fas fa-user-graduate" style="color:#2a7de1;"></i> Student Registration</h2>
+                <p class="subtitle">Fill in your details to register for the program.</p>
+
+                <form id="registrationForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="regFullName">Full Name</label>
+                            <input type="text" id="regFullName" placeholder="e.g. Adeola Ogunlesi" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="regMatricNo">Matric Number</label>
+                            <input type="text" id="regMatricNo" placeholder="e.g. 2024/12345" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="regDepartment">Department</label>
+                            <input type="text" id="regDepartment" placeholder="e.g. Computer Science" required />
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="regSubmitBtn">
+                                <i class="fas fa-paper-plane"></i> Register
+                            </button>
+                            <span id="regSpinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i> Submitting...</span>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="regMessage" class="message"></div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: ADMIN LOGIN + DASHBOARD -->
+        <!-- ========================================== -->
+        <section id="adminView" class="view">
+            <!-- Login Form -->
+            <div id="adminLoginBox" class="admin-login-box">
+                <h3><i class="fas fa-shield-alt"></i> Admin Login</h3>
+                <form id="adminLoginForm">
+                    <div class="form-group">
+                        <label for="adminUsername">Username</label>
+                        <input type="text" id="adminUsername" placeholder="adebimpe" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="adminPassword">Password</label>
+                        <input type="password" id="adminPassword" placeholder="••••••••" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    <div id="loginMessage" style="margin-top:1rem; color:#c73b3b; font-size:0.9rem;"></div>
+                </form>
+            </div>
+
+            <!-- Dashboard (hidden until login) -->
+            <div id="adminDashboard" style="display:none;">
+                <div class="dashboard-header">
+                    <h2><i class="fas fa-users-cog"></i> Admin Dashboard</h2>
+                    <div>
+                        <button class="btn btn-success btn-sm" id="exportCsvBtn">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <i class="fas fa-user-graduate"></i>
+                        <span class="stat-number" id="totalStudents">0</span>
+                        <span class="stat-label">Total Students</span>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-building"></i>
+                        <span class="stat-number" id="totalDepartments">0</span>
+                        <span class="stat-label">Departments</span>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-toolbar">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="adminSearchInput" placeholder="Search students..." />
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Full Name</th>
+                                <th>Matric Number</th>
+                                <th>Department</th>
+                                <th>Registered</th>
+                                <th style="text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody">
+                            <tr><td colspan="6"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SUPABASE SDK & APP LOGIC -->
+    <!-- ========================================== -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (function() {
+            'use strict';
+
+            // ============================================================
+            // 1. SUPABASE CONFIGURATION (REPLACE WITH YOUR OWN)
+            // ============================================================
+            const SUPABASE_URL = 'https://ipstxfvtasgbnqtybmyn.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwc3R4ZnZ0YXNnYm5xdHlibXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNjIwODMsImV4cCI6MjA5NzgzODA4M30.UBw7F3y2mYdOEkrHlcpOH1DuZh373ipuv9EpIeGGcl4';
+
+            // ============================================================
+            // 2. INIT SUPABASE
+            // ============================================================
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            // ============================================================
+            // 3. DOM REFS
+            // ============================================================
+            const registrationView = document.getElementById('registrationView');
+            const adminView = document.getElementById('adminView');
+            const switchToStudentView = document.getElementById('switchToStudentView');
+            const switchToAdminView = document.getElementById('switchToAdminView');
+            const logoutBtn = document.getElementById('logoutBtn');
+
+            // Registration
+            const regForm = document.getElementById('registrationForm');
+            const regFullName = document.getElementById('regFullName');
+            const regMatricNo = document.getElementById('regMatricNo');
+            const regDepartment = document.getElementById('regDepartment');
+            const regSubmitBtn = document.getElementById('regSubmitBtn');
+            const regSpinner = document.getElementById('regSpinner');
+            const regMessage = document.getElementById('regMessage');
+
+            // Admin Login
+            const adminLoginBox = document.getElementById('adminLoginBox');
+            const adminDashboard = document.getElementById('adminDashboard');
+            const adminLoginForm = document.getElementById('adminLoginForm');
+            const adminUsername = document.getElementById('adminUsername');
+            const adminPassword = document.getElementById('adminPassword');
+            const loginMessage = document.getElementById('loginMessage');
+
+            // Admin Dashboard
+            const adminTableBody = document.getElementById('adminTableBody');
+            const totalStudentsEl = document.getElementById('totalStudents');
+            const totalDepartmentsEl = document.getElementById('totalDepartments');
+            const adminSearchInput = document.getElementById('adminSearchInput');
+            const exportCsvBtn = document.getElementById('exportCsvBtn');
+
+            // ============================================================
+            // 4. STATE
+            // ============================================================
+            let allStudents = [];
+            let isAdmin = false; // simple flag for admin login
+
+            // ============================================================
+            // 5. UI HELPERS
+            // ============================================================
+            function showView(view) {
+                registrationView.classList.remove('active');
+                adminView.classList.remove('active');
+                if (view === 'registration') {
+                    registrationView.classList.add('active');
+                    switchToStudentView.style.display = 'none';
+                    switchToAdminView.style.display = 'inline-flex';
+                    logoutBtn.style.display = 'none';
+                } else if (view === 'admin') {
+                    adminView.classList.add('active');
+                    switchToStudentView.style.display = 'inline-flex';
+                    switchToAdminView.style.display = 'none';
+                    // show login or dashboard based on isAdmin
+                    if (isAdmin) {
+                        adminLoginBox.style.display = 'none';
+                        adminDashboard.style.display = 'block';
+                        logoutBtn.style.display = 'inline-flex';
+                        fetchStudents();
+                    } else {
+                        adminLoginBox.style.display = 'block';
+                        adminDashboard.style.display = 'none';
+                        logoutBtn.style.display = 'none';
+                    }
+                }
+            }
+
+            function showRegMessage(text, type) {
+                regMessage.textContent = text;
+                regMessage.className = 'message ' + type;
+            }
+            function hideRegMessage() {
+                regMessage.className = 'message';
+                regMessage.textContent = '';
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatDate(isoString) {
+                if (!isoString) return '—';
+                const d = new Date(isoString);
+                return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+
+            // ============================================================
+            // 6. REGISTRATION (PUBLIC)
+            // ============================================================
+            regForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideRegMessage();
+
+                const fullName = regFullName.value.trim();
+                const matricNo = regMatricNo.value.trim();
+                const department = regDepartment.value.trim();
+
+                if (!fullName || !matricNo || !department) {
+                    showRegMessage('Please fill in all fields.', 'error');
+                    return;
+                }
+
+                // Disable button & show spinner
+                regSubmitBtn.disabled = true;
+                regSpinner.style.display = 'inline';
+
+                try {
+                    const { data, error } = await supabase
+                        .from('students')
+                        .insert([{
+                            full_name: fullName,
+                            matric_no: matricNo,
+                            department: department
+                        }]);
+
+                    if (error) {
+                        console.error('Supabase insert error:', error);
+                        if (error.code === '23505') { // Unique violation
+                            showRegMessage('This Matric Number is already registered.', 'error');
+                        } else {
+                            showRegMessage('Registration failed. Please try again.', 'error');
+                        }
+                    } else {
+                        showRegMessage('✅ Registration successful! You have been added to the system.', 'success');
+                        regForm.reset();
+                    }
+                } catch (err) {
+                    console.error('Network error:', err);
+                    showRegMessage('Network error. Please check your connection.', 'error');
+                } finally {
+                    regSubmitBtn.disabled = false;
+                    regSpinner.style.display = 'none';
+                }
+            });
+
+            // ============================================================
+            // 7. ADMIN LOGIN (simple username/password)
+            // ============================================================
+            adminLoginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                loginMessage.textContent = '';
+
+                const username = adminUsername.value.trim();
+                const password = adminPassword.value.trim();
+
+                // Hardcoded credentials
+                if (username === 'adebimpe' && password === 'ademideola') {
+                    isAdmin = true;
+                    showView('admin');
+                    loginMessage.textContent = '';
+                    adminLoginForm.reset();
+                } else {
+                    loginMessage.textContent = 'Invalid username or password.';
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                isAdmin = false;
+                showView('registration');
+            });
+
+            // ============================================================
+            // 8. ADMIN DASHBOARD (CRUD)
+            // ============================================================
+            async function fetchStudents() {
+                try {
+                    const { data, error } = await supabase
+                        .from('students')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+
+                    if (error) {
+                        console.error('Fetch error:', error);
+                        adminTableBody.innerHTML =
+                            `<tr><td colspan="6"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading data.</p></div></td></tr>`;
+                        return;
+                    }
+
+                    allStudents = data || [];
+                    renderAdminTable(allStudents);
+                    updateStats(allStudents);
+                } catch (err) {
+                    console.error('Network error:', err);
+                    adminTableBody.innerHTML =
+                        `<tr><td colspan="6"><div class="empty-state"><i class="fas fa-wifi"></i><p>Network error. Please refresh.</p></div></td></tr>`;
+                }
+            }
+
+            function renderAdminTable(students) {
+                if (!students || students.length === 0) {
+                    adminTableBody.innerHTML =
+                        `<tr><td colspan="6"><div class="empty-state"><i class="fas fa-user-slash"></i><p>No students registered yet.</p></div></td></tr>`;
+                    return;
+                }
+
+                let html = '';
+                students.forEach((s, index) => {
+                    html += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td><strong>${escapeHtml(s.full_name)}</strong></td>
+                            <td><span style="background:#eef3f8; padding:0.2rem 0.9rem; border-radius:100px; font-size:0.8rem;">${escapeHtml(s.matric_no)}</span></td>
+                            <td>${escapeHtml(s.department)}</td>
+                            <td>${formatDate(s.created_at)}</td>
+                            <td style="text-align:right;">
+                                <div class="action-btns" style="justify-content:flex-end;">
+                                    <button class="btn btn-danger btn-sm delete-btn" data-id="${s.id}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                adminTableBody.innerHTML = html;
+
+                // Bind delete events
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', handleDelete);
+                });
+            }
+
+            function updateStats(students) {
+                totalStudentsEl.textContent = students.length;
+                const depts = new Set(students.map(s => s.department.trim().toLowerCase()));
+                totalDepartmentsEl.textContent = depts.size;
+            }
+
+            async function handleDelete(e) {
+                const btn = e.currentTarget;
+                const id = parseInt(btn.getAttribute('data-id'), 10);
+                if (!confirm('Delete this student record permanently?')) return;
+
+                try {
+                    const { error } = await supabase
+                        .from('students')
+                        .delete()
+                        .eq('id', id);
+
+                    if (error) {
+                        alert('Failed to delete. Please try again.');
+                        console.error(error);
+                    } else {
+                        await fetchStudents(); // refresh
+                    }
+                } catch (err) {
+                    alert('Network error.');
+                    console.error(err);
+                }
+            }
+
+            // Search
+            adminSearchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (!query) {
+                    renderAdminTable(allStudents);
+                    return;
+                }
+                const filtered = allStudents.filter(s =>
+                    s.full_name.toLowerCase().includes(query) ||
+                    s.matric_no.toLowerCase().includes(query) ||
+                    s.department.toLowerCase().includes(query)
+                );
+                renderAdminTable(filtered);
+            });
+
+            // ============================================================
+            // 9. EXPORT CSV
+            // ============================================================
+            exportCsvBtn.addEventListener('click', () => {
+                if (!allStudents || allStudents.length === 0) {
+                    alert('No students to export.');
+                    return;
+                }
+
+                const headers = ['Full Name', 'Matric Number', 'Department', 'Registration Date'];
+                const rows = allStudents.map(s => [
+                    s.full_name,
+                    s.matric_no,
+                    s.department,
+                    s.created_at ? new Date(s.created_at).toLocaleString() : ''
+                ]);
+
+                const escape = (str) => {
+                    if (typeof str !== 'string') str = String(str);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                };
+
+                let csv = headers.map(escape).join(',') + '\n';
+                rows.forEach(row => {
+                    csv += row.map(escape).join(',') + '\n';
+                });
+
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                const date = new Date().toISOString().slice(0, 10);
+                link.setAttribute('download', `students_${date}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            });
+
+            // ============================================================
+            // 10. VIEW SWITCHING
+            // ============================================================
+            switchToStudentView.addEventListener('click', () => {
+                showView('registration');
+            });
+
+            switchToAdminView.addEventListener('click', () => {
+                showView('admin');
+                if (isAdmin) {
+                    fetchStudents();
+                }
+            });
+
+            // ============================================================
+            // 11. INIT
+            // ============================================================
+            // Start with registration view
+            showView('registration');
+
+        })();
+    </script>
+
+</body>
+</html>
