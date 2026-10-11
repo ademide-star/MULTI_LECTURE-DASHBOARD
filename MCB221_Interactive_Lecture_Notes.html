@@ -1610,6 +1610,7 @@ async function nmSbSet(key, value) {
 }
 
 function nmGetLocalIdent() {
+  try { const q = new URLSearchParams(location.search); if (q.get('m') && q.get('n')) nmSetLocalIdent(q.get('n').trim(), q.get('m').trim()); } catch (e) {}
   try { return JSON.parse(localStorage.getItem('nm_notes_student') || 'null') || { name: '', matric: '' }; }
   catch (e) { return { name: '', matric: '' }; }
 }
@@ -1634,7 +1635,7 @@ async function nmEnsureRemoteQuestionBank(weekNum) {
   await nmSbSet(qKey, lmsShape);
   const statusKey = `nm_cw_status_${NM_COURSE_CODE}_${nmWeekLabel(weekNum)}`;
   const status = await nmSbGet(statusKey);
-  if (!status) await nmSbSet(statusKey, { is_open: true, release_answers: false });
+  if (!status) await nmSbSet(statusKey, { is_open: false, release_answers: false });
 }
 
 async function nmGetExistingSubmission(weekNum, matric) {
@@ -1684,8 +1685,8 @@ async function fcInit(weekNum) {
   }
 
   const status = await nmSbGet(`nm_cw_status_${NM_COURSE_CODE}_${nmWeekLabel(weekNum)}`);
-  if (status && status.is_open === false) {
-    el.innerHTML = `<div class="fc-locked">🔒 Classwork for ${nmWeekLabel(weekNum)} is currently closed by the lecturer.</div>`;
+  if (!status || status.is_open !== true) {
+    el.innerHTML = `<div class="fc-locked">🔒 Classwork for ${nmWeekLabel(weekNum)} is not open yet. Your lecturer opens it from the portal.</div>`;
     return;
   }
 
@@ -1984,5 +1985,7 @@ document.querySelectorAll('.week-nav-item').forEach(item => {
 });
 
 </script>
+<div style="text-align:center;padding:1.2rem;font:13px/1.6 system-ui,sans-serif;color:#555;border-top:1px solid #ddd">Powered by <a href="https://neuromatrixbiosystems.com" style="color:#006847;font-weight:600;text-decoration:none">NeuroMatrix Biosystems</a> · 2026<br>Course developer: Adebimpe-John Omolola · <a href="https://neuromatrixbiosystems.com" style="color:#006847;text-decoration:none">neuromatrixbiosystems.com</a></div>
+<script>window.addEventListener('load',function(){var m=(location.hash||'').match(/Week(\d+)/i);if(m&&typeof showSection==='function'){try{showSection('w'+parseInt(m[1],10));}catch(e){}}});</script>
 </body>
 </html>
