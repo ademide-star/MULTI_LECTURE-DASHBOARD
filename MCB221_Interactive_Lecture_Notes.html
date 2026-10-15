@@ -1577,7 +1577,7 @@ const NM_SB_URL = 'https://ieqfdehnsggdaiiftsvm.supabase.co';
 const NM_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllcWZkZWhuc2dnZGFpaWZ0c3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzk4MjcsImV4cCI6MjA5NzY1NTgyN30.2L4Fvbfr-y8KpSao3cjmhoDeiniaeSQ6AIqo_E0aAX4';
 const NM_TABLE = 'portal_data';
 const NM_REST = NM_SB_URL + '/rest/v1/' + NM_TABLE;
-const NM_AQ = '?apikey=' + NM_SB_KEY;
+const NM_AQ = ''; // the key is sent in the request headers (NM_RH); appending it to the URL broke every request
 const NM_RH = { 'apikey': NM_SB_KEY, 'Authorization': 'Bearer ' + NM_SB_KEY };
 const NM_WH = { ...NM_RH, 'Content-Type': 'application/json' };
 const NM_COURSE_CODE = "MCB221";
@@ -1654,9 +1654,24 @@ async function nmSubmitClasswork(weekNum, student, answerLog, autoScore, autoTot
     ts: new Date().toISOString()
   };
   const subKey = `nm_cw_${NM_COURSE_CODE}_${nmWeekLabel(weekNum)}_${student.matric}`;
-  await nmSbSet(subKey, submission);
+  const ok = await nmSbSet(subKey, submission);
+  if (!ok) {
+    try { const q = JSON.parse(localStorage.getItem('nm_pending') || '{}'); q[subKey] = submission; localStorage.setItem('nm_pending', JSON.stringify(q)); } catch (e) {}
+    submission._saved = false;
+  }
   return submission;
 }
+
+
+// Retry any result that could not reach the portal yet
+async function nmFlush() {
+  try {
+    const q = JSON.parse(localStorage.getItem('nm_pending') || '{}');
+    for (const k of Object.keys(q)) { if (await nmSbSet(k, q[k])) delete q[k]; }
+    localStorage.setItem('nm_pending', JSON.stringify(q));
+  } catch (e) {}
+}
+window.addEventListener('load', () => { nmFlush(); setInterval(nmFlush, 20000); });
 
 // ═══════════════════════════════════════════════════════════
 // FLASHCARD ENGINE — 30 seconds per question, forward-only, one attempt
@@ -1845,6 +1860,7 @@ function fcResultView(sub) {
     <div class="fc-result-score">${sub.score ?? sub.auto_score}/${sub.total ?? sub.auto_total}</div>
     <div class="fc-result-pct">${pct}%</div>
     <p class="fc-result-note">Submitted ${new Date(sub.ts).toLocaleString()} · Visible on your student portal progress page.</p>
+    ${sub._saved === false ? '<p class="fc-result-note" style="color:#b00020;font-weight:700">⚠ Your score could not reach the portal yet. Keep this page open with internet on; it will retry automatically.</p>' : ''}
   </div>`;
 }
 
