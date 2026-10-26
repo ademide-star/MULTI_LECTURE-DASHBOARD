@@ -38,8 +38,8 @@ textarea{min-height:90px;resize:vertical}label{font-size:.8rem;font-weight:600;c
 <div id="err"></div><nav id="nav"></nav><main id="app"></main><footer id="ft"></footer>
 <script>
 /* ===== CONFIG: Supabase (table portal_data with columns key text primary, value text, ts bigint) ===== */
-const SB_URL='https://ieqfdehnsggdaiiftsvm.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllcWZkZWhuc2dnZGFpaWZ0c3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzk4MjcsImV4cCI6MjA5NzY1NTgyN30.2L4Fvbfr-y8KpSao3cjmhoDeiniaeSQ6AIqo_E0aAX4';
+const SB_URL='https://ugomtrszachrzalsattr.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnb210cnN6YWNocnphbHNhdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDc4MDQsImV4cCI6MjA5Nzg4MzgwNH0.y4VIaPhtp4hUDCMMlDnH8bzIIrI2_pazuYwAzlNMQ80';
 const NOTES_BASE=c=>`https://neuromatrixbiosystems.com/${c}_Interactive_Lecture_Notes#`;
 /* ===== DATA LAYER: one row per record, so simultaneous students never overwrite each other ===== */
 const REST=SB_URL+'/rest/v1/portal_data',H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'},LS='lms_cache';
