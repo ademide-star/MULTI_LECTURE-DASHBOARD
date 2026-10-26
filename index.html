@@ -38,19 +38,22 @@ textarea{min-height:90px;resize:vertical}label{font-size:.8rem;font-weight:600;c
 <div id="err"></div><nav id="nav"></nav><main id="app"></main><footer id="ft"></footer>
 <script>
 /* ===== CONFIG: Supabase (table portal_data with columns key text primary, value text, ts bigint) ===== */
-const SB_URL='https://ugomtrszachrzalsattr.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnb210cnN6YWNocnphbHNhdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDc4MDQsImV4cCI6MjA5Nzg4MzgwNH0.y4VIaPhtp4hUDCMMlDnH8bzIIrI2_pazuYwAzlNMQ80';
+const SB_URL='https://ieqfdehnsggdaiiftsvm.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImllcWZkZWhuc2dnZGFpaWZ0c3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNzk4MjcsImV4cCI6MjA5NzY1NTgyN30.2L4Fvbfr-y8KpSao3cjmhoDeiniaeSQ6AIqo_E0aAX4';
 const NOTES_BASE=c=>`https://neuromatrixbiosystems.com/${c}_Interactive_Lecture_Notes#`;
 /* ===== DATA LAYER: one row per record, so simultaneous students never overwrite each other ===== */
 const REST=SB_URL+'/rest/v1/portal_data',H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'},LS='lms_cache';
 let D={};try{D=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
 const cache=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch(e){}};
+const nm_=m=>String(m||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const R=p=>Object.entries(D).filter(([k])=>k.startsWith(p)).map(([,v])=>v);
-function sync(ok,msg){const e=document.getElementById('err'),s=document.getElementById('sy');if(s)s.textContent=ok?'● Synced':'● Offline';e.style.display=ok?'none':'block';e.textContent=msg||''}
-async function put(k,v){D[k]=v;cache();try{const r=await fetch(REST+'?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:JSON.stringify(v),ts:Date.now()})});if(!r.ok)throw r.status}catch(e){sync(false,'Could not save to the cloud (error '+e+'). Check your connection and the portal_data table policies in Supabase.')}}
+let LAST='';function sync(ok,msg){const e=document.getElementById('err'),s=document.getElementById('sy');if(ok)LAST=new Date().toLocaleTimeString();if(s){const n=Object.keys(D).filter(k=>k.startsWith('nm_cw_')&&D[k]&&D[k].matric).length;s.textContent=ok?`● Synced ${LAST} · ${n} classwork result${n==1?'':'s'}`:'● Offline';s.style.cursor='pointer';s.title='Click to sync now';s.onclick=()=>tick()}e.style.display=ok?'none':'block';e.textContent=msg||''}
+let PEND={};try{PEND=JSON.parse(localStorage.getItem('lms_pending')||'{}')}catch(e){}
+const savePend=()=>{try{localStorage.setItem('lms_pending',JSON.stringify(PEND))}catch(e){}};
+async function put(k,v){D[k]=v;cache();try{const r=await fetch(REST+'?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:JSON.stringify(v),ts:Date.now()})});if(!r.ok)throw r.status;if(PEND[k]){delete PEND[k];savePend()}}catch(e){PEND[k]=v;savePend();sync(false,'Could not reach the cloud ('+e+'). Your change is saved on this device and will be sent when the connection returns.')}}
 async function del(k){delete D[k];cache();try{await fetch(REST+'?key=eq.'+encodeURIComponent(k),{method:'DELETE',headers:H})}catch(e){}}
-async function pull(){let all=[],off=0;for(;;){const r=await fetch(REST+`?select=key,value&or=(key.like.lms_*,key.like.nm_cw_*)&limit=1000&offset=${off}`,{headers:H});if(!r.ok)throw r.status;const b=await r.json();all=all.concat(b);if(b.length<1000)break;off+=1000}
- const n={};all.forEach(x=>{try{n[x.key]=JSON.parse(x.value)}catch(e){}});const ch=JSON.stringify(n)!==JSON.stringify(D);D=n;cache();return ch}
+async function pull(){let all=[],off=0;for(;;){const r=await fetch(REST+`?select=key,value&or=(key.like.lms_*,key.like.nm_cw_*)&order=key.asc&limit=1000&offset=${off}`,{headers:H});if(!r.ok)throw r.status;const b=await r.json();all=all.concat(b);if(b.length<1000)break;off+=1000}
+ const n={};all.forEach(x=>{try{n[x.key]=JSON.parse(x.value)}catch(e){}});const ch=JSON.stringify(n)!==JSON.stringify(D);D=n;Object.assign(D,PEND);cache();return ch}
 /* ===== APP ===== */
 /* ===== BRAND: put your logo file URL in LOGO_URL (for example https://neuromatrixbiosystems.com/logo.png); until then a built-in mark is used ===== */
 const LOGO_URL='',AUTHOR='Adebimpe-John Omolola',SITE='https://neuromatrixbiosystems.com';
@@ -73,7 +76,8 @@ const vLogin=()=>`<div class=login><div class=hero><h2>Sikiru Adetona College of
 function stuLogin(){const n=$('sn').value.trim(),m=$('sm').value.trim();if(!n||!m)return alert('Enter your name and matric number.');try{localStorage.setItem('lms_user',JSON.stringify({name:n,matric:m}))}catch(e){}go('dash',{role:'student',name:n,matric:m})}
 function lecLogin(){const c=$('lc').value;if($('lp').value!==(D['lms_pw_'+c]?.pw||'admin123'))return $('le').textContent='Wrong password. Check it and try again.';go('course',{role:'lect',code:c,tab:'lecture'})}
 function logout(){try{localStorage.removeItem('lms_user')}catch(e){}go('login',{role:null,name:'',matric:''})}
-const attCount=(c,m)=>W.filter((w,i)=>D[`lms_att_${c}_W${i+1}_${mk(m)}`]).length;
+const attHas=(c,i,m)=>R(`lms_att_${c}_W${i}_`).some(r=>nm_(r.matric)==nm_(m));
+const attCount=(c,m)=>W.filter((w,i)=>attHas(c,i+1,m)).length;
 function vDash(){const list=L()?C.filter(c=>c[0]==S.code):C;
  return `<h1>Hi, ${L()?'Lecturer':esc(S.name.split(' ')[0])}! 👋</h1><h3>Course overview</h3><div class=grid>${list.map(c=>{const i=C.indexOf(c),n=L()?0:attCount(c[0],S.matric);return `<div class="card cc" tabindex=0 onclick="go('course',{code:'${c[0]}',tab:'lecture'})" onkeydown="if(event.key=='Enter')this.click()"><div class=top style="background:linear-gradient(135deg,${COL[i]},#0008),${COL[i]}">${c[0]}</div><div class=bd><b>${c[1]}</b><span class=mut style="display:block">${AUTHOR}</span>${L()?'<span class=mut>Manage this course</span>':`<div class=bar><i style="width:${n/W.length*100}%"></i></div><span class=mut>${n} of ${W.length} weeks attended</span>`}</div></div>`}).join('')}</div>`}
 function vCourse(){const T=[['lecture','Lecture'],['att','Attendance'],['cw','Classwork'],['mst','Mid-semester test'],['disc','Discussion'],['ann','Announcements']];T.push(L()?['grades','Grades & export']:['prog','My progress']);
@@ -97,18 +101,27 @@ function saveSet(){put('lms_url_'+S.code,{url:$('nu').value.trim()||NOTES_BASE(S
 /* Attendance */
 function tAtt(){const k=K(),open=D['lms_atts_'+k]?.open,recs=R(`lms_att_${k}_`).sort((a,b)=>a.ts-b.ts);
  if(L())return chips()+`<div class=card><h3>${S.week} <span class="pill ${open?'on':''}">${open?'Open':'Closed'}</span></h3><button class=btn onclick=togAtt()>${open?'Close':'Open'} attendance</button></div><div class=card><h3>Present (${recs.length})</h3>${recs.length?table(['#','Name','Matric','Time'],recs.map((r,i)=>[i+1,r.name,r.matric,new Date(r.ts).toLocaleTimeString()])):'<p class=mut>No one has marked attendance yet.</p>'}</div>`;
- const me=D[`lms_att_${k}_${mk(S.matric)}`];return chips()+`<div class=card>${me?'<div class="al ok">✅ You are marked present.</div>':open?'<button class=btn onclick=mark()>Mark me present</button>':'<div class=al>🔒 Attendance is closed for this week.</div>'}</div>`}
+ const me=R(`lms_att_${k}_`).find(r=>nm_(r.matric)==nm_(S.matric));return chips()+`<div class=card>${me?'<div class="al ok">✅ You are marked present.</div>':open?'<button class=btn onclick=mark()>Mark me present</button>':'<div class=al>🔒 Attendance is closed for this week.</div>'}</div>`}
 function togAtt(){put('lms_atts_'+K(),{open:!D['lms_atts_'+K()]?.open});render()}
 function mark(){if(!D['lms_atts_'+K()]?.open)return;put(`lms_att_${K()}_${mk(S.matric)}`,{name:S.name,matric:S.matric,ts:Date.now()});render()}
 /* Classwork: taken inside the Interactive Notes, results land here */
 const fk=s=>String(s).replace(/[\/\.#\$\[\]\s]/g,'__'),cwSt=(c,i)=>fk(`nm_cw_status_${c}_Week ${i}`),cwSub=(c,i,m)=>fk(`nm_cw_${c}_Week ${i}_${m}`);
 function notesUrl(n){const base=D['lms_url_'+S.code]?.url||NOTES_BASE(S.code),p=base.split('#')[0];return p+'?n='+encodeURIComponent(S.name||'')+'&m='+encodeURIComponent(S.matric||'')+(n?'#Week'+n:'#')}
+const subOf=(c,i,m)=>R(fk(`nm_cw_${c}_Week ${i}_`)).find(r=>r&&r.matric&&nm_(r.matric)==nm_(m))||D[cwSub(c,i,m)];
+const mstOf=m=>R(`lms_msts_${S.code}_`).find(r=>nm_(r.matric)==nm_(m));
 const cwOpen=(c,i)=>D[cwSt(c,i)]?.is_open===true;
 function tCw(){
- if(!L()){const rows=W.map((w,i)=>{const s=D[cwSub(S.code,i+1,S.matric)],o=cwOpen(S.code,i+1);return `<tr><td>${w}</td><td>${s?'<span class="pill on">Done</span>':o?'<span class="pill on">Open</span>':'<span class=pill>Closed</span>'}</td><td>${s?`<b>${s.score}/${s.total}</b> (${s.pct}%)`:'—'}</td><td>${!s&&o?`<a class="btn s" href="${esc(notesUrl(i+1))}" target=_blank rel=noopener>Start in notes</a>`:''}</td></tr>`}).join('');
+ if(!L()){const rows=W.map((w,i)=>{const s=subOf(S.code,i+1,S.matric),o=cwOpen(S.code,i+1);return `<tr><td>${w}</td><td>${s?'<span class="pill on">Done</span>':o?'<span class="pill on">Open</span>':'<span class=pill>Closed</span>'}</td><td>${s?`<b>${s.score}/${s.total}</b> (${s.pct}%)`:'—'}</td><td>${!s&&o?`<a class="btn s" href="${esc(notesUrl(i+1))}" target=_blank rel=noopener>Start in notes</a>`:''}</td></tr>`}).join('');
   return `<div class=card><h3>Classwork results</h3><p class=mut>Classwork is taken inside the Interactive Lecture Notes once your lecturer opens it. Your score appears here after you submit.</p><div class=tw><table><tr><th>Week</th><th>Status</th><th>Score</th><th></th></tr>${rows}</table></div></div>`}
  const n=W.indexOf(S.week)+1,o=cwOpen(S.code,n),subs=R(fk(`nm_cw_${S.code}_Week ${n}_`)).sort((a,b)=>String(a.ts).localeCompare(b.ts));
- return chips()+`<div class=card><h3>Access for ${S.week} <span class="pill ${o?'on':''}">${o?'Open':'Closed'}</span></h3><p class=mut>Students can only start this week's classwork in the notes while it is open.</p><button class=btn onclick="togGate(${n})">${o?'Close':'Open'} classwork</button></div><div class=card><h3>Results (${subs.length})</h3>${subs.length?table(['Name','Matric','Score','%','Submitted'],subs.map(s=>[s.name,s.matric,s.score+'/'+s.total,s.pct+'%',new Date(s.ts).toLocaleString()])):'<p class=mut>No submissions yet.</p>'}</div>`}
+ return chips()+`<div class=card><h3>Access for ${S.week} <span class="pill ${o?'on':''}">${o?'Open':'Closed'}</span></h3><p class=mut>Students can only start this week's classwork in the notes while it is open.</p><button class=btn onclick="togGate(${n})">${o?'Close':'Open'} classwork</button></div><div class=card><h3>Results (${subs.length})</h3>${subs.length?table(['Name','Matric','Score','%','Submitted'],subs.map(s=>[s.name,s.matric,s.score+'/'+s.total,s.pct+'%',new Date(s.ts).toLocaleString()])):'<p class=mut>No submissions yet.</p>'}</div>${allCw()}${diagCard()}`}
+function allCw(){const pre=fk(`nm_cw_${S.code}_Week`),rows=Object.entries(D).filter(([k,v])=>k.startsWith(pre)&&v&&v.matric&&v.score!==undefined).map(([k,v])=>[+((k.match(/Week__(\d+)_/)||[])[1]||0),v]).sort((a,b)=>a[0]-b[0]||String(a[1].name).localeCompare(b[1].name));return `<div class=card><h3>All classwork results for ${S.code} (${rows.length})</h3><p class=mut>Every result found in the database, for all weeks.</p>${rows.length?table(['Week','Name','Matric','Score','%'],rows.map(([w,v])=>[w||'?',v.name,v.matric,v.score+'/'+v.total,v.pct+'%'])):'<p class=mut>None found. If students say they submitted, run the database check below.</p>'}</div>`}
+function diagCard(){return `<div class=card><h3>Database check</h3><p class=mut>Tests that this portal can save to and read from your database, and counts what is stored.</p><button class=btn onclick=runDiag()>Run check</button><pre id=dg class=pre style="margin-top:.8rem;font-size:.82rem"></pre></div>`}
+async function runDiag(){const o=document.getElementById('dg');const out=m=>{o.textContent+=m+'\n'};o.textContent='';
+ try{const k='lms_diag_'+S.code,w=await fetch(REST+'?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:JSON.stringify({t:Date.now()}),ts:Date.now()})});out('Write test: '+(w.ok?'OK':'FAILED HTTP '+w.status+' '+(await w.text()).slice(0,200)));
+  const r=await fetch(REST+'?select=key&key=eq.'+k,{headers:H});out('Read test: '+(r.ok?'OK ('+(await r.json()).length+' row)':'FAILED HTTP '+r.status));
+  const c=await fetch(REST+'?select=key&key=like.nm_cw_*&limit=1000',{headers:H});if(c.ok){const ks=(await c.json()).map(x=>x.key);out('Classwork rows in database (all courses): '+ks.filter(x=>/^nm_cw_[A-Z]+\d+_Week/.test(x)).length);out('Rows for '+S.code+': '+ks.filter(x=>x.startsWith('nm_cw_'+S.code+'_Week')).length);out('Sample keys: '+ks.filter(x=>x.startsWith('nm_cw_'+S.code+'_Week')).slice(0,3).join(' | '))}else out('Classwork count FAILED HTTP '+c.status+' '+(await c.text()).slice(0,200));
+ }catch(e){out('Could not reach the database: '+e)}}
 function togGate(n){const k=cwSt(S.code,n);put(k,{is_open:!cwOpen(S.code,n),opened:true,release_answers:false});render()}
 /* Discussion board */
 const who=p=>`${esc(p.author)}${p.role=='lect'?' <span class="pill on">Lecturer</span>':''} · ${new Date(p.ts).toLocaleString()}`;
@@ -128,7 +141,7 @@ const T={on:false,iv:null};
 const MQ=()=>({open:false,mins:30,qs:[],...(D['lms_mstq_'+S.code]||{})});
 const mstKey=m=>`lms_msts_${S.code}_${mk(m)}`,stKey=()=>`lms_mstStart_${S.code}_${mk(S.matric)}`;
 function tMst(){const X=MQ();
- if(!L()){const s=D[mstKey(S.matric)];
+ if(!L()){const s=mstOf(S.matric);
   if(s)return `<div class=card><div class="al ok">✅ Submitted ${new Date(s.ts).toLocaleString()}</div><h3 style="margin-top:.8rem">Score: ${s.score}/${s.total} (${s.pct}%)</h3></div>`;
   if(!X.open||!X.qs.length)return `<div class=card><div class=al>🔒 The mid-semester test is not open.</div></div>`;
   let st=0;try{st=+localStorage.getItem(stKey())||0}catch(e){}
@@ -145,12 +158,12 @@ function mstClear(){if(confirm('Delete all test questions?')){put('lms_mstq_'+S.
 function mstBulk(){const X=MQ(),qs=X.qs.slice();let n=0;$('mb').value.split(/\n(?=MCQ:)/i).forEach(b=>{const ls=b.split('\n').map(x=>x.trim()).filter(Boolean);if(!/^MCQ:/i.test(ls[0]||''))return;const q=ls[0].slice(4).trim(),o=[];let a=-1;ls.slice(1).forEach(l=>{const m=l.match(/^([A-D])[.)]\s*(.+)/i);if(m)o[m[1].toUpperCase().charCodeAt(0)-65]=m[2];else if(/^correct:/i.test(l))a=l.split(':')[1].trim().toUpperCase().charCodeAt(0)-65});if(q&&o.length==4&&o.every(Boolean)&&a>=0&&a<4){qs.push({q,o,a});n++}});if(!n)return alert('No valid questions found. Check the format.');put('lms_mstq_'+S.code,{...X,qs});render()}
 function mstBegin(){try{localStorage.setItem(stKey(),Date.now())}catch(e){}render()}
 function mstTick(){const e=document.getElementById('mt');if(!e)return;const r=Math.max(0,Math.round((T.end-Date.now())/1000));e.textContent=String(Math.floor(r/60)).padStart(2,'0')+':'+String(r%60).padStart(2,'0');if(r<=0)mstSubmit(true)}
-function mstSubmit(auto){const X=MQ();if(D[mstKey(S.matric)])return;let sc=0;X.qs.forEach((q,i)=>{const r=document.querySelector(`input[name=m${i}]:checked`);if(r&&+r.value==q.a)sc++});clearInterval(T.iv);T.on=false;try{localStorage.removeItem(stKey())}catch(e){}put(mstKey(S.matric),{name:S.name,matric:S.matric,score:sc,total:X.qs.length,pct:X.qs.length?Math.round(sc/X.qs.length*100):0,ts:Date.now()});render()}
+function mstSubmit(auto){const X=MQ();if(mstOf(S.matric))return;let sc=0;X.qs.forEach((q,i)=>{const r=document.querySelector(`input[name=m${i}]:checked`);if(r&&+r.value==q.a)sc++});clearInterval(T.iv);T.on=false;try{localStorage.removeItem(stKey())}catch(e){}put(mstKey(S.matric),{name:S.name,matric:S.matric,score:sc,total:X.qs.length,pct:X.qs.length?Math.round(sc/X.qs.length*100):0,ts:Date.now()});render()}
 /* Continuous assessment: attendance + classwork + mid-semester test */
 const CFG=()=>({att:5,cw:10,mst:15,...(D['lms_cfg_'+S.code]||{})});
 function calc(){const c=CFG(),n=W.length,heldA=W.filter((w,i)=>D[`lms_atts_${S.code}_W${i+1}`]).length,heldC=W.filter((w,i)=>{const x=D[cwSt(S.code,i+1)];return x&&(x.opened||x.is_open===true)}).length,st={};
- W.forEach((w,i)=>{R(`lms_att_${S.code}_W${i+1}_`).concat(R(fk(`nm_cw_${S.code}_Week ${i+1}_`))).forEach(r=>{if(r.matric)st[mk(r.matric)]={name:r.name,matric:r.matric}})});R(`lms_msts_${S.code}_`).forEach(r=>st[mk(r.matric)]={name:r.name,matric:r.matric});
- const rd=x=>Math.round(x*10)/10,rows=Object.values(st).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{const att=W.map((w,i)=>D[`lms_att_${S.code}_W${i+1}_${mk(s.matric)}`]?1:0),cw=W.map((w,i)=>{const x=D[cwSub(S.code,i+1,s.matric)];return x?x.pct:null}),m=D[mstKey(s.matric)],pres=att.reduce((a,b)=>a+b,0),ap=heldA?Math.min(100,pres/heldA*100):0,cn=Math.max(heldC,cw.filter(x=>x!==null).length),cp=cn?cw.reduce((a,b)=>a+(b||0),0)/cn:0,mp=m?m.pct:0,pa=rd(ap*c.att/100),pc=rd(cp*c.cw/100),pm=rd(mp*c.mst/100);return {...s,att,cw,pres,ap:rd(ap),cp:rd(cp),m,mp,pa,pc,pm,tot:rd(pa+pc+pm)}});
+ W.forEach((w,i)=>{R(`lms_att_${S.code}_W${i+1}_`).concat(R(fk(`nm_cw_${S.code}_Week ${i+1}_`))).forEach(r=>{if(r&&r.matric&&!st[nm_(r.matric)])st[nm_(r.matric)]={name:r.name,matric:r.matric}})});R(`lms_msts_${S.code}_`).forEach(r=>{if(!st[nm_(r.matric)])st[nm_(r.matric)]={name:r.name,matric:r.matric}});
+ const rd=x=>Math.round(x*10)/10,rows=Object.values(st).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{const att=W.map((w,i)=>attHas(S.code,i+1,s.matric)?1:0),cw=W.map((w,i)=>{const x=subOf(S.code,i+1,s.matric);return x?x.pct:null}),m=mstOf(s.matric),pres=att.reduce((a,b)=>a+b,0),ap=heldA?Math.min(100,pres/heldA*100):0,cn=Math.max(heldC,cw.filter(x=>x!==null).length),cp=cn?cw.reduce((a,b)=>a+(b||0),0)/cn:0,mp=m?m.pct:0,pa=rd(ap*c.att/100),pc=rd(cp*c.cw/100),pm=rd(mp*c.mst/100);return {...s,att,cw,pres,ap:rd(ap),cp:rd(cp),m,mp,pa,pc,pm,tot:rd(pa+pc+pm)}});
  return {c,rows,heldA,heldC,n}}
 function tGrades(){const {c,rows,heldA,heldC}=calc(),tot=c.att+c.cw+c.mst;
  return `<div class=card><h3>Continuous assessment weights</h3><p class=mut>Attendance, classwork and the mid-semester test together make up the continuous assessment mark (default 30).</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem"><div><label>Attendance</label><input id=wa type=number min=0 value="${c.att}"></div><div><label>Classwork</label><input id=wc type=number min=0 value="${c.cw}"></div><div><label>Mid-semester test</label><input id=wm type=number min=0 value="${c.mst}"></div></div><button class=btn onclick=saveCfg()>Save weights (total ${tot})</button></div>
@@ -165,12 +178,12 @@ function save1(blob,name){const a=document.createElement('a');a.href=URL.createO
 function dlCsv(){const t=tables().all;save1(new Blob(['\ufeff'+t.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n')],{type:'text/csv'}),`${S.code}_attendance_and_scores.csv`)}
 function dlExcel(){if(typeof XLSX==='undefined'){alert('Excel export did not load, so a CSV was downloaded instead.');return dlCsv()}const t=tables(),wb=XLSX.utils.book_new();[['Summary',t.sum],['Attendance',t.att],['Classwork',t.cw]].forEach(([n,a])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),n));XLSX.writeFile(wb,`${S.code}_attendance_and_scores.xlsx`)}
 /* Student progress */
-function tProg(){const {c,rows,heldA}=calc(),r=rows.find(x=>mk(x.matric)==mk(S.matric)),dp=R(`lms_dp_${S.code}_`).filter(p=>p.matric==S.matric).length,tot=c.att+c.cw+c.mst,
+function tProg(){const {c,rows,heldA}=calc(),r=rows.find(x=>nm_(x.matric)==nm_(S.matric)),dp=R(`lms_dp_${S.code}_`).filter(p=>p.matric==S.matric).length,tot=c.att+c.cw+c.mst,
  k=(h,v,p)=>`<div class=card><h3>${h}</h3><b style="font-size:1.8rem;color:var(--g)">${v}</b>${p!=null?`<div class=bar><i style="width:${Math.min(100,p)}%"></i></div>`:''}</div>`;
  return `<div class=grid>${k('Attendance',(r?r.pres:0)+'/'+heldA+' weeks',r?r.ap:0)}${k('Classwork average',(r?r.cp:0)+'%',r?r.cp:0)}${k('Mid-semester test',r&&r.m?r.m.score+'/'+r.m.total:'—',r&&r.m?r.mp:0)}${k('Continuous assessment',(r?r.tot:0)+' / '+tot,tot?(r?r.tot:0)/tot*100:0)}${k('Discussion posts',dp)}</div><p class=mut>Continuous assessment = attendance (${c.att}) + classwork (${c.cw}) + mid-semester test (${c.mst}).</p>`}
 /* Boot: show cached data instantly, then sync and keep refreshing */
 const busy=()=>T.on||/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)||[...document.querySelectorAll('.kp')].some(x=>x.value);
-async function tick(){try{const ch=await pull();sync(true);if(ch&&S.view!='login'&&!busy())render()}catch(e){sync(false,'Cannot reach the cloud (error '+e+'). Showing saved data.')}}
+async function tick(){const sy=document.getElementById('sy');if(sy)sy.textContent='● Syncing…';try{const ch=await pull();for(const k of Object.keys(PEND))await put(k,PEND[k]);if(Object.keys(PEND).length)sync(false,'Some changes are saved on this device and are still waiting to reach the cloud.');else sync(true);if(ch&&S.view!='login'&&!busy())render()}catch(e){sync(false,'Cannot reach the cloud ('+e+'). Showing saved data. Check the internet connection; if it keeps failing, the Supabase project may be paused.')}}
 $('ft').innerHTML=`<div class=fl>${LOGO(22)} Powered by <a href="${SITE}" target=_blank rel=noopener>NeuroMatrix Biosystems</a> · 2026</div>Developed by ${AUTHOR} · <a href="${SITE}" target=_blank rel=noopener>neuromatrixbiosystems.com</a><br>Sikiru Adetona College of Education, Science and Technology, Omu-Ijebu-Ode`;
 render();tick();setInterval(tick,8000);
 </script></body></html>
