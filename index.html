@@ -1,7 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>NeuroMatrix LMS</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>NeuroMatrix LMS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
 :root{--g:#006847;--g2:#2D5016;--y:#FFB81C;--bg:#f7fafc;--card:#fff;--t:#1d2125;--m:#718096;--b:#e2e8f0;--soft:#f0fff4}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1720;--card:#18222d;--t:#e8eef4;--m:#97a6b6;--b:#2a3846;--soft:#15332a}}
 *{box-sizing:border-box}
@@ -34,9 +39,17 @@ textarea{min-height:90px;resize:vertical}label{font-size:.8rem;font-weight:600;c
 #sy{font-size:.75rem;color:var(--m)}#err{background:#c53030;color:#fff;padding:.5rem 1rem;text-align:center;font-size:.85rem;display:none}
 @media(max-width:720px){.login{grid-template-columns:1fr}nav{gap:.8rem}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style></head><body>
-<div id="err"></div><nav id="nav"></nav><main id="app"></main><footer id="ft"></footer>
-<script>
+</style></head>
+    <body>
+      <div id="err">
+      </div>
+      <nav id="nav">
+      </nav>
+      <main id="app">
+      </main>
+      <footer id="ft">
+      </footer>
+      <script>
 /* ===== CONFIG: Supabase (table portal_data with columns key text primary, value text, ts bigint) ===== */
 const SB_URL='https://ugomtrszachrzalsattr.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnb210cnN6YWNocnphbHNhdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDc4MDQsImV4cCI6MjA5Nzg4MzgwNH0.y4VIaPhtp4hUDCMMlDnH8bzIIrI2_pazuYwAzlNMQ80';
@@ -47,7 +60,7 @@ let D={};try{D=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
 const cache=()=>{try{localStorage.setItem(LS,JSON.stringify(D))}catch(e){}};
 const nm_=m=>String(m||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const R=p=>Object.entries(D).filter(([k])=>k.startsWith(p)).map(([,v])=>v);
-let LAST='';function sync(ok,msg){const e=document.getElementById('err'),s=document.getElementById('sy');if(ok)LAST=new Date().toLocaleTimeString();if(s){const n=Object.keys(D).filter(k=>k.startsWith('nm_cw_')&&D[k]&&D[k].matric).length;s.textContent=ok?`● Synced ${LAST} · ${n} classwork result${n==1?'':'s'} · db ${SB_URL.slice(8,14)}`:'● Offline · db '+SB_URL.slice(8,14);s.style.cursor='pointer';s.title='Click to sync now';s.onclick=()=>tick()}e.style.display=ok?'none':'block';e.textContent=msg||''}
+let LAST='';function sync(ok,msg){const e=document.getElementById('err'),s=document.getElementById('sy');if(ok)LAST=new Date().toLocaleTimeString();if(s){const n=Object.keys(D).filter(k=>k.startsWith('nm_cw_')&&D[k]&&D[k].matric).length;s.textContent=ok?`● Synced ${LAST} · ${n} classwork result${n==1?'':'s'} · db ${SB_URL.slice(8,14)}`:'● Offline · db '+SB_URL.slice(8,14);s.style.cursor='pointer';s.title='Tap to sync now. Automatic full-database polling is disabled to reduce egress.';s.onclick=()=>tick()}e.style.display=ok?'none':'block';e.textContent=msg||''}
 let PEND={};try{PEND=JSON.parse(localStorage.getItem('lms_pending')||'{}')}catch(e){}
 const savePend=()=>{try{localStorage.setItem('lms_pending',JSON.stringify(PEND))}catch(e){}};
 async function put(k,v){D[k]=v;cache();try{const r=await fetch(REST+'?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:JSON.stringify(v),ts:Date.now()})});if(!r.ok)throw r.status;if(PEND[k]){delete PEND[k];savePend()}}catch(e){PEND[k]=v;savePend();sync(false,'Could not reach the cloud ('+e+'). Your change is saved on this device and will be sent when the connection returns.')}}
@@ -79,7 +92,7 @@ function logout(){try{localStorage.removeItem('lms_user')}catch(e){}go('login',{
 const attHas=(c,i,m)=>R(`lms_att_${c}_W${i}_`).some(r=>nm_(r.matric)==nm_(m));
 const attCount=(c,m)=>W.filter((w,i)=>attHas(c,i+1,m)).length;
 function withCode(c,f){const o=S.code;S.code=c;try{return f()}finally{S.code=o}}
-function stuSum(c){return withCode(c,()=>{const {c:cf,rows}=calc(),r=rows.find(x=>nm_(x.matric)==nm_(S.matric));if(!r)return '<div class=mut style="margin-top:.4rem">No scores yet</div>';const done=r.cw.filter(x=>x!==null),last=done.length?r.cw.map((x,i)=>x===null?null:[i+1,x]).filter(Boolean).pop():null;return `<div style="margin-top:.5rem;font-size:.85rem">${last?`📝 Latest classwork (Week ${last[0]}): <b>${last[1]}%</b><br>`:''}📊 Approved classwork avg <b>${r.cp}%</b>${r.m?` · Test <b>${r.m.score}/${r.m.total}</b>`:''}<br>🎯 CA <b>${r.tot}/${cf.att+cf.cw+cf.mst}</b></div>`})}
+function stuSum(c){return withCode(c,()=>{const {c:cf,rows}=calc(),r=rows.find(x=>nm_(x.matric)==nm_(S.matric));if(!r)return '<div class=mut style="margin-top:.4rem">No scores yet</div>';const done=r.cw.filter(x=>x!==null),last=done.length?r.cw.map((x,i)=>x===null?null:[i+1,x]).filter(Boolean).pop():null;return `<div style="margin-top:.5rem;font-size:.85rem">${last?`📝 Latest classwork (Week ${last[0]}): <b>${last[1]}%</b><br>`:''}📊 Classwork avg <b>${r.cp}%</b>${r.m?` · Test <b>${r.m.score}/${r.m.total}</b>`:''}<br>🎯 CA <b>${r.tot}/${cf.att+cf.cw+cf.mst}</b></div>`})}
 function lecSum(c){return withCode(c,()=>{const {rows}=calc(),n=Object.keys(D).filter(k=>k.startsWith(fk('nm_cw_'+c+'_Week'))&&D[k]&&D[k].matric).length;return `<span class=mut>${rows.length} student${rows.length==1?'':'s'} · ${n} classwork result${n==1?'':'s'}</span>`})}
 function vDash(){const list=L()?C.filter(c=>c[0]==S.code):C;
  return `<h1>Hi, ${L()?'Lecturer':esc(S.name.split(' ')[0])}! 👋</h1><h3>Course overview</h3><div class=grid>${list.map(c=>{const i=C.indexOf(c),n=L()?0:attCount(c[0],S.matric);return `<div class="card cc" tabindex=0 onclick="go('course',{code:'${c[0]}',tab:'lecture'})" onkeydown="if(event.key=='Enter')this.click()"><div class=top style="background:linear-gradient(135deg,${COL[i]},#0008),${COL[i]}">${c[0]}</div><div class=bd><b>${c[1]}</b><span class=mut style="display:block">${AUTHOR}</span>${L()?lecSum(c[0]):`<div class=bar><i style="width:${n/W.length*100}%"></i></div><span class=mut>${n} of ${W.length} weeks attended</span>${stuSum(c[0])}`}</div></div>`}).join('')}</div>`}
@@ -113,31 +126,40 @@ function notesUrl(n){const base=D['lms_url_'+S.code]?.url||NOTES_BASE(S.code),p=
 const subOf=(c,i,m)=>R(fk(`nm_cw_${c}_Week ${i}_`)).find(r=>r&&r.matric&&nm_(r.matric)==nm_(m))||D[cwSub(c,i,m)];
 const mstOf=m=>R(`lms_msts_${S.code}_`).find(r=>nm_(r.matric)==nm_(m));
 
-/* Approval records are separate from original student submissions. */
-const reviewKey=(c,i,m)=>`lms_cw_review_${c}_W${i}_${nm_(m)}`;
-const reviewOf=(c,i,m)=>D[reviewKey(c,i,m)]||null;
-const reviewStatus=(c,i,m)=>reviewOf(c,i,m)?.status||'pending';
-const approvedPct=(c,i,m)=>{const a=reviewOf(c,i,m),sub=subOf(c,i,m);if(!sub||a?.status!=='approved'||a.submitted_ts!==sub.ts)return null;return Number.isFinite(+a.pct)?Math.max(0,Math.min(100,+a.pct)):null};
-const reviewLabel=(c,i,m)=>({approved:'Approved',rejected:'Returned for correction',pending:'Awaiting lecturer review'})[reviewStatus(c,i,m)]||'Awaiting lecturer review';
-async function saveReview(week,matric,action){
+/* Classwork marks are stored directly in each student's original submission record. */
+function submissionKeyOf(c,week,matric){
+ const prefix=fk(`nm_cw_${c}_Week ${week}_`);
+ const hit=Object.entries(D).find(([k,v])=>k.startsWith(prefix)&&v&&v.matric&&nm_(v.matric)===nm_(matric));
+ return hit?hit[0]:cwSub(c,week,matric);
+}
+async function saveScore(week,matric){
  if(!L())return alert('Lecturer access required.');
  const sub=subOf(S.code,week,matric);if(!sub)return alert('Submission not found.');
- const scoreInput=document.getElementById('rev_score_'+week+'_'+nm_(matric));
- const commentInput=document.getElementById('rev_comment_'+week+'_'+nm_(matric));
+ const scoreInput=document.getElementById('score_'+week+'_'+nm_(matric));
+ const commentInput=document.getElementById('comment_'+week+'_'+nm_(matric));
  const score=scoreInput?Number(scoreInput.value):Number(sub.score),total=Number(sub.total);
  if(!Number.isFinite(score)||!Number.isFinite(total)||total<=0||score<0||score>total)return alert('Enter a score between zero and the total questions.');
- const prev=reviewOf(S.code,week,matric),now={status:action,score,total,pct:Math.round(score/total*1000)/10,submitted_ts:sub.ts,original_score:sub.score,original_total:sub.total,comment:(commentInput?.value||'').trim(),reviewer_course:S.code,reviewed_at:new Date().toISOString(),history:[...(prev?.history||[]),...(prev?[{status:prev.status,score:prev.score,comment:prev.comment,reviewed_at:prev.reviewed_at}]:[])]};
- const k=reviewKey(S.code,week,matric);
- try{const r=await fetch(REST+'?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:k,value:JSON.stringify(now),ts:Date.now()})});if(!r.ok)throw Error('HTTP '+r.status+' '+(await r.text()).slice(0,120));D[k]=now;cache();render();alert('Review saved to cloud.')}catch(e){alert('Review was NOT saved: '+e+'\nCheck database access.')}}
+ const k=submissionKeyOf(S.code,week,matric),stamp=new Date().toISOString();
+ const now={...sub,original_score:sub.original_score??sub.score,original_total:sub.original_total??sub.total,
+   score,total,pct:Math.round(score/total*1000)/10,lecturer_comment:(commentInput?.value||'').trim(),
+   score_updated_at:stamp,score_history:[...(sub.score_history||[]),{score,total,at:stamp,by:'lecturer'}]};
+ await put(k,now);
+ render();
+ alert(PEND[k]?'Score saved on this device. It will sync when database access returns.':'Score saved directly to the classwork submission.');
+}
 
 const cwOpen=(c,i)=>D[cwSt(c,i)]?.is_open===true;
 function tCw(){
- if(!L()){const rows=W.map((w,i)=>{const week=i+1,s=subOf(S.code,week,S.matric),o=cwOpen(S.code,week),status=s?reviewLabel(S.code,week,S.matric):(o?'Open':'Closed'),a=s?reviewOf(S.code,week,S.matric):null;return `<tr><td>${w}</td><td>${esc(status)}</td><td>${s?`<b>${esc(s.score)}/${esc(s.total)}</b> (${esc(s.pct)}%)`:'—'}</td><td>${a?.status==='approved'?`Official: ${esc(a.score)}/${esc(a.total)}`:s?'Pending approval':o?`<a class="btn s" href="${esc(notesUrl(week))}" target=_blank rel=noopener>Start in notes</a>`:'—'}</td></tr>`}).join('');
- return `<div class=card><h3>Classwork submissions and approval</h3><p class=mut>Scores from interactive notes appear here after successful cloud sync. Only lecturer-approved scores count toward official CA.</p><div class=tw><table><tr><th>Week</th><th>Status</th><th>Submitted score</th><th>Official result</th></tr>${rows}</table></div></div>`}
- const n=W.indexOf(S.week)+1,o=cwOpen(S.code,n),subs=R(fk(`nm_cw_${S.code}_Week ${n}_`)).filter(x=>x&&x.matric&&x.score!==undefined).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
- const reviewRows=subs.map(x=>{const id='rev_'+n+'_'+nm_(x.matric),a=reviewOf(S.code,n,x.matric),v=a?.submitted_ts===x.ts?a:null;return `<tr><td>${esc(x.name)}<div class=mut>${esc(x.matric)}</div></td><td>${esc(x.score)}/${esc(x.total)} (${esc(x.pct)}%)</td><td>${esc(v?.status||'pending')}</td><td><input id="rev_score_${n}_${nm_(x.matric)}" type=number min=0 max="${esc(x.total)}" step=0.1 value="${esc(v?.score??x.score)}" aria-label="Reviewed score"></td><td><input id="rev_comment_${n}_${nm_(x.matric)}" value="${esc(v?.comment||'')}" aria-label="Review comment"></td><td><button class="btn s" onclick="saveReview(${n},${JSON.stringify(x.matric).replace(/"/g,'&quot;')},'approved')">Approve</button> <button class="btn s y" onclick="saveReview(${n},${JSON.stringify(x.matric).replace(/"/g,'&quot;')},'rejected')">Return</button></td></tr>`}).join('');
- return chips()+`<div class=card><h3>Access for ${S.week} <span class="pill ${o?'on':''}">${o?'Open':'Closed'}</span></h3><p class=mut>Open classwork before students attempt it.</p><button class=btn onclick="togGate(${n})">${o?'Close':'Open'} classwork</button></div><div class=card><h3>Review submissions (${subs.length})</h3><p class=mut>Approve or adjust each score. Original scores remain in the submission record. Approval is stored separately.</p>${subs.length?`<div class=tw><table><tr><th>Student</th><th>Submitted</th><th>Review</th><th>Score</th><th>Comment</th><th>Action</th></tr>${reviewRows}</table></div>`:'<p class=mut>No submissions yet.</p>'}</div>${allCw()}${diagCard()}`}
-function allCw(){const pre=fk(`nm_cw_${S.code}_Week`),rows=Object.entries(D).filter(([k,v])=>k.startsWith(pre)&&v&&v.matric&&v.score!==undefined).map(([k,v])=>[+((k.match(/Week__(\d+)_/)||[])[1]||0),v]).sort((a,b)=>a[0]-b[0]||String(a[1].name).localeCompare(b[1].name));return `<div class=card><h3>All classwork submissions for ${S.code} (${rows.length})</h3>${rows.length?table(['Week','Name','Matric','Submitted score','Review'],rows.map(([w,v])=>[w||'?',v.name,v.matric,v.score+'/'+v.total,reviewLabel(S.code,w,v.matric)])):'<p class=mut>None found. Run the database check below.</p>'}</div>`}
+ if(!L()){
+  const rows=W.map((w,i)=>{const week=i+1,sub=subOf(S.code,week,S.matric),open=cwOpen(S.code,week),status=sub?'Saved':(open?'Open':'Closed');
+   return `<tr><td>${w}</td><td>${esc(status)}</td><td>${sub?`<b>${esc(sub.score)}/${esc(sub.total)}</b> (${esc(sub.pct??Math.round(Number(sub.score)/Number(sub.total)*100))}%)`:'—'}</td><td>${sub?'Recorded':open?`<a class="btn s" href="${esc(notesUrl(week))}" target=_blank rel=noopener>Start in notes</a>`:'—'}</td></tr>`}).join('');
+  return `<div class=card><h3>My classwork scores</h3><p class=mut>Classwork scores are recorded directly when submitted and count toward your continuous assessment.</p><div class=tw><table><tr><th>Week</th><th>Status</th><th>Score</th><th>Record</th></tr>${rows}</table></div></div>`;
+ }
+ const n=W.indexOf(S.week)+1,open=cwOpen(S.code,n),subs=R(fk(`nm_cw_${S.code}_Week ${n}_`)).filter(x=>x&&x.matric&&x.score!==undefined).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+ const scoreRows=subs.map(x=>`<tr><td>${esc(x.name)}<div class=mut>${esc(x.matric)}</div></td><td>${esc(x.score)}/${esc(x.total)} (${esc(x.pct??Math.round(Number(x.score)/Number(x.total)*100))}%)</td><td><input id="score_${n}_${nm_(x.matric)}" type=number min=0 max="${esc(x.total)}" step=0.1 value="${esc(x.score)}" aria-label="Classwork score"></td><td><input id="comment_${n}_${nm_(x.matric)}" value="${esc(x.lecturer_comment||'')}" aria-label="Lecturer comment" placeholder="Optional comment"></td><td><button class="btn s" onclick="saveScore(${n},${JSON.stringify(x.matric).replace(/"/g,'&quot;')})">Save score</button></td></tr>`).join('');
+ return chips()+`<div class=card><h3>Access for ${S.week} <span class="pill ${open?'on':''}">${open?'Open':'Closed'}</span></h3><p class=mut>Open classwork before students attempt it.</p><button class=btn onclick="togGate(${n})">${open?'Close':'Open'} classwork</button></div><div class=card><h3>Classwork scores (${subs.length})</h3><p class=mut>Scores are stored directly in each student's original submission. Edit a score if necessary, then select Save score. No separate approval step is required.</p>${subs.length?`<div class=tw><table><tr><th>Student</th><th>Submitted</th><th>Score</th><th>Comment</th><th>Action</th></tr>${scoreRows}</table></div>`:'<p class=mut>No submissions yet.</p>'}</div>${allCw()}${diagCard()}`;
+}
+function allCw(){const pre=fk(`nm_cw_${S.code}_Week`),rows=Object.entries(D).filter(([k,v])=>k.startsWith(pre)&&v&&v.matric&&v.score!==undefined).map(([k,v])=>[+((k.match(/Week__(\d+)_/)||[])[1]||0),v]).sort((a,b)=>a[0]-b[0]||String(a[1].name).localeCompare(String(b[1].name)));return `<div class=card><h3>All classwork submissions for ${S.code} (${rows.length})</h3>${rows.length?table(['Week','Name','Matric','Saved score'],rows.map(([w,v])=>[w||'?',v.name,v.matric,v.score+'/'+v.total])):'<p class=mut>None found. Run the database check below.</p>'}</div>`}
 function diagCard(){return `<div class=card><h3>Database check</h3><p class=mut>Tests that this portal can save to and read from your database, and counts what is stored.</p><button class=btn onclick=runDiag()>Run check</button><pre id=dg class=pre style="margin-top:.8rem;font-size:.82rem"></pre></div>`}
 async function runDiag(){const o=document.getElementById('dg');const out=m=>{o.textContent+=m+'\n'};o.textContent='Project: '+SB_URL+'\n';
  try{for(const [label,k] of [['attendance-type key (lms_)','lms_diag_'+S.code],['classwork-type key (nm_cw_)','nm_cw_diag_'+S.code]]){
@@ -192,11 +214,11 @@ function mstSubmit(auto){const X=MQ();if(mstOf(S.matric))return;let sc=0;X.qs.fo
 const CFG=()=>({att:5,cw:10,mst:15,...(D['lms_cfg_'+S.code]||{})});
 function calc(){const c=CFG(),n=W.length,heldA=W.filter((w,i)=>D[`lms_atts_${S.code}_W${i+1}`]).length,heldC=W.filter((w,i)=>{const x=D[cwSt(S.code,i+1)];return x&&(x.opened||x.is_open===true)}).length,st={};
  W.forEach((w,i)=>{R(`lms_att_${S.code}_W${i+1}_`).concat(R(fk(`nm_cw_${S.code}_Week ${i+1}_`))).forEach(r=>{if(r&&r.matric&&!st[nm_(r.matric)])st[nm_(r.matric)]={name:r.name,matric:r.matric}})});R(`lms_msts_${S.code}_`).forEach(r=>{if(!st[nm_(r.matric)])st[nm_(r.matric)]={name:r.name,matric:r.matric}});
- const rd=x=>Math.round(x*10)/10,rows=Object.values(st).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{const att=W.map((w,i)=>attHas(S.code,i+1,s.matric)?1:0),cw=W.map((w,i)=>{const x=subOf(S.code,i+1,s.matric);return x?approvedPct(S.code,i+1,s.matric):null}),m=mstOf(s.matric),pres=att.reduce((a,b)=>a+b,0),ap=heldA?Math.min(100,pres/heldA*100):0,cn=Math.max(heldC,cw.filter(x=>x!==null).length),cp=cn?cw.reduce((a,b)=>a+(b||0),0)/cn:0,mp=m?m.pct:0,pa=rd(ap*c.att/100),pc=rd(cp*c.cw/100),pm=rd(mp*c.mst/100);return {...s,att,cw,pres,ap:rd(ap),cp:rd(cp),m,mp,pa,pc,pm,tot:rd(pa+pc+pm)}});
+ const rd=x=>Math.round(x*10)/10,rows=Object.values(st).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{const att=W.map((w,i)=>attHas(S.code,i+1,s.matric)?1:0),cw=W.map((w,i)=>{const x=subOf(S.code,i+1,s.matric);return x?Math.max(0,Math.min(100,Number.isFinite(Number(x.pct))?Number(x.pct):(Number(x.total)>0?Number(x.score)/Number(x.total)*100:0))):null}),m=mstOf(s.matric),pres=att.reduce((a,b)=>a+b,0),ap=heldA?Math.min(100,pres/heldA*100):0,cn=Math.max(heldC,cw.filter(x=>x!==null).length),cp=cn?cw.reduce((a,b)=>a+(b||0),0)/cn:0,mp=m?m.pct:0,pa=rd(ap*c.att/100),pc=rd(cp*c.cw/100),pm=rd(mp*c.mst/100);return {...s,att,cw,pres,ap:rd(ap),cp:rd(cp),m,mp,pa,pc,pm,tot:rd(pa+pc+pm)}});
  return {c,rows,heldA,heldC,n}}
 function tGrades(){const {c,rows,heldA,heldC}=calc(),tot=c.att+c.cw+c.mst;
  return `<div class=card><h3>Continuous assessment weights</h3><p class=mut>Attendance, classwork and the mid-semester test together make up the continuous assessment mark (default 30).</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem"><div><label>Attendance</label><input id=wa type=number min=0 value="${c.att}"></div><div><label>Classwork</label><input id=wc type=number min=0 value="${c.cw}"></div><div><label>Mid-semester test</label><input id=wm type=number min=0 value="${c.mst}"></div></div><button class=btn onclick=saveCfg()>Save weights (total ${tot})</button></div>
-<div class=card><h3>Scores for all students (${rows.length})</h3><p class=mut>Attendance is counted over ${heldA} week(s) held and classwork over ${heldC} week(s) opened. Pending classwork contributes zero until approved; missed work also counts as zero.</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem"><button class=btn onclick=dlExcel()>⬇ Download Excel</button><button class="btn y" onclick=dlCsv()>⬇ Download CSV</button></div>${rows.length?table(['Name','Matric','Attendance',`Att /${c.att}`,'Approved classwork %',`CW /${c.cw}`,'MST %',`MST /${c.mst}`,`Total /${tot}`],rows.map(r=>[r.name,r.matric,r.pres+'/'+heldA,r.pa,r.cp+'%',r.pc,r.m?r.mp+'%':'—',r.pm,r.tot])):'<p class=mut>No student activity yet.</p>'}</div>`}
+<div class=card><h3>Scores for all students (${rows.length})</h3><p class=mut>Attendance is counted over ${heldA} week(s) held and classwork over ${heldC} week(s) opened. Submitted classwork scores count directly; missed work also counts as zero.</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem"><button class=btn onclick=dlExcel()>⬇ Download Excel</button><button class="btn y" onclick=dlCsv()>⬇ Download CSV</button></div>${rows.length?table(['Name','Matric','Attendance',`Att /${c.att}`,'Classwork %',`CW /${c.cw}`,'MST %',`MST /${c.mst}`,`Total /${tot}`],rows.map(r=>[r.name,r.matric,r.pres+'/'+heldA,r.pa,r.cp+'%',r.pc,r.m?r.mp+'%':'—',r.pm,r.tot])):'<p class=mut>No student activity yet.</p>'}</div>`}
 function saveCfg(){put('lms_cfg_'+S.code,{att:+$('wa').value||0,cw:+$('wc').value||0,mst:+$('wm').value||0});render()}
 function tables(){const {c,rows,n}=calc(),tot=c.att+c.cw+c.mst,wk=p=>W.map((w,i)=>p+(i+1)),
  sum=[['Name','Matric','Weeks present','Attendance %','Attendance /'+c.att,'Classwork avg %','Classwork /'+c.cw,'MST score','MST %','MST /'+c.mst,'Total /'+tot]].concat(rows.map(r=>[r.name,r.matric,r.pres,r.ap,r.pa,r.cp,r.pc,r.m?r.m.score+'/'+r.m.total:'',r.mp,r.pm,r.tot])),
@@ -209,10 +231,11 @@ function dlExcel(){if(typeof XLSX==='undefined'){alert('Excel export did not loa
 /* Student progress */
 function tProg(){const {c,rows,heldA}=calc(),r=rows.find(x=>nm_(x.matric)==nm_(S.matric)),dp=R(`lms_dp_${S.code}_`).filter(p=>p.matric==S.matric).length,tot=c.att+c.cw+c.mst,
  k=(h,v,p)=>`<div class=card><h3>${h}</h3><b style="font-size:1.8rem;color:var(--g)">${v}</b>${p!=null?`<div class=bar><i style="width:${Math.min(100,p)}%"></i></div>`:''}</div>`;
- return `<div class=grid>${k('Attendance',(r?r.pres:0)+'/'+heldA+' weeks',r?r.ap:0)}${k('Approved classwork CA',(r?r.pc:0)+' / '+c.cw,r?r.cp:0)}${k('Mid-semester test',r&&r.m?r.m.score+'/'+r.m.total:'—',r&&r.m?r.mp:0)}${k('Continuous assessment',(r?r.tot:0)+' / '+tot,tot?(r?r.tot:0)/tot*100:0)}${k('Discussion posts',dp)}</div><p class=mut>Continuous assessment = attendance (${c.att}) + classwork (${c.cw}) + mid-semester test (${c.mst}).</p>`}
+ return `<div class=grid>${k('Attendance',(r?r.pres:0)+'/'+heldA+' weeks',r?r.ap:0)}${k('Classwork CA',(r?r.pc:0)+' / '+c.cw,r?r.cp:0)}${k('Mid-semester test',r&&r.m?r.m.score+'/'+r.m.total:'—',r&&r.m?r.mp:0)}${k('Continuous assessment',(r?r.tot:0)+' / '+tot,tot?(r?r.tot:0)/tot*100:0)}${k('Discussion posts',dp)}</div><p class=mut>Continuous assessment = attendance (${c.att}) + classwork (${c.cw}) + mid-semester test (${c.mst}).</p>`}
 /* Boot: show cached data instantly, then sync and keep refreshing */
 const busy=()=>T.on||/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)||[...document.querySelectorAll('.kp')].some(x=>x.value);
 async function tick(){const sy=document.getElementById('sy');if(sy)sy.textContent='● Syncing…';try{const ch=await pull();for(const k of Object.keys(PEND))await put(k,PEND[k]);if(Object.keys(PEND).length)sync(false,'Some changes are saved on this device and are still waiting to reach the cloud.');else sync(true);if(ch&&S.view!='login'&&!busy())render()}catch(e){sync(false,'Cannot reach the cloud ('+e+'). Showing saved data. Check the internet connection; if it keeps failing, the Supabase project may be paused.')}}
 $('ft').innerHTML=`<div class=fl>${LOGO(22)} Powered by <a href="${SITE}" target=_blank rel=noopener>NeuroMatrix Biosystems</a> · 2026</div>Developed by ${AUTHOR} · <a href="${SITE}" target=_blank rel=noopener>neuromatrixbiosystems.com</a><br>Sikiru Adetona College of Education, Science and Technology, Omu-Ijebu-Ode`;
-render();tick();setInterval(tick,8000);
-</script></body></html>
+render();tick(); // Initial sync only; use the sync indicator for manual refresh.\nwindow.addEventListener('online',()=>tick());
+</script></body>
+    </html>
